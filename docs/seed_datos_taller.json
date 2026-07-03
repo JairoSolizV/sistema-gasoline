@@ -1,0 +1,2150 @@
+{
+  "_meta": {
+    "descripcion": "Seed de datos reales extraido de los Excel del taller (PERSONAL.xlsx). Validado: la suma de CT por modelo coincide con el Excel original.",
+    "moneda": "BOB",
+    "nota_plus": "En estos cortes la fila PLUS venia vacia. Regla de negocio: la cantidad que se paga = suma(corte_por_talla) + suma(plus_por_talla). El PLUS SI se paga.",
+    "nota_normalizacion": "Los nombres de maquinas/procesos vienen crudos del Excel con variantes (over/overlock/overloc, rect/recta, overloc). Conviene normalizarlos a un catalogo limpio."
+  },
+  "configuracion": {
+    "tope_anticipo_advertencia": 2000,
+    "diferencial_maestro_externo": 0.1,
+    "redondeo_decimales": 2,
+    "semana": "lunes a sabado",
+    "dia_anticipo_regular": "sabado",
+    "cierre": "fin de mes; se pagan solo los cortes 100% terminados en el mes"
+  },
+  "operarios_roster": [
+    {
+      "nombre": "RUBEN",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "CHEMA",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "CLARIS",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "PABLO",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "MARIO",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "CARLA",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "ALEX",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "LOREN",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "ROSA",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "TEO",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "JOSE",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "ANDRE",
+      "tipo": "regular",
+      "activo": true
+    },
+    {
+      "nombre": "SEBAS",
+      "tipo": "regular",
+      "activo": true
+    }
+  ],
+  "catalogo_maquinas": [
+    "Plancha",
+    "asegurado",
+    "atraque",
+    "cerradora",
+    "codo",
+    "collareta",
+    "over",
+    "overloc",
+    "overlock",
+    "piquete",
+    "plana",
+    "plancha",
+    "pretina",
+    "rect",
+    "recta",
+    "recta+pres",
+    "tijera"
+  ],
+  "catalogo_procesos": [
+    "1despunte",
+    "2corrida",
+    "3 pinza",
+    "5 pinza",
+    "SOLO",
+    "aleta",
+    "aleta/ciere",
+    "asegurado",
+    "asegurar",
+    "atraque",
+    "boca",
+    "bol latera",
+    "boteado",
+    "caracol",
+    "cerrado",
+    "cintura",
+    "colocado",
+    "contraleta",
+    "corte",
+    "costura",
+    "despunte",
+    "despunte 1",
+    "despunte 2",
+    "despunte 2 solapa",
+    "ensamble",
+    "herraje 1",
+    "herraje 2",
+    "jota",
+    "medio",
+    "overeado",
+    "parchado",
+    "pasador",
+    "pega despunte",
+    "pegado",
+    "pinza",
+    "planchado",
+    "presilla",
+    "pretina",
+    "pretina aseg",
+    "refuerzo",
+    "reloj",
+    "safado",
+    "solapa",
+    "talla",
+    "union",
+    "urlado",
+    "vista"
+  ],
+  "catalogo_piezas": [
+    "2",
+    "ENTREPI",
+    "aleta",
+    "aleta cierre",
+    "aleta cuerp",
+    "aletacierre",
+    "boca bol",
+    "bol",
+    "bol latera",
+    "bolsillo",
+    "bolsillo del",
+    "cierre",
+    "contra",
+    "cuerpo",
+    "del",
+    "delantero",
+    "entrep",
+    "entrep.",
+    "ext tapa",
+    "herraje",
+    "int tapa",
+    "jota",
+    "lateral",
+    "lateral/solapa",
+    "medio",
+    "medio sola",
+    "pequeña",
+    "pinza",
+    "popelina",
+    "pres corta",
+    "pres larga",
+    "presilla",
+    "pretina",
+    "pretina2",
+    "pretineado",
+    "reloj",
+    "short",
+    "sola medio",
+    "solap1",
+    "solap1/shor",
+    "solap2",
+    "solap2/shor",
+    "solapa",
+    "talla",
+    "tapa",
+    "trasero",
+    "vista",
+    "vista Der",
+    "vista cuerpo",
+    "y entrep"
+  ],
+  "catalogo_grupos": [
+    "TRASEROS",
+    "DELANTEROS",
+    "ENSAMBLE",
+    "CERADO",
+    "ACABADO",
+    "PRESILLA",
+    "PARCHE",
+    "ENCAJONADO",
+    "DELANTERO"
+  ],
+  "modelos": [
+    {
+      "nombre": "black DOBLE PRET 06",
+      "version": 1,
+      "tallas": [
+        28,
+        30,
+        32,
+        34,
+        36,
+        38
+      ],
+      "corte_por_talla": [
+        62,
+        62,
+        62,
+        62,
+        62,
+        62
+      ],
+      "plus_por_talla": [],
+      "cantidad_total": 372,
+      "costo_mano_obra_prenda": 8.1,
+      "operaciones": [
+        {
+          "orden": 1,
+          "grupo": "TRASEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pinza",
+          "pieza": "trasero",
+          "ct": 0.15
+        },
+        {
+          "orden": 2,
+          "grupo": "TRASEROS",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "herraje",
+          "ct": 0.2
+        },
+        {
+          "orden": 3,
+          "grupo": "TRASEROS",
+          "n": "3",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "trasero",
+          "ct": 0.3
+        },
+        {
+          "orden": 4,
+          "grupo": "TRASEROS",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 5,
+          "grupo": "TRASEROS",
+          "n": "5",
+          "equipo": "plancha",
+          "proceso": "planchado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 6,
+          "grupo": "TRASEROS",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "bolsillo",
+          "ct": 0.5
+        },
+        {
+          "orden": 7,
+          "grupo": "DELANTEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "talla",
+          "ct": 0.05
+        },
+        {
+          "orden": 8,
+          "grupo": "DELANTEROS",
+          "n": "2",
+          "equipo": "over",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.1
+        },
+        {
+          "orden": 9,
+          "grupo": "DELANTEROS",
+          "n": "3",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "boca bol",
+          "ct": 0.1
+        },
+        {
+          "orden": 10,
+          "grupo": "DELANTEROS",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "presilla",
+          "pieza": "bol",
+          "ct": 0.2
+        },
+        {
+          "orden": 11,
+          "grupo": "DELANTEROS",
+          "n": "5",
+          "equipo": "Plancha",
+          "proceso": "bol latera",
+          "pieza": null,
+          "ct": 0.2
+        },
+        {
+          "orden": 12,
+          "grupo": "DELANTEROS",
+          "n": "7.1",
+          "equipo": "recta+pres",
+          "proceso": "parchado",
+          "pieza": "bol latera",
+          "ct": 0.3
+        },
+        {
+          "orden": 13,
+          "grupo": "DELANTEROS",
+          "n": "7.2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "int tapa",
+          "ct": 0.1
+        },
+        {
+          "orden": 14,
+          "grupo": "DELANTEROS",
+          "n": "8.1",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "ext tapa",
+          "ct": 0.1
+        },
+        {
+          "orden": 15,
+          "grupo": "DELANTEROS",
+          "n": "8.2",
+          "equipo": "recta",
+          "proceso": "talla",
+          "pieza": "cuerpo",
+          "ct": 0.05
+        },
+        {
+          "orden": 16,
+          "grupo": "DELANTEROS",
+          "n": "9",
+          "equipo": "recta+pres",
+          "proceso": "pegado",
+          "pieza": "tapa",
+          "ct": 0.25
+        },
+        {
+          "orden": 17,
+          "grupo": "ENSAMBLE",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "aleta",
+          "ct": 0.05
+        },
+        {
+          "orden": 18,
+          "grupo": "ENSAMBLE",
+          "n": "2",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "contra",
+          "ct": 0.1
+        },
+        {
+          "orden": 19,
+          "grupo": "ENSAMBLE",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "colocado",
+          "pieza": "aleta cierre",
+          "ct": 0.1
+        },
+        {
+          "orden": 20,
+          "grupo": "ENSAMBLE",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "aleta",
+          "ct": 0.1
+        },
+        {
+          "orden": 21,
+          "grupo": "ENSAMBLE",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.1
+        },
+        {
+          "orden": 22,
+          "grupo": "ENSAMBLE",
+          "n": "7",
+          "equipo": "plana",
+          "proceso": "ensamble",
+          "pieza": "delantero",
+          "ct": 0.5
+        },
+        {
+          "orden": 23,
+          "grupo": "CERADO",
+          "n": "1",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "lateral",
+          "ct": 0.4
+        },
+        {
+          "orden": 24,
+          "grupo": "CERADO",
+          "n": "2",
+          "equipo": "rect",
+          "proceso": "despunte",
+          "pieza": "lateral",
+          "ct": 0.3
+        },
+        {
+          "orden": 25,
+          "grupo": "CERADO",
+          "n": "3",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "entrep",
+          "ct": 0.1
+        },
+        {
+          "orden": 26,
+          "grupo": "ACABADO",
+          "n": "1.1",
+          "equipo": "pretina",
+          "proceso": "cintura",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 27,
+          "grupo": "ACABADO",
+          "n": "1.2",
+          "equipo": "pretina",
+          "proceso": "solapa",
+          "pieza": "pretina2",
+          "ct": 0.25
+        },
+        {
+          "orden": 28,
+          "grupo": "ACABADO",
+          "n": "3.1",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 29,
+          "grupo": "ACABADO",
+          "n": "3.2",
+          "equipo": "recta",
+          "proceso": "safado",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 30,
+          "grupo": "ACABADO",
+          "n": "4.1",
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 31,
+          "grupo": "ACABADO",
+          "n": "4.2",
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina2",
+          "ct": 0.1
+        },
+        {
+          "orden": 32,
+          "grupo": "ACABADO",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina2",
+          "ct": 0.15
+        },
+        {
+          "orden": 33,
+          "grupo": "PRESILLA",
+          "n": "1",
+          "equipo": "collareta",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.12
+        },
+        {
+          "orden": 34,
+          "grupo": "PRESILLA",
+          "n": "2",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 35,
+          "grupo": "PRESILLA",
+          "n": "4",
+          "equipo": "atraque",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.24
+        },
+        {
+          "orden": 36,
+          "grupo": "PRESILLA",
+          "n": "5",
+          "equipo": "atraque",
+          "proceso": "pretina",
+          "pieza": "tapa",
+          "ct": 0.06
+        },
+        {
+          "orden": 37,
+          "grupo": "PRESILLA",
+          "n": "6",
+          "equipo": "atraque",
+          "proceso": "atraque",
+          "pieza": "bolsillo",
+          "ct": 0.12
+        },
+        {
+          "orden": 38,
+          "grupo": "PRESILLA",
+          "n": "7",
+          "equipo": "atraque",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.06
+        },
+        {
+          "orden": 39,
+          "grupo": "PARCHE",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "3 pinza",
+          "pieza": "solapa",
+          "ct": 0.15
+        },
+        {
+          "orden": 40,
+          "grupo": "PARCHE",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "asegurar",
+          "pieza": "pinza",
+          "ct": 0.05
+        },
+        {
+          "orden": 41,
+          "grupo": "PARCHE",
+          "n": "4",
+          "equipo": "asegurado",
+          "proceso": "pretina",
+          "pieza": null,
+          "ct": 0.15
+        },
+        {
+          "orden": 42,
+          "grupo": "PARCHE",
+          "n": "5.1",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "solapa",
+          "ct": 0.15
+        },
+        {
+          "orden": 43,
+          "grupo": "PARCHE",
+          "n": "5.2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "solapa",
+          "ct": 0.15
+        },
+        {
+          "orden": 44,
+          "grupo": "PARCHE",
+          "n": "5.3",
+          "equipo": "recta",
+          "proceso": "pretina",
+          "pieza": "pequeña",
+          "ct": 0.05
+        },
+        {
+          "orden": 45,
+          "grupo": "PARCHE",
+          "n": "5.4",
+          "equipo": "recta",
+          "proceso": "pretina aseg",
+          "pieza": "pequeña",
+          "ct": 0.05
+        },
+        {
+          "orden": 46,
+          "grupo": "PARCHE",
+          "n": "5.5",
+          "equipo": "recta",
+          "proceso": "pega despunte",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 47,
+          "grupo": "PARCHE",
+          "n": "5.6",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "sola medio",
+          "ct": 0.15
+        }
+      ]
+    },
+    {
+      "nombre": "black SHORT 16",
+      "version": 1,
+      "tallas": [
+        28,
+        30,
+        32,
+        34,
+        36,
+        38
+      ],
+      "corte_por_talla": [
+        62,
+        62,
+        62,
+        62,
+        62,
+        62
+      ],
+      "plus_por_talla": [],
+      "cantidad_total": 372,
+      "costo_mano_obra_prenda": 5.97,
+      "operaciones": [
+        {
+          "orden": 1,
+          "grupo": "TRASEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pinza",
+          "pieza": "trasero",
+          "ct": 0.15
+        },
+        {
+          "orden": 2,
+          "grupo": "TRASEROS",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "herraje",
+          "ct": 0.2
+        },
+        {
+          "orden": 3,
+          "grupo": "TRASEROS",
+          "n": "3",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "trasero",
+          "ct": 0.3
+        },
+        {
+          "orden": 4,
+          "grupo": "TRASEROS",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 5,
+          "grupo": "TRASEROS",
+          "n": "5",
+          "equipo": "plancha",
+          "proceso": "planchado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 6,
+          "grupo": "TRASEROS",
+          "n": "6",
+          "equipo": "recta",
+          "proceso": "1despunte",
+          "pieza": "bolsillo",
+          "ct": 0.25
+        },
+        {
+          "orden": 7,
+          "grupo": "TRASEROS",
+          "n": "7",
+          "equipo": "recta",
+          "proceso": "2corrida",
+          "pieza": "bolsillo",
+          "ct": 0.25
+        },
+        {
+          "orden": 8,
+          "grupo": "DELANTEROS",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "refuerzo",
+          "pieza": "medio",
+          "ct": 0.1
+        },
+        {
+          "orden": 9,
+          "grupo": "DELANTEROS",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "despunte 2 solapa",
+          "pieza": null,
+          "ct": 0.1
+        },
+        {
+          "orden": 10,
+          "grupo": "DELANTEROS",
+          "n": "3",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "solap2",
+          "ct": 0.1
+        },
+        {
+          "orden": 11,
+          "grupo": "DELANTEROS",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "boteado",
+          "pieza": "solap1",
+          "ct": 0.1
+        },
+        {
+          "orden": 12,
+          "grupo": "DELANTEROS",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "boteado",
+          "pieza": "solap2",
+          "ct": 0.1
+        },
+        {
+          "orden": 13,
+          "grupo": "DELANTEROS",
+          "n": "7",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "solap1/shor",
+          "ct": 0.1
+        },
+        {
+          "orden": 14,
+          "grupo": "DELANTEROS",
+          "n": "8",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "solap2/shor",
+          "ct": 0.1
+        },
+        {
+          "orden": 15,
+          "grupo": "ENSAMBLE",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "aleta",
+          "ct": 0.05
+        },
+        {
+          "orden": 16,
+          "grupo": "ENSAMBLE",
+          "n": "2",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "contra",
+          "ct": 0.1
+        },
+        {
+          "orden": 17,
+          "grupo": "ENSAMBLE",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "colocado",
+          "pieza": "aleta cierre",
+          "ct": 0.1
+        },
+        {
+          "orden": 18,
+          "grupo": "ENSAMBLE",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "aleta",
+          "ct": 0.1
+        },
+        {
+          "orden": 19,
+          "grupo": "ENSAMBLE",
+          "n": "6",
+          "equipo": "recta",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.1
+        },
+        {
+          "orden": 20,
+          "grupo": "ENSAMBLE",
+          "n": "7",
+          "equipo": "plana",
+          "proceso": "ensamble",
+          "pieza": "delantero",
+          "ct": 0.5
+        },
+        {
+          "orden": 21,
+          "grupo": "CERADO",
+          "n": "1",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "lateral",
+          "ct": 0.3
+        },
+        {
+          "orden": 22,
+          "grupo": "CERADO",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "lateral",
+          "ct": 0.2
+        },
+        {
+          "orden": 23,
+          "grupo": "CERADO",
+          "n": "3",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "entrep.",
+          "ct": 0.1
+        },
+        {
+          "orden": 24,
+          "grupo": "ACABADO",
+          "n": "1",
+          "equipo": "pretina",
+          "proceso": "cintura",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 25,
+          "grupo": "ACABADO",
+          "n": "2",
+          "equipo": "piquete",
+          "proceso": "safado",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 26,
+          "grupo": "ACABADO",
+          "n": "3.1",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 27,
+          "grupo": "ACABADO",
+          "n": "3.2",
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 28,
+          "grupo": "ACABADO",
+          "n": "3.3",
+          "equipo": "recta",
+          "proceso": "talla",
+          "pieza": "delantero",
+          "ct": 0.05
+        },
+        {
+          "orden": 29,
+          "grupo": "ACABADO",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "boteado",
+          "pieza": "short",
+          "ct": 0.3
+        },
+        {
+          "orden": 30,
+          "grupo": "PRESILLA",
+          "n": "1",
+          "equipo": "collareta",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.15
+        },
+        {
+          "orden": 31,
+          "grupo": "PRESILLA",
+          "n": "2",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 32,
+          "grupo": "PRESILLA",
+          "n": "4",
+          "equipo": "atraque",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.24
+        },
+        {
+          "orden": 33,
+          "grupo": "PRESILLA",
+          "n": "6",
+          "equipo": "atraque",
+          "proceso": "atraque",
+          "pieza": "bolsillo",
+          "ct": 0.12
+        },
+        {
+          "orden": 34,
+          "grupo": "PRESILLA",
+          "n": "7",
+          "equipo": "atraque",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.06
+        }
+      ]
+    },
+    {
+      "nombre": "black SH FALD 20",
+      "version": 1,
+      "tallas": [
+        28,
+        30,
+        32,
+        34,
+        36,
+        38
+      ],
+      "corte_por_talla": [
+        62,
+        62,
+        62,
+        62,
+        62,
+        62
+      ],
+      "plus_por_talla": [],
+      "cantidad_total": 372,
+      "costo_mano_obra_prenda": 7.68,
+      "operaciones": [
+        {
+          "orden": 1,
+          "grupo": "TRASEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pinza",
+          "pieza": "trasero",
+          "ct": 0.15
+        },
+        {
+          "orden": 2,
+          "grupo": "TRASEROS",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "herraje",
+          "ct": 0.2
+        },
+        {
+          "orden": 3,
+          "grupo": "TRASEROS",
+          "n": "3",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "trasero",
+          "ct": 0.3
+        },
+        {
+          "orden": 4,
+          "grupo": "TRASEROS",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 5,
+          "grupo": "TRASEROS",
+          "n": "5.1",
+          "equipo": "plancha",
+          "proceso": "planchado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 6,
+          "grupo": "TRASEROS",
+          "n": "5.2",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "bolsillo",
+          "ct": 0.5
+        },
+        {
+          "orden": 7,
+          "grupo": "DELANTEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "5 pinza",
+          "pieza": "solapa",
+          "ct": 0.25
+        },
+        {
+          "orden": 8,
+          "grupo": "DELANTEROS",
+          "n": "2.1",
+          "equipo": "overlock",
+          "proceso": "union",
+          "pieza": "solapa",
+          "ct": 0.2
+        },
+        {
+          "orden": 9,
+          "grupo": "DELANTEROS",
+          "n": "2.2",
+          "equipo": "recta",
+          "proceso": "refuerzo",
+          "pieza": "cuerpo",
+          "ct": 0.05
+        },
+        {
+          "orden": 10,
+          "grupo": "DELANTEROS",
+          "n": "3.1",
+          "equipo": "over",
+          "proceso": "vista",
+          "pieza": "delantero",
+          "ct": 0.1
+        },
+        {
+          "orden": 11,
+          "grupo": "DELANTEROS",
+          "n": "3.2",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "reloj",
+          "ct": 0.1
+        },
+        {
+          "orden": 12,
+          "grupo": "DELANTEROS",
+          "n": "3.3",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "reloj",
+          "ct": 0.1
+        },
+        {
+          "orden": 13,
+          "grupo": "DELANTEROS",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "boteado",
+          "pieza": "short",
+          "ct": 0.2
+        },
+        {
+          "orden": 14,
+          "grupo": "DELANTEROS",
+          "n": "5",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "solapa",
+          "ct": 0.1
+        },
+        {
+          "orden": 15,
+          "grupo": "DELANTEROS",
+          "n": "7",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "medio sola",
+          "ct": 0.1
+        },
+        {
+          "orden": 16,
+          "grupo": "DELANTEROS",
+          "n": "8",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "vista",
+          "ct": 0.1
+        },
+        {
+          "orden": 17,
+          "grupo": "DELANTEROS",
+          "n": "9.1",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "talla",
+          "ct": 0.05
+        },
+        {
+          "orden": 18,
+          "grupo": "DELANTEROS",
+          "n": "9.2",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "solapa",
+          "ct": 0.15
+        },
+        {
+          "orden": 19,
+          "grupo": "DELANTEROS",
+          "n": "10",
+          "equipo": "recta",
+          "proceso": "boteado",
+          "pieza": "solapa",
+          "ct": 0.2
+        },
+        {
+          "orden": 20,
+          "grupo": "ENSAMBLE",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "aleta",
+          "ct": 0.05
+        },
+        {
+          "orden": 21,
+          "grupo": "ENSAMBLE",
+          "n": "2",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "contra",
+          "ct": 0.1
+        },
+        {
+          "orden": 22,
+          "grupo": "ENSAMBLE",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "colocado",
+          "pieza": "aletacierre",
+          "ct": 0.1
+        },
+        {
+          "orden": 23,
+          "grupo": "ENSAMBLE",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "aleta",
+          "ct": 0.1
+        },
+        {
+          "orden": 24,
+          "grupo": "ENSAMBLE",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.2
+        },
+        {
+          "orden": 25,
+          "grupo": "ENSAMBLE",
+          "n": "7",
+          "equipo": "plana",
+          "proceso": "ensamble",
+          "pieza": "delantero",
+          "ct": 0.7
+        },
+        {
+          "orden": 26,
+          "grupo": "CERADO",
+          "n": "1",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "lateral",
+          "ct": 0.3
+        },
+        {
+          "orden": 27,
+          "grupo": "CERADO",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "despunte",
+          "pieza": "lateral",
+          "ct": 0.2
+        },
+        {
+          "orden": 28,
+          "grupo": "CERADO",
+          "n": "3",
+          "equipo": "overlock",
+          "proceso": "cerrado",
+          "pieza": "entrep",
+          "ct": 0.1
+        },
+        {
+          "orden": 29,
+          "grupo": "ACABADO",
+          "n": "1",
+          "equipo": "pretina",
+          "proceso": "cintura",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 30,
+          "grupo": "ACABADO",
+          "n": "2",
+          "equipo": "piquete",
+          "proceso": "safado",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 31,
+          "grupo": "ACABADO",
+          "n": "3",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 32,
+          "grupo": "ACABADO",
+          "n": null,
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 33,
+          "grupo": "PRESILLA",
+          "n": "1",
+          "equipo": "collareta",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.12
+        },
+        {
+          "orden": 34,
+          "grupo": "PRESILLA",
+          "n": "2",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 35,
+          "grupo": "PRESILLA",
+          "n": "4",
+          "equipo": "atraque",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.24
+        },
+        {
+          "orden": 36,
+          "grupo": "PRESILLA",
+          "n": "5",
+          "equipo": "atraque",
+          "proceso": "reloj",
+          "pieza": "entrep",
+          "ct": 0.03
+        },
+        {
+          "orden": 37,
+          "grupo": "PRESILLA",
+          "n": "6",
+          "equipo": "atraque",
+          "proceso": "atraque",
+          "pieza": "bolsillo",
+          "ct": 0.12
+        },
+        {
+          "orden": 38,
+          "grupo": "PRESILLA",
+          "n": "7",
+          "equipo": "atraque",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.06
+        },
+        {
+          "orden": 39,
+          "grupo": "PARCHE",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "int tapa",
+          "ct": 0.1
+        },
+        {
+          "orden": 40,
+          "grupo": "PARCHE",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "ext tapa",
+          "ct": 0.1
+        },
+        {
+          "orden": 41,
+          "grupo": "PARCHE",
+          "n": "3",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "tapa",
+          "ct": 0.2
+        },
+        {
+          "orden": 42,
+          "grupo": "ENCAJONADO",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "caracol",
+          "pieza": "presilla",
+          "ct": 0.1
+        },
+        {
+          "orden": 43,
+          "grupo": "ENCAJONADO",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 44,
+          "grupo": "ENCAJONADO",
+          "n": "3",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 45,
+          "grupo": "ENCAJONADO",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "atraque",
+          "pieza": "pres larga",
+          "ct": 0.1
+        },
+        {
+          "orden": 46,
+          "grupo": "ENCAJONADO",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "atraque",
+          "pieza": "pres corta",
+          "ct": 0.06
+        }
+      ]
+    },
+    {
+      "nombre": "CRUDO SHORT",
+      "version": 1,
+      "tallas": [
+        28,
+        30,
+        32,
+        34,
+        36,
+        38
+      ],
+      "corte_por_talla": [
+        39,
+        39,
+        39,
+        39,
+        39,
+        39
+      ],
+      "plus_por_talla": [],
+      "cantidad_total": 234,
+      "costo_mano_obra_prenda": 6.29,
+      "operaciones": [
+        {
+          "orden": 1,
+          "grupo": "TRASEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pinza",
+          "pieza": "trasero",
+          "ct": 0.15
+        },
+        {
+          "orden": 2,
+          "grupo": "TRASEROS",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "herraje",
+          "ct": 0.2
+        },
+        {
+          "orden": 3,
+          "grupo": "TRASEROS",
+          "n": "3",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "trasero",
+          "ct": 0.3
+        },
+        {
+          "orden": 4,
+          "grupo": "TRASEROS",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 5,
+          "grupo": "TRASEROS",
+          "n": "5",
+          "equipo": "plancha",
+          "proceso": "planchado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 6,
+          "grupo": "TRASEROS",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "bolsillo",
+          "ct": 0.5
+        },
+        {
+          "orden": 7,
+          "grupo": "DELANTERO",
+          "n": "2",
+          "equipo": "collareta",
+          "proceso": "vista",
+          "pieza": "popelina",
+          "ct": 0.2
+        },
+        {
+          "orden": 8,
+          "grupo": "DELANTERO",
+          "n": "3",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "reloj",
+          "ct": 0.1
+        },
+        {
+          "orden": 9,
+          "grupo": "DELANTERO",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "reloj",
+          "ct": 0.1
+        },
+        {
+          "orden": 10,
+          "grupo": "DELANTERO",
+          "n": "5",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "popelina",
+          "ct": 0.2
+        },
+        {
+          "orden": 11,
+          "grupo": "DELANTERO",
+          "n": "7",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 12,
+          "grupo": "DELANTERO",
+          "n": "8",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "bolsillo del",
+          "ct": 0.2
+        },
+        {
+          "orden": 13,
+          "grupo": "DELANTERO",
+          "n": "9",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "talla",
+          "ct": 0.05
+        },
+        {
+          "orden": 14,
+          "grupo": "DELANTERO",
+          "n": "10",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "popelina",
+          "ct": 0.3
+        },
+        {
+          "orden": 15,
+          "grupo": "ENSAMBLE",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "aleta",
+          "ct": 0.05
+        },
+        {
+          "orden": 16,
+          "grupo": "ENSAMBLE",
+          "n": "2",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "contra",
+          "ct": 0.1
+        },
+        {
+          "orden": 17,
+          "grupo": "ENSAMBLE",
+          "n": "3",
+          "equipo": "recta",
+          "proceso": "colocado",
+          "pieza": "aleta cuerp",
+          "ct": 0.1
+        },
+        {
+          "orden": 18,
+          "grupo": "ENSAMBLE",
+          "n": "4",
+          "equipo": "recta",
+          "proceso": "colocado",
+          "pieza": "cierre",
+          "ct": 0.1
+        },
+        {
+          "orden": 19,
+          "grupo": "ENSAMBLE",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "aleta",
+          "ct": 0.1
+        },
+        {
+          "orden": 20,
+          "grupo": "ENSAMBLE",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.1
+        },
+        {
+          "orden": 21,
+          "grupo": "ENSAMBLE",
+          "n": "7",
+          "equipo": "plana",
+          "proceso": "ensamble",
+          "pieza": "delantero",
+          "ct": 0.5
+        },
+        {
+          "orden": 22,
+          "grupo": "CERADO",
+          "n": "1",
+          "equipo": "overloc",
+          "proceso": "cerrado",
+          "pieza": "lateral",
+          "ct": 0.3
+        },
+        {
+          "orden": 23,
+          "grupo": "CERADO",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "lateral",
+          "ct": 0.2
+        },
+        {
+          "orden": 24,
+          "grupo": "CERADO",
+          "n": "3",
+          "equipo": "overloc",
+          "proceso": "cerrado",
+          "pieza": "entrep",
+          "ct": 0.1
+        },
+        {
+          "orden": 25,
+          "grupo": "ACABADO",
+          "n": "1",
+          "equipo": "pretina",
+          "proceso": "cintura",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 26,
+          "grupo": "ACABADO",
+          "n": "2",
+          "equipo": "piquete",
+          "proceso": "safado",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 27,
+          "grupo": "ACABADO",
+          "n": "3.1",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina",
+          "ct": 0.3
+        },
+        {
+          "orden": 28,
+          "grupo": "ACABADO",
+          "n": "3.2",
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 29,
+          "grupo": "PRESILLA",
+          "n": "1",
+          "equipo": "collareta",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.15
+        },
+        {
+          "orden": 30,
+          "grupo": "PRESILLA",
+          "n": "2",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 31,
+          "grupo": "PRESILLA",
+          "n": "4",
+          "equipo": "atraque",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.3
+        },
+        {
+          "orden": 32,
+          "grupo": "PRESILLA",
+          "n": "5",
+          "equipo": "atraque",
+          "proceso": "reloj",
+          "pieza": "y entrep",
+          "ct": 0.06
+        },
+        {
+          "orden": 33,
+          "grupo": "PRESILLA",
+          "n": "6",
+          "equipo": "atraque",
+          "proceso": "atraque",
+          "pieza": "bolsillo",
+          "ct": 0.12
+        },
+        {
+          "orden": 34,
+          "grupo": "PRESILLA",
+          "n": "7",
+          "equipo": "atraque",
+          "proceso": "jota",
+          "pieza": "delantero",
+          "ct": 0.06
+        }
+      ]
+    },
+    {
+      "nombre": "SHORT 2 PRETIN",
+      "version": 1,
+      "tallas": [
+        28,
+        30,
+        32,
+        34,
+        36,
+        38
+      ],
+      "corte_por_talla": [
+        29,
+        29,
+        29,
+        29,
+        29,
+        29
+      ],
+      "plus_por_talla": [],
+      "cantidad_total": 174,
+      "costo_mano_obra_prenda": 7.18,
+      "operaciones": [
+        {
+          "orden": 1,
+          "grupo": "TRASEROS",
+          "n": "1",
+          "equipo": "recta",
+          "proceso": "pinza",
+          "pieza": "trasero",
+          "ct": 0.15
+        },
+        {
+          "orden": 2,
+          "grupo": "TRASEROS",
+          "n": "2",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "herraje",
+          "ct": 0.2
+        },
+        {
+          "orden": 3,
+          "grupo": "TRASEROS",
+          "n": "3",
+          "equipo": "codo",
+          "proceso": "urlado",
+          "pieza": "trasero",
+          "ct": 0.3
+        },
+        {
+          "orden": 4,
+          "grupo": "TRASEROS",
+          "n": "4",
+          "equipo": "plana",
+          "proceso": "boca",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 5,
+          "grupo": "TRASEROS",
+          "n": "5",
+          "equipo": "plancha",
+          "proceso": "planchado",
+          "pieza": "bolsillo",
+          "ct": 0.2
+        },
+        {
+          "orden": 6,
+          "grupo": "TRASEROS",
+          "n": "6",
+          "equipo": "plana",
+          "proceso": "parchado",
+          "pieza": "bolsillo",
+          "ct": 0.5
+        },
+        {
+          "orden": 7,
+          "grupo": "DELANTEROS",
+          "n": "1",
+          "equipo": "over",
+          "proceso": "overeado",
+          "pieza": "vista Der",
+          "ct": 0.1
+        },
+        {
+          "orden": 8,
+          "grupo": "DELANTEROS",
+          "n": "2",
+          "equipo": "recta",
+          "proceso": "refuerzo",
+          "pieza": "cuerpo",
+          "ct": 0.1
+        },
+        {
+          "orden": 9,
+          "grupo": "DELANTEROS",
+          "n": "3",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "vista cuerpo",
+          "ct": 0.15
+        },
+        {
+          "orden": 10,
+          "grupo": "DELANTEROS",
+          "n": "4",
+          "equipo": "cerradora",
+          "proceso": "herraje 1",
+          "pieza": "del",
+          "ct": 0.1
+        },
+        {
+          "orden": 11,
+          "grupo": "DELANTEROS",
+          "n": "5",
+          "equipo": "cerradora",
+          "proceso": "herraje 2",
+          "pieza": "del",
+          "ct": 0.1
+        },
+        {
+          "orden": 12,
+          "grupo": "DELANTEROS",
+          "n": "7",
+          "equipo": "cerradora",
+          "proceso": "medio",
+          "pieza": "del",
+          "ct": 0.1
+        },
+        {
+          "orden": 13,
+          "grupo": "DELANTEROS",
+          "n": "8",
+          "equipo": "plana",
+          "proceso": "despunte 1",
+          "pieza": "del",
+          "ct": 0.1
+        },
+        {
+          "orden": 14,
+          "grupo": "DELANTEROS",
+          "n": "9",
+          "equipo": "plana",
+          "proceso": "despunte 2",
+          "pieza": "del",
+          "ct": 0.1
+        },
+        {
+          "orden": 15,
+          "grupo": "DELANTEROS",
+          "n": null,
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "medio",
+          "ct": 0.1
+        },
+        {
+          "orden": 16,
+          "grupo": "DELANTEROS",
+          "n": "10",
+          "equipo": "recta",
+          "proceso": "pegado",
+          "pieza": "talla",
+          "ct": 0.05
+        },
+        {
+          "orden": 17,
+          "grupo": "ENSAMBLE",
+          "n": "1",
+          "equipo": "cerradora",
+          "proceso": "medio",
+          "pieza": "delantero",
+          "ct": 0.1
+        },
+        {
+          "orden": 18,
+          "grupo": "ENSAMBLE",
+          "n": "2",
+          "equipo": "plana",
+          "proceso": "despunte",
+          "pieza": "medio",
+          "ct": 0.1
+        },
+        {
+          "orden": 19,
+          "grupo": "ENSAMBLE",
+          "n": "3",
+          "equipo": "over",
+          "proceso": "aleta",
+          "pieza": null,
+          "ct": 0.05
+        },
+        {
+          "orden": 20,
+          "grupo": "ENSAMBLE",
+          "n": "4",
+          "equipo": "over",
+          "proceso": "contraleta",
+          "pieza": null,
+          "ct": 0.1
+        },
+        {
+          "orden": 21,
+          "grupo": "ENSAMBLE",
+          "n": "5",
+          "equipo": "recta",
+          "proceso": "aleta",
+          "pieza": "cierre",
+          "ct": 0.1
+        },
+        {
+          "orden": 22,
+          "grupo": "ENSAMBLE",
+          "n": "6",
+          "equipo": "recta",
+          "proceso": "aleta/ciere",
+          "pieza": "cuerpo",
+          "ct": 0.1
+        },
+        {
+          "orden": 23,
+          "grupo": "ENSAMBLE",
+          "n": "7",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "aleta",
+          "ct": 0.1
+        },
+        {
+          "orden": 24,
+          "grupo": "ENSAMBLE",
+          "n": "8",
+          "equipo": "plana",
+          "proceso": "ensamble",
+          "pieza": "lateral/solapa",
+          "ct": 0.8
+        },
+        {
+          "orden": 25,
+          "grupo": "ENSAMBLE",
+          "n": "9",
+          "equipo": "recta",
+          "proceso": "costura",
+          "pieza": "jota",
+          "ct": 0.1
+        },
+        {
+          "orden": 26,
+          "grupo": "CERADO",
+          "n": "1",
+          "equipo": "overloc",
+          "proceso": "cerrado",
+          "pieza": "lateral",
+          "ct": 0.3
+        },
+        {
+          "orden": 27,
+          "grupo": "CERADO",
+          "n": "2.1",
+          "equipo": "recta",
+          "proceso": "despunte",
+          "pieza": "lateral",
+          "ct": 0.2
+        },
+        {
+          "orden": 28,
+          "grupo": "CERADO",
+          "n": "2.2",
+          "equipo": "recta",
+          "proceso": "solapa",
+          "pieza": "lateral",
+          "ct": 0.2
+        },
+        {
+          "orden": 29,
+          "grupo": "CERADO",
+          "n": "3",
+          "equipo": "overloc",
+          "proceso": "cerrado",
+          "pieza": "entrep",
+          "ct": 0.1
+        },
+        {
+          "orden": 30,
+          "grupo": "ACABADO",
+          "n": "1",
+          "equipo": "pretina",
+          "proceso": "cintura",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 31,
+          "grupo": "ACABADO",
+          "n": "2",
+          "equipo": "piquete",
+          "proceso": "safado",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 32,
+          "grupo": "ACABADO",
+          "n": "3.1",
+          "equipo": "recta",
+          "proceso": "asegurado",
+          "pieza": "pretina",
+          "ct": 0.5
+        },
+        {
+          "orden": 33,
+          "grupo": "ACABADO",
+          "n": "3.2",
+          "equipo": "pretina",
+          "proceso": "solapa",
+          "pieza": "pretineado",
+          "ct": 0.25
+        },
+        {
+          "orden": 34,
+          "grupo": "ACABADO",
+          "n": "3.3",
+          "equipo": "over",
+          "proceso": "union",
+          "pieza": "pretina",
+          "ct": 0.1
+        },
+        {
+          "orden": 35,
+          "grupo": "PRESILLA",
+          "n": "1",
+          "equipo": "collareta",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.15
+        },
+        {
+          "orden": 36,
+          "grupo": "PRESILLA",
+          "n": "2",
+          "equipo": "tijera",
+          "proceso": "corte",
+          "pieza": "presilla",
+          "ct": 0.05
+        },
+        {
+          "orden": 37,
+          "grupo": "PRESILLA",
+          "n": "4",
+          "equipo": "atraque",
+          "proceso": "pasador",
+          "pieza": "presilla",
+          "ct": 0.42
+        },
+        {
+          "orden": 38,
+          "grupo": "PRESILLA",
+          "n": "5",
+          "equipo": "atraque",
+          "proceso": "SOLO",
+          "pieza": "ENTREPI",
+          "ct": 0.03
+        },
+        {
+          "orden": 39,
+          "grupo": "PRESILLA",
+          "n": null,
+          "equipo": "atraque",
+          "proceso": "jota",
+          "pieza": 2,
+          "ct": 0.06
+        },
+        {
+          "orden": 40,
+          "grupo": "PRESILLA",
+          "n": "6",
+          "equipo": "atraque",
+          "proceso": "atraque",
+          "pieza": "bolsillo",
+          "ct": 0.12
+        }
+      ]
+    }
+  ]
+}
