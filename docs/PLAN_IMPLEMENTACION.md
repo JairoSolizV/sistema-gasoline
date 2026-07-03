@@ -120,18 +120,18 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-1.1, CA-1.2 (sumas de CT: 8.10, 5.97, 7.68, 6.29, 7.18).
 
-- [ ] `git init` + `.gitignore` (node_modules, .env, dist) + commit inicial con docs y plan.
-- [ ] Monorepo con workspaces: `shared/` (tipos + Zod + `money.ts` de presentación), `server/`, `client/` (placeholder; se scaffoldea en R2). `.env.example` con `DATABASE_URL`, `DATABASE_URL_TEST`, `ADMIN_PASSWORD`, `JWT_SECRET`.
-- [ ] `docker-compose.yml` con el servicio **postgres** (server y client se agregan al compose en R8; en desarrollo corren con `npm run dev`).
-- [ ] `prisma/schema.prisma` según Anexo B con estos **ajustes documentados** (§6): todos los montos como `Int` en **centavos** (`ct`, `diferencial`, `tarifaEfectiva`, `total`, `monto`, `costoManoObraPrenda`, `saldo*`, `pagado`, `topeAnticipoAdvertencia`, `diferencialMaestroExterno`); `Operacion.n String?` y `CorteOperacion.n String?` (el seed trae 3 operaciones con `n: null`).
-- [ ] `prisma migrate dev` — migración inicial aplicada.
-- [ ] `server/src/lib/money.ts` + `shared/src/money.ts`: `aCentavos("8.10"|8.1|Decimal) → 810` con redondeo **half-up una sola vez** en la frontera de entrada, `formatBs(810) → "8.10"`. Con tests unitarios (incluye negativos: −256.40 ↔ −25640).
-- [ ] Middleware base: `errors.ts` (forma estándar `{ data }` / `{ error: { code, message } }`) y `validate.ts` (Zod contra esquemas de `shared`).
-- [ ] `prisma/seed.ts`: carga el JSON → `Configuracion` (tope 200000, diferencial 10, en centavos), 13 operarios (regulares, activos), 5 modelos con `ModeloVersion` v1 y sus `Operacion` (orden, grupo, n, equipo, proceso, pieza, ct en centavos). Coerciones: `pieza` numérica → string (caso `pieza: 2`), `n: null` → null. Normalización de `equipo` con mapa explícito (`over/overloc/overlock → overlock`, `rect → recta`, `Plancha → plancha`, `recta+pres` se conserva). `costoManoObraPrenda` = Σ ct en centavos. El seed **valida al final** que las sumas den 810/597/768/629/718 y falla ruidosamente si no.
-- [ ] Seed **idempotente** (re-ejecutable sin duplicar: upsert por nombre/versión).
-- [ ] Test `ca-1.1` y `ca-1.2`: leer de la BD seedeada y verificar suma de CT por modelo = 810, 597, 768, 629, 718 centavos y que `black DOBLE PRET 06` tenga 47 operaciones.
-- [ ] `app.ts`/`server.ts` mínimos con `GET /api/v1/health` y el middleware de errores montado.
-- [ ] Actualizar README (docker-compose up postgres, migrar, seedear) y marcar casillas.
+- [x] `git init` + `.gitignore` (node_modules, .env, dist) + commit inicial con docs y plan.
+- [x] Monorepo con workspaces: `shared/` (tipos + Zod + `money.ts` de presentación), `server/`, `client/` (placeholder; se scaffoldea en R2). `.env.example` con `DATABASE_URL`, `DATABASE_URL_TEST`, `ADMIN_PASSWORD`, `JWT_SECRET`.
+- [x] `docker-compose.yml` con el servicio **postgres** (server y client se agregan al compose en R8; en desarrollo corren con `npm run dev`). *En desarrollo se usa el PostgreSQL 18 local ya instalado (5432); el compose expone 5433 para no chocar.*
+- [x] `prisma/schema.prisma` según Anexo B con estos **ajustes documentados** (§6): todos los montos como `Int` en **centavos** (`ct`, `diferencial`, `tarifaEfectiva`, `total`, `monto`, `costoManoObraPrenda`, `saldo*`, `pagado`, `topeAnticipoAdvertencia`, `diferencialMaestroExterno`); `Operacion.n String?` y `CorteOperacion.n String?` (el seed trae 3 operaciones con `n: null`). *Ajuste extra: `Modelo.nombre @unique` para el upsert idempotente del seed.*
+- [x] `prisma migrate dev` — migración inicial aplicada (`20260703234528_init`).
+- [x] `shared/src/money.ts` (re-usada por el server): `aCentavos("8.10"|8.1) → 810` con redondeo **half-up una sola vez** en la frontera de entrada, `formatBs(810) → "8.10"`. Con 9 tests unitarios (incluye negativos −256.40 ↔ −25640 y trampas de float como 1.005).
+- [x] Middleware base: `errors.ts` (forma estándar `{ data }` / `{ error: { code, message } }`) y `validate.ts` (Zod contra esquemas de `shared`).
+- [x] `prisma/seed.ts`: carga el JSON → `Configuracion` (tope 200000, diferencial 10, en centavos), 13 operarios (regulares, activos), 5 modelos con `ModeloVersion` v1 y sus `Operacion` (orden, grupo, n, equipo, proceso, pieza, ct en centavos). Coerciones: `pieza` numérica → string (caso `pieza: 2`), `n: null` → null. Normalización de `equipo` con mapa explícito (`over/overloc/overlock → overlock`, `rect → recta`, `Plancha → plancha`, `recta+pres` se conserva). `costoManoObraPrenda` = Σ ct en centavos. El seed **valida al final** que las sumas den 810/597/768/629/718 y falla ruidosamente si no.
+- [x] Seed **idempotente** (verificado con doble ejecución sobre la BD de desarrollo: la segunda omite y re-valida).
+- [x] Test `ca-1.1` y `ca-1.2`: leer de la BD seedeada y verificar suma de CT por modelo = 810, 597, 768, 629, 718 centavos y que `black DOBLE PRET 06` tenga 47 operaciones. *La suite corre contra `DATABASE_URL_TEST` (global-setup migra y seedea solo).*
+- [x] `app.ts`/`server.ts` mínimos con `GET /api/v1/health` y el middleware de errores montado (smoke test: HTTP 200).
+- [x] Actualizar README (levantar Postgres, migrar, seedear) y marcar casillas.
 
 > Nota: el seed **no** crea cortes. Las cantidades por talla del JSON (372, 234, 174) quedan como fixture de tests y para crear cortes reales desde la UI en la Rebanada 4.
 
