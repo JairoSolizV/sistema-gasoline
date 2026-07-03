@@ -1,0 +1,186 @@
+// Esquema basado en docs/MODELO_DATOS_TALLER.md (Anexo B) con dos ajustes
+// documentados en docs/PLAN_IMPLEMENTACION.md §6:
+//  - Todos los montos son Int en CENTAVOS de Bs (ARQUITECTURA §3.1); se
+//    formatean a Bs solo en presentación. Ej.: ct=15 significa Bs 0.15.
+//  - `n` es opcional: el seed real trae operaciones sin número de paso.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TipoOperario {
+  regular
+  maestro_externo
+}
+
+enum EstadoCorte {
+  borrador
+  abierto
+  cerrado
+}
+
+enum EstadoCorteOp {
+  sin_asignar
+  parcial
+  asignada
+}
+
+enum EstadoPeriodo {
+  abierto
+  cerrado
+}
+
+model Operario {
+  id            String        @id @default(uuid())
+  nombre        String
+  tipo          TipoOperario  @default(regular)
+  activo        Boolean       @default(true)
+  fechaIngreso  DateTime      @default(now())
+  fechaBaja     DateTime?
+  asignaciones  Asignacion[]
+  anticipos     Anticipo[]
+  liquidaciones Liquidacion[]
+}
+
+model Modelo {
+  id        String          @id @default(uuid())
+  nombre    String          @unique
+  activo    Boolean         @default(true)
+  versiones ModeloVersion[]
+}
+
+model ModeloVersion {
+  id                  String      @id @default(uuid())
+  modelo              Modelo      @relation(fields: [modeloId], references: [id])
+  modeloId            String
+  numeroVersion       Int
+  notas               String?
+  // derivado: suma de ct de sus operaciones, en centavos (cacheado al guardar)
+  costoManoObraPrenda Int         @default(0)
+  activa              Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  operaciones         Operacion[]
+  cortes              Corte[]
+
+  @@unique([modeloId, numeroVersion])
+}
+
+model Operacion {
+  id              String           @id @default(uuid())
+  version         ModeloVersion    @relation(fields: [modeloVersionId], references: [id])
+  modeloVersionId String
+  orden           Int
+  grupo           String
+  n               String? // número de paso; sub-pasos como "7.1" → texto; a veces vacío
+  equipo          String
+  proceso         String
+  pieza           String?
+  ct              Int // centavos por pieza
+  copias          CorteOperacion[]
+}
+
+model Corte {
+  id              String           @id @default(uuid())
+  version         ModeloVersion    @relation(fields: [modeloVersionId], references: [id])
+  modeloVersionId String
+  codigo          String?
+  tallas          Json // referencia visual; NO entra al cálculo
+  cortePorTalla   Json
+  plusPorTalla    Json
+  cantidadTotal   Int // = Σ corte_por_talla + Σ plus_por_talla; base de todo el pago
+  estado          EstadoCorte      @default(borrador)
+  fechaInicio     DateTime         @default(now())
+  fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
+  operaciones     CorteOperacion[]
+
+  @@index([estado, fechaCierre])
+}
+
+// Snapshot pagable: copia congelada de una Operacion al abrir el corte.
+// Editar tarifas de la versión NO altera cortes ya creados (CA-1.4).
+model CorteOperacion {
+  id                String        @id @default(uuid())
+  corte             Corte         @relation(fields: [corteId], references: [id])
+  corteId           String
+  operacionOrigen   Operacion?    @relation(fields: [operacionOrigenId], references: [id], onDelete: SetNull)
+  operacionOrigenId String?
+  orden             Int
+  grupo             String
+  n                 String?
+  equipo            String
+  proceso           String
+  pieza             String?
+  ct                Int // centavos, congelado al abrir el corte
+  cantidadObjetivo  Int // lo que debe sumar la asignación (suma exacta)
+  estado            EstadoCorteOp @default(sin_asignar)
+  asignaciones      Asignacion[]
+
+  @@index([corteId, estado])
+}
+
+model Asignacion {
+  id               String         @id @default(uuid())
+  corteOperacion   CorteOperacion @relation(fields: [corteOperacionId], references: [id])
+  corteOperacionId String
+  operario         Operario       @relation(fields: [operarioId], references: [id])
+  operarioId       String
+  cantidad         Int
+  esMaestroExterno Boolean        @default(false)
+  diferencial      Int            @default(0) // centavos; 10 por defecto si maestro externo (editable)
+  tarifaEfectiva   Int // centavos = ct + diferencial
+  total            Int // centavos = cantidad × tarifaEfectiva (aritmética entera exacta)
+
+  @@index([operarioId])
+}
+
+model Anticipo {
+  id         String   @id @default(uuid())
+  operario   Operario @relation(fields: [operarioId], references: [id])
+  operarioId String
+  fecha      DateTime
+  monto      Int // centavos; si supera el tope → advertencia, no bloqueo
+  nota       String?
+
+  @@index([operarioId, fecha])
+}
+
+model Periodo {
+  id            String        @id @default(uuid())
+  anio          Int
+  mes           Int
+  estado        EstadoPeriodo @default(abierto)
+  fechaCierre   DateTime?
+  liquidaciones Liquidacion[]
+
+  @@unique([anio, mes])
+}
+
+model Liquidacion {
+  id             String   @id @default(uuid())
+  periodo        Periodo  @relation(fields: [periodoId], references: [id])
+  periodoId      String
+  operario       Operario @relation(fields: [operarioId], references: [id])
+  operarioId     String
+  saldoEntrada   Int      @default(0) // centavos; arrastre del mes anterior (puede ser negativo)
+  totalGanado    Int      @default(0)
+  totalAnticipos Int      @default(0)
+  saldoPeriodo   Int      @default(0) // = saldoEntrada + totalGanado − totalAnticipos
+  pagado         Int      @default(0)
+  arrastraSaldo  Boolean  @default(false)
+  saldoSalida    Int      @default(0) // 0 si se liquidó todo; pasa a saldoEntrada del siguiente
+
+  @@unique([periodoId, operarioId])
+}
+
+model Configuracion {
+  id                        Int     @id @default(1)
+  topeAnticipoAdvertencia   Int     @default(200000) // centavos (Bs 2000.00)
+  diferencialMaestroExterno Int     @default(10) // centavos (Bs 0.10)
+  redondeoDecimales         Int     @default(2)
+  nombreTaller              String?
+}

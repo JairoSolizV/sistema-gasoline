@@ -1,0 +1,21 @@
+# Ejecución local en la máquina del taller (ARQUITECTURA §9).
+# En desarrollo se puede usar un PostgreSQL local ya instalado (ver README);
+# este compose es la vía "instalar sin pelear con Postgres".
+# El puerto host es 5433 para no chocar con un PostgreSQL local en 5432.
+# Los servicios de server y client se agregan en la Rebanada 8.
+services:
+  postgres:
+    image: postgres:18
+    container_name: taller-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: taller
+      POSTGRES_PASSWORD: taller
+      POSTGRES_DB: taller_pagos
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+volumes:
+  pgdata:

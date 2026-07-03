@@ -1,0 +1,15 @@
+{
+  "name": "sistema-pagos-taller",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sistema de pagos del taller de confección (Fase 1) — panel administrativo",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace @taller/server",
+    "test": "npm run test --workspace @taller/server"
+  }
+}
