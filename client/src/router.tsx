@@ -5,6 +5,9 @@ import { OperariosPage } from './features/operarios/OperariosPage';
 import { ModelosPage } from './features/modelos/ModelosPage';
 import { NuevoModeloPage } from './features/modelos/NuevoModeloPage';
 import { VersionDetallePage } from './features/modelos/VersionDetallePage';
+import { CortesPage } from './features/cortes/CortesPage';
+import { NuevoCortePage } from './features/cortes/NuevoCortePage';
+import { CorteDetallePage } from './features/cortes/CorteDetallePage';
 
 export const router = createBrowserRouter([
   {
@@ -15,7 +18,9 @@ export const router = createBrowserRouter([
       { path: '/modelos', element: <ModelosPage /> },
       { path: '/modelos/nuevo', element: <NuevoModeloPage /> },
       { path: '/modelos/versiones/:versionId', element: <VersionDetallePage /> },
-      { path: '/cortes', element: <EnConstruccion titulo="Cortes" nota="Producción y asignación — Rebanada 4" /> },
+      { path: '/cortes', element: <CortesPage /> },
+      { path: '/cortes/nuevo', element: <NuevoCortePage /> },
+      { path: '/cortes/:corteId', element: <CorteDetallePage /> },
       { path: '/anticipos', element: <EnConstruccion titulo="Anticipos" nota="Rebanada 5" /> },
       { path: '/liquidacion', element: <EnConstruccion titulo="Liquidación" nota="Consolidado y cierre de mes — Rebanada 6" /> },
       { path: '/rendicion', element: <EnConstruccion titulo="Rendición de cuentas" nota="Vista por operario — Rebanada 7" /> },
