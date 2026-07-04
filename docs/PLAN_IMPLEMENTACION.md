@@ -288,7 +288,7 @@ Los 10 invariantes de CLAUDE.md §6 + manejo de dinero. Cada uno con su mecanism
 
 ## 7. Registro de avance
 
-- [ ] Rebanada 1 — Base (monorepo + schema + migración + seed) · verificada CA-1.1, CA-1.2 · OK del dueño
+- [x] Rebanada 1 — Base (monorepo + schema + migración + seed) · verificada CA-1.1, CA-1.2 · OK del dueño ✓
 - [ ] Rebanada 2 — Operarios · verificada CA-8.2 (parte) · OK del dueño
 - [ ] Rebanada 3 — Modelos y versiones · verificadas CA-1.1–1.3 · OK del dueño
 - [ ] Rebanada 4 — Cortes + Asignación · verificadas CA-1.4, CA-2.x, CA-3.x, CA-4.1–4.2, CA-8.1, CA-8.3 · OK del dueño

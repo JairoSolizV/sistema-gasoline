@@ -1,10 +1,4 @@
-// Cliente Prisma apuntado a la BD de TEST para toda la suite.
-import { PrismaClient } from '@prisma/client';
-import { config } from 'dotenv';
-
-config({ path: '.env' });
-
-const url = process.env.DATABASE_URL_TEST;
-if (!url) throw new Error('DATABASE_URL_TEST no definida en server/.env');
-
-export const prisma = new PrismaClient({ datasourceUrl: url });
+// Mismo cliente Prisma que usa la app: bajo Vitest ya apunta a DATABASE_URL_TEST
+// (ver src/lib/prisma.ts). Compartirlo evita dos pools y garantiza que tests y
+// app miran la misma BD.
+export { prisma } from '../../src/lib/prisma.js';
