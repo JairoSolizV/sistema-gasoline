@@ -1,6 +1,7 @@
 import express from 'express';
 import { errorHandler, noEncontrado } from './middleware/errors.js';
 import { operariosRouter } from './modules/operarios/routes.js';
+import { modelosRouter } from './modules/modelos/routes.js';
 
 export function crearApp() {
   const app = express();
@@ -11,6 +12,7 @@ export function crearApp() {
   });
 
   app.use('/api/v1/operarios', operariosRouter);
+  app.use('/api/v1', modelosRouter);
 
   // Las rutas de los módulos se montan aquí, rebanada por rebanada.
 
