@@ -141,12 +141,12 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-8.2 (parte: baja = `activo=false` + `fecha_baja`, nunca DELETE; la conservación de histórico se re-verifica en R4/R6).
 
-- [ ] Scaffold `client/` (Vite + React + TS + Tailwind + TanStack Query + react-hook-form + Router) con layout: sidebar fijo (Inicio, Operarios, Modelos, Cortes, Anticipos, Liquidación, Rendición de cuentas, Configuración) según mockup; estructura `/features`.
-- [ ] `shared`: DTO `OperarioDTO` + esquemas Zod de alta/edición (reusados por el form y el middleware).
-- [ ] API `modules/operarios`: `GET /api/v1/operarios` (filtro activo/todos), `POST /api/v1/operarios`, `GET /api/v1/operarios/:id`, `PATCH /api/v1/operarios/:id` (edición y **baja lógica**: `activo=false` fija `fechaBaja`; reactivar la limpia). **Sin DELETE físico.**
-- [ ] Tests de integración: alta, edición, baja lógica (el registro sigue existiendo y consultable), reactivación.
-- [ ] Feature Operarios: tabla (nombre, tipo, estado, fecha ingreso), formulario de alta/edición (react-hook-form + Zod de `shared`), acción de baja con confirmación; inactivos atenuados con filtro.
-- [ ] Regresión completa + marcar casillas + resumen al dueño.
+- [x] Scaffold `client/` (Vite + React + TS + Tailwind 4 + TanStack Query + react-hook-form + Router) con layout: sidebar fijo (Inicio, Operarios, Modelos, Cortes, Anticipos, Liquidación, Rendición de cuentas, Configuración) según mockup; estructura `/features`. *Proxy `/api` → :3001; `host: true` para acceso por IP local.*
+- [x] `shared`: DTO `OperarioDTO` + esquemas Zod de alta/edición (reusados por el form y el middleware).
+- [x] API `modules/operarios`: `GET /api/v1/operarios` (filtro activo/todos), `POST /api/v1/operarios`, `GET /api/v1/operarios/:id`, `PATCH /api/v1/operarios/:id` (edición y **baja lógica**: `activo=false` fija `fechaBaja`; reactivar la limpia). **Sin DELETE físico.**
+- [x] Tests de integración: alta, edición, baja lógica (el registro sigue existiendo y consultable), reactivación (12 tests; TDD rojo→verde).
+- [x] Feature Operarios: tabla (nombre, tipo, estado, fecha ingreso), formulario de alta/edición (react-hook-form + Zod de `shared`), acción de baja con confirmación; inactivos atenuados con filtro. *Verificado en navegador: alta y baja desde la UI contra la API real.*
+- [x] Regresión completa (31/31 tests + typecheck) + marcar casillas + resumen al dueño.
 
 ### Rebanada 3 — Modelos y versiones
 

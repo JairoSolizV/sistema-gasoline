@@ -38,8 +38,8 @@ Panel web administrativo **local** que calcula cuánto pagar a cada operario seg
    Es idempotente: se puede re-ejecutar sin duplicar datos.
 5. **Levantar la API.** En `server/`: `npm run dev` → `http://localhost:3001/api/v1/health`.
    El server escucha en `0.0.0.0`: las demás máquinas del taller acceden por la IP local del equipo servidor.
-
-El cliente React llega en la Rebanada 2 (este apartado se actualiza con cada rebanada).
+6. **Levantar el panel.** En `client/`: `npm run dev` → `http://localhost:5173`.
+   El panel proxya `/api` hacia la API local, así que basta abrir el navegador.
 
 ## Tests
 
@@ -55,7 +55,7 @@ Los tests están nombrados por criterio de aceptación (`ca-1.test.ts` ↔ CA-1.
 ## Estado (rebanadas)
 
 - [x] **Rebanada 1 — Base**: monorepo, schema Prisma (centavos), migración, seed validado, health.
-- [ ] Rebanada 2 — Operarios
+- [x] **Rebanada 2 — Operarios**: API CRUD con baja lógica + panel React (layout del mockup, tabla y formularios).
 - [ ] Rebanada 3 — Modelos y versiones
 - [ ] Rebanada 4 — Cortes + Asignación
 - [ ] Rebanada 5 — Anticipos

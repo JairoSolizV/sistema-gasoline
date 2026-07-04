@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  /* paleta del mockup */
+  --color-fondo: #eef0f3;
+  --color-tinta: #1a1f27;
+  --color-acento: #2f6fe0;
+  --color-lateral: #111820;
+  --color-ok: #127a45;
+  --color-ok-suave: #e6f4ec;
+  --color-error: #c0362c;
+  --color-error-suave: #fbeceb;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
