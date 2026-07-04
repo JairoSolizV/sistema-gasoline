@@ -154,13 +154,13 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-1.1, CA-1.2 (suma visible en UI, recalculada al editar), CA-1.3 (versionar conserva el original).
 
-- [ ] `shared`: DTOs de modelo/versión/operación + esquemas Zod.
-- [ ] API `modules/modelos`: `GET /api/v1/modelos` (con versiones), `POST /api/v1/modelos` (nombre + operaciones → crea v1), `GET /api/v1/versiones/:id` (detalle con operaciones), `PATCH /api/v1/versiones/:id/operaciones` (alta/edición/borrado de operaciones), `POST /api/v1/modelos/:id/versiones` (copia todas las operaciones de la versión origen → vN+1, la origen queda intacta; transaccional).
-- [ ] `costoManoObraPrenda` se recalcula **en el service, en centavos**, en cada mutación de operaciones.
-- [ ] Test `ca-1.3`: crear v2 de DOBLE PRET, quitar una operación de CT 0.20 → v2 = 790 centavos y v1 sigue en 810.
-- [ ] Tests: crear modelo suma bien; editar CT recalcula; unicidad `(modelo, numero_version)`.
-- [ ] Feature Modelos: lista (nombre, versiones, costo/prenda); detalle de versión con operaciones por grupo (orden, N, equipo, proceso, pieza, CT) y suma de CT en cabecera; formularios de operación; botón "Crear nueva versión" con nota.
-- [ ] Regresión completa + marcar casillas + resumen al dueño.
+- [x] `shared`: DTOs de modelo/versión/operación + esquemas Zod.
+- [x] API `modules/modelos`: `GET /api/v1/modelos` (con versiones), `POST /api/v1/modelos` (nombre + operaciones → crea v1), `GET /api/v1/versiones/:id` (detalle con operaciones), operaciones **granulares** (`POST /versiones/:id/operaciones`, `PATCH /operaciones/:opId`, `DELETE /operaciones/:opId` — más fiel a la UI que el PATCH masivo planeado y conserva la trazabilidad `operacionOrigenId`), `POST /api/v1/modelos/:id/versiones` (copia la versión origen → vN+1, la origen queda intacta; transaccional).
+- [x] `costoManoObraPrenda` se recalcula **en la transacción, en centavos**, en cada mutación de operaciones.
+- [x] Test `ca-1.3`: crear v2 de DOBLE PRET, quitar una operación de CT 0.20 → v2 = 790 centavos y v1 sigue en 810 con 47 operaciones.
+- [x] Tests: crear modelo suma bien; editar CT recalcula; eliminar resta; nombre duplicado 409; validaciones 400 (10 tests nuevos; 41 en total).
+- [x] Feature Modelos: lista (nombre, versiones, costo/prenda); detalle de versión con operaciones por grupo (orden, N, equipo, proceso, pieza, CT) y suma de CT en cabecera; formularios de operación (alta/edición/eliminación, CT en Bs convertido una vez a centavos); botón "Crear nueva versión" con nota; página "Nuevo modelo" con filas dinámicas y suma en vivo. *Verificado en navegador: flujo CA-1.3 completo desde la UI.*
+- [x] Regresión completa (41/41 + typecheck server y client) + marcar casillas + resumen al dueño.
 
 ### Rebanada 4 — Cortes + Asignación (la pantalla estrella) ⚠️ la más riesgosa
 

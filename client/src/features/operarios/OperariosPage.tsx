@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { crearOperarioSchema, type OperarioDTO, type TipoOperario } from '@taller/shared';
 import { useCrearOperario, useEditarOperario, useOperarios } from '../../api/operarios';
 import { ErrorApi } from '../../api/client';
+import { Modal } from '../../components/Modal';
 
 // El esquema compartido + tolerancia al <input type="date"> vacío del form.
 const formSchema = crearOperarioSchema.extend({
@@ -46,22 +47,6 @@ function BadgeEstado({ activo }: { activo: boolean }) {
     <span className="rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
       De baja
     </span>
-  );
-}
-
-function Modal({ children, onCerrar }: { children: React.ReactNode; onCerrar: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onCerrar}
-    >
-      <div
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 
