@@ -8,6 +8,7 @@ import { VersionDetallePage } from './features/modelos/VersionDetallePage';
 import { CortesPage } from './features/cortes/CortesPage';
 import { NuevoCortePage } from './features/cortes/NuevoCortePage';
 import { CorteDetallePage } from './features/cortes/CorteDetallePage';
+import { AnticiposPage } from './features/anticipos/AnticiposPage';
 
 export const router = createBrowserRouter([
   {
@@ -21,7 +22,7 @@ export const router = createBrowserRouter([
       { path: '/cortes', element: <CortesPage /> },
       { path: '/cortes/nuevo', element: <NuevoCortePage /> },
       { path: '/cortes/:corteId', element: <CorteDetallePage /> },
-      { path: '/anticipos', element: <EnConstruccion titulo="Anticipos" nota="Rebanada 5" /> },
+      { path: '/anticipos', element: <AnticiposPage /> },
       { path: '/liquidacion', element: <EnConstruccion titulo="Liquidación" nota="Consolidado y cierre de mes — Rebanada 6" /> },
       { path: '/rendicion', element: <EnConstruccion titulo="Rendición de cuentas" nota="Vista por operario — Rebanada 7" /> },
       { path: '/configuracion', element: <EnConstruccion titulo="Configuración" nota="Rebanada 8" /> },

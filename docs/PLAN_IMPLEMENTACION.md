@@ -191,12 +191,12 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-5.5, CA-5.6.
 
-- [ ] `shared`: DTO + Zod de anticipo.
-- [ ] API `modules/anticipos`: `GET /api/v1/anticipos` (filtros operario/rango de fechas), `POST`, `PATCH /:id`, `DELETE /:id`. El POST/PATCH responde con `advertenciaTope: true` cuando `monto > topeAnticipoAdvertencia` **pero guarda igual** (CA-5.6).
-- [ ] Test `ca-5.5`: dos anticipos en la misma semana (sábado 300 + miércoles 150) → ambos guardados, suma 45000 centavos.
-- [ ] Test `ca-5.6`: anticipo 2500 con tope 2000 → guardado + flag de advertencia.
-- [ ] Feature Anticipos: formulario rápido (mockup), advertencia visual amarilla al exceder el tope, histórico agrupado por semana con filtro por operario, editar/eliminar con confirmación explicando el impacto en saldos.
-- [ ] Regresión completa + marcar casillas + resumen al dueño.
+- [x] `shared`: DTO `AnticipoDTO` + `AnticipoGuardadoDTO` (con flag `advertenciaTope`) + Zod.
+- [x] API `modules/anticipos`: `GET /api/v1/anticipos` (filtros operario/rango de fechas), `POST`, `PATCH /:id`, `DELETE /:id`. El POST/PATCH responde con `advertenciaTope: true` cuando `monto > topeAnticipoAdvertencia` **pero guarda igual** (CA-5.6).
+- [x] Test `ca-5.5`: dos anticipos en la misma semana (sábado 300 + miércoles 150) → ambos guardados, suma 45000 centavos.
+- [x] Test `ca-5.6`: anticipo 2500 con tope 2000 → guardado (201) + flag de advertencia; editar también dispara la advertencia. *(9 tests de integración nuevos; 83 en total.)*
+- [x] Feature Anticipos: formulario rápido con advertencia amarilla en vivo, histórico agrupado por **semana lunes–sábado** con filtro por operario y total por semana, editar/eliminar con confirmación que menciona el impacto en el saldo. *Verificado en navegador: anticipo de 2500 sobre el tope guardado con advertencia y luego eliminado.*
+- [x] Regresión completa (83/83 + typecheck server y client) + marcar casillas + resumen al dueño.
 
 ### Rebanada 6 — Liquidación / Consolidado (segunda zona de mayor riesgo)
 
