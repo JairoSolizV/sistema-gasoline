@@ -4,6 +4,7 @@ import { operariosRouter } from './modules/operarios/routes.js';
 import { modelosRouter } from './modules/modelos/routes.js';
 import { cortesRouter } from './modules/cortes/routes.js';
 import { anticiposRouter } from './modules/anticipos/routes.js';
+import { liquidacionRouter } from './modules/liquidacion/routes.js';
 
 export function crearApp() {
   const app = express();
@@ -16,6 +17,7 @@ export function crearApp() {
   app.use('/api/v1/operarios', operariosRouter);
   app.use('/api/v1/cortes', cortesRouter);
   app.use('/api/v1/anticipos', anticiposRouter);
+  app.use('/api/v1/liquidacion', liquidacionRouter);
   app.use('/api/v1', modelosRouter);
 
   // Las rutas de los módulos se montan aquí, rebanada por rebanada.
