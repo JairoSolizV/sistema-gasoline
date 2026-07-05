@@ -24,3 +24,16 @@ body {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
+
+/* Vista imprimible de la planilla (Liquidación / Rendición): sin sidebar ni controles. */
+@media print {
+  aside {
+    display: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+}
