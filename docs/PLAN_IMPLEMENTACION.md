@@ -217,11 +217,11 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-7.1, CA-7.2.
 
-- [ ] API `modules/rendicion`: `GET /api/v1/rendicion/:operarioId?anio&mes` → DTO `{ operario, cortes: [{corte, operaciones propias con cantidad/tarifa/total}], anticipos, totalGanado, saldo }`. Reutiliza el dominio de liquidación filtrando por `operarioId`; el DTO se **construye** (ARQUITECTURA §5.3), no se filtra en el cliente.
-- [ ] Test `ca-7.2` (anti-fuga): con datos de varios operarios en la BD, la respuesta serializada **no contiene** nombres ni montos de otros operarios (aserción sobre el JSON completo, no solo la forma).
-- [ ] Test `ca-7.1`: la vista de CLARIS contiene exactamente sus asignaciones y anticipos.
-- [ ] Feature Rendición: selector de operario + período, detalle de solo lectura, botón imprimir (CSS print). Esta vista es la semilla del rol operario de Fase 2 — sin lógica en el cliente.
-- [ ] Regresión completa + marcar casillas + resumen al dueño.
+- [x] API `modules/rendicion`: `GET /api/v1/rendicion/:operarioId?anio&mes` → DTO `{ operario, cortes: [{corte, operaciones propias con cantidad/tarifa/total}], anticipos, totalGanado, saldo }`. Reutiliza el dominio de saldo y el arrastre de liquidación; **todas** las consultas filtran por `operarioId` y el DTO se **construye** (ARQUITECTURA §5.3), no se filtra en el cliente.
+- [x] Test `ca-7.2` (anti-fuga): con dos operarios en el MISMO corte, la respuesta serializada de uno **no contiene** el nombre ni el id del otro (aserción sobre el JSON completo).
+- [x] Test `ca-7.1`: la vista de CLARIS contiene exactamente su operación, su ganado, su anticipo y su saldo (no la operación del otro). *(5 tests nuevos; 107 en total.)*
+- [x] Feature Rendición: selector de operario + período (navegación de meses), detalle de solo lectura con resumen (entrada/ganado/anticipos/saldo), cortes con sus operaciones propias y anticipos, botón imprimir (CSS `@media print`; el selector es `no-print`). *Verificado en navegador: CLARIS y otro operario en el mismo corte de DOBLE PRET → el contenido imprimible de CLARIS no contiene datos de los demás.*
+- [x] Regresión completa (107/107 + typecheck server y client) + marcar casillas + resumen al dueño.
 
 ### Rebanada 8 — Dashboard + Configuración + auth (cierre de fase)
 

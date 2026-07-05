@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { formatBs, type ConsolidadoDTO, type LiquidacionFilaDTO } from '@taller/shared';
 import { useConsolidado } from '../../api/liquidacion';
+import { MESES } from '../../lib/meses';
 import { CerrarMesModal } from './CerrarMesModal';
-
-const MESES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-];
 
 function SaldoBadge({ centavos }: { centavos: number }) {
   const neg = centavos < 0;

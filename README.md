@@ -60,5 +60,5 @@ Los tests están nombrados por criterio de aceptación (`ca-1.test.ts` ↔ CA-1.
 - [x] **Rebanada 4 — Cortes + Asignación**: snapshot inmutable, asignación híbrida con suma exacta, maestro externo, cierre con fecha de liquidación.
 - [x] **Rebanada 5 — Anticipos**: registro con advertencia de tope (no bloqueo), histórico por semana, editar/eliminar.
 - [x] **Rebanada 6 — Liquidación**: consolidado mensual con saldo y arrastre, cierre de mes persistido con excepción de arrastre, planilla imprimible.
-- [ ] Rebanada 7 — Rendición de cuentas
+- [x] **Rebanada 7 — Rendición de cuentas**: vista filtrada por operario sin fuga de terceros, imprimible.
 - [ ] Rebanada 8 — Dashboard + Configuración + auth
