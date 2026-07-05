@@ -168,22 +168,22 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-1.4, CA-2.1, CA-2.2, CA-2.3, CA-2.4, CA-3.1, CA-3.2, CA-3.3, CA-3.4, CA-3.5, CA-3.6, CA-4.1, CA-4.2, CA-8.1, CA-8.3 (y CA-8.2 en su parte "operario de baja no asignable pero su histórico intacto").
 
-- [ ] `/domain` (TDD, funciones puras primero): en `calculo.ts` `cantidadTotal(cortePorTalla, plusPorTalla)`, `tarifaEfectiva(ctCentavos, diferencialCentavos)`, `totalAsignacion(cantidad, tarifaCentavos)`; en `validaciones.ts` `validarSumaExacta(asignaciones, cantidadObjetivo) → sin_asignar|parcial|asignada` (con faltante/sobrante), `validarMaximoTres`, `puedeCerrarCorte(operaciones)`.
-- [ ] Tests unitarios del dominio: CA-2.1 (372 sin PLUS), CA-2.2 (310+62=372, **el PLUS se paga**), CA-2.3 (372×810=301320 centavos), CA-2.4 (234×629=147186), CA-3.1..3.4 (5580 / 4500+1080 / faltan 22 / sobran 28), CA-4.1, CA-4.2 (tarifa 30 → 3000; 272×20=5440; total operación 8440).
-- [ ] `shared`: DTOs de corte/operación/asignación + esquemas Zod (crear corte, asignar).
-- [ ] API `modules/cortes`:
+- [x] `/domain` (TDD, funciones puras primero): en `calculo.ts` `cantidadTotal(cortePorTalla, plusPorTalla)`, `tarifaEfectiva(ctCentavos, diferencialCentavos)`, `totalAsignacion(cantidad, tarifaCentavos)`; en `validaciones.ts` `validarSumaExacta(asignaciones, cantidadObjetivo) → sin_asignar|parcial|asignada` (con faltante/sobrante), `validarMaximoTres`, `puedeCerrarCorte(operaciones)`.
+- [x] Tests unitarios del dominio (17): CA-2.1 (372 sin PLUS), CA-2.2 (310+62=372, **el PLUS se paga**), CA-2.3 (372×810=301320 centavos), CA-2.4 (234×629=147186), CA-3.1..3.4 (5580 / 4500+1080 / faltan 22 / sobran 28), CA-3.5, CA-4.1, CA-4.2 (tarifa 30 → 3000; 272×20=5440; total operación 8440), CA-4.3, CA-8.3.
+- [x] `shared`: DTOs de corte/operación/asignación + esquemas Zod (crear corte, asignar, asignar grupo, cerrar).
+- [x] API `modules/cortes`:
   - `POST /api/v1/cortes` (borrador: versión, tallas, corte_por_talla, plus_por_talla; el service calcula `cantidadTotal` con el dominio).
   - `POST /api/v1/cortes/:id/abrir` → **snapshot en `prisma.$transaction`**: copia cada `Operacion` de la versión a `CorteOperacion` con `ct` congelado y `cantidadObjetivo = cantidadTotal`, estado `sin_asignar`.
-  - `GET /api/v1/cortes` (filtros estado/modelo/fecha), `GET /api/v1/cortes/:id` (DTO: grupos, operaciones, asignaciones, totales por operario).
-  - `PUT /api/v1/cortes/:id/operaciones/:opId/asignaciones` (reemplaza el set de asignaciones de la operación): valida **máx. 3** (CA-3.5), `cantidad > 0`, operario **activo**; calcula y **persiste** `diferencial`, `tarifaEfectiva`, `total` (en el service, con el diferencial de config si es maestro); recalcula `estado`. Todo dentro de transacción.
+  - `GET /api/v1/cortes` (filtros estado/modelo), `GET /api/v1/cortes/:id` (DTO: grupos, operaciones, asignaciones, totales por operario, costo total).
+  - `PUT /api/v1/cortes/:id/operaciones/:opId/asignaciones` (reemplaza el set de asignaciones de la operación): valida **máx. 3** (CA-3.5), `cantidad > 0`, operario **activo**, sin repetidos; calcula y **persiste** `diferencial`, `tarifaEfectiva`, `total` (con el diferencial de config si es maestro); recalcula `estado`. Todo dentro de transacción.
   - `POST /api/v1/cortes/:id/asignar-grupo` (grupo + operario → todas las operaciones del grupo al 100% — CA-3.6).
-  - `POST /api/v1/cortes/:id/cerrar`: **rechaza (409)** si alguna operación no está `asignada` (CA-3.3, CA-3.4, CA-8.3); fija `fechaCierre`; el corte deja de ser editable.
-- [ ] Test `ca-1.4` (snapshot inmutable): crear corte con v1 (pinza 0.15), editar la tarifa de la versión a 0.20 → el corte sigue calculando con 0.15.
-- [ ] Test `ca-8.1` (cuadre de centavos): con un corte completo asignado, Σ totales por operario = `cantidadTotal × Σ CT` exacto en centavos (aritmética entera lo garantiza; el test lo demuestra con el seed real de DOBLE PRET: 301320 = Bs 3013.20).
-- [ ] Test: operario dado de baja no puede recibir asignaciones nuevas, pero sus asignaciones existentes se conservan (CA-8.2).
-- [ ] Feature Cortes: lista con filtros y estados; wizard "Nuevo corte" (modelo+versión → tallas/corte/PLUS con total en vivo → confirmar y abrir).
-- [ ] Feature Detalle de corte (mockup): cabecera (modelo, versión, cantidad, estado, progreso X/Y asignadas), grupos plegables con badge de estado y "Asignar grupo completo a…", filas de operación con hasta 3 asignaciones (operario, cantidad, toggle maestro con override editable), badge en vivo "Cuadra/Faltan/Sobran" (suma en vivo solo como feedback; el backend confirma), pago por asignación, panel "total por operario" con barras, botón "Cerrar corte" (deshabilitado con motivo si no cuadra).
-- [ ] Regresión completa + marcar casillas + resumen al dueño.
+  - `POST /api/v1/cortes/:id/cerrar`: **rechaza (409 CORTE_INCOMPLETO)** si alguna operación no está `asignada` (CA-3.3, CA-3.4, CA-8.3); fija `fechaCierre` (editable, default hoy); el corte cerrado es inmutable (reasignar → 409).
+- [x] Test `ca-1.4` (snapshot inmutable): crear corte con v1 (pinza 0.15), editar la tarifa de la versión a 0.99 → el corte sigue calculando con 0.15.
+- [x] Test `ca-8.1` (cuadre de centavos): corte completo sobre DOBLE PRET real asignado por grupos a 3 operarios → Σ totales por operario = 301320 centavos exactos (Bs 3013.20).
+- [x] Test: operario dado de baja no puede recibir asignaciones nuevas (409 OPERARIO_INACTIVO), pero sus asignaciones existentes se conservan (CA-8.2). *(16 tests de integración nuevos; 74 en total.)*
+- [x] Feature Cortes: lista con filtros y estados; wizard "Nuevo corte" (modelo+versión → tallas/corte/PLUS con total y costo estimado en vivo → crear y abrir en un paso; el borrador queda con acción "Abrir" si falla).
+- [x] Feature Detalle de corte (mockup): cabecera (modelo, versión, cantidad, estado, progreso X/Y asignadas), tallas de referencia, grupos plegables con badge de estado y "Asignar grupo completo a…" (con confirmación), filas de operación con hasta 3 asignaciones (operario, cantidad, toggle maestro con diferencial editable), badge en vivo "Cuadra/Faltan/Sobran" (feedback; el backend confirma), pago por asignación, panel "total por operario" con barras y verificación de cuadre, botón "Cerrar corte" (deshabilitado con motivo si no cuadra) con fecha de liquidación. *Verificado en navegador de punta a punta: corte real de DOBLE PRET 372, grupo completo, división 300/72 (badge "Faltan 22" → "Cuadra"), cierre bloqueado hasta 47/47, cuadre exacto Bs 3013.20 y cierre con fecha.*
+- [x] Regresión completa (74/74 + typecheck server y client) + marcar casillas + resumen al dueño.
 
 ### Rebanada 5 — Anticipos
 

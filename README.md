@@ -57,7 +57,7 @@ Los tests están nombrados por criterio de aceptación (`ca-1.test.ts` ↔ CA-1.
 - [x] **Rebanada 1 — Base**: monorepo, schema Prisma (centavos), migración, seed validado, health.
 - [x] **Rebanada 2 — Operarios**: API CRUD con baja lógica + panel React (layout del mockup, tabla y formularios).
 - [x] **Rebanada 3 — Modelos y versiones**: catálogo con suma de CT, versionado que conserva el original.
-- [ ] Rebanada 4 — Cortes + Asignación
+- [x] **Rebanada 4 — Cortes + Asignación**: snapshot inmutable, asignación híbrida con suma exacta, maestro externo, cierre con fecha de liquidación.
 - [ ] Rebanada 5 — Anticipos
 - [ ] Rebanada 6 — Liquidación
 - [ ] Rebanada 7 — Rendición de cuentas
