@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { EnConstruccion } from './components/EnConstruccion';
+import { RequireAuth } from './components/RequireAuth';
+import { LoginPage } from './features/auth/LoginPage';
+import { InicioPage } from './features/inicio/InicioPage';
 import { OperariosPage } from './features/operarios/OperariosPage';
 import { ModelosPage } from './features/modelos/ModelosPage';
 import { NuevoModeloPage } from './features/modelos/NuevoModeloPage';
@@ -11,12 +13,18 @@ import { CorteDetallePage } from './features/cortes/CorteDetallePage';
 import { AnticiposPage } from './features/anticipos/AnticiposPage';
 import { LiquidacionPage } from './features/liquidacion/LiquidacionPage';
 import { RendicionPage } from './features/rendicion/RendicionPage';
+import { ConfiguracionPage } from './features/configuracion/ConfiguracionPage';
 
 export const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
-    element: <Layout />,
+    element: (
+      <RequireAuth>
+        <Layout />
+      </RequireAuth>
+    ),
     children: [
-      { path: '/', element: <EnConstruccion titulo="Inicio" nota="El dashboard llega en la Rebanada 8" /> },
+      { path: '/', element: <InicioPage /> },
       { path: '/operarios', element: <OperariosPage /> },
       { path: '/modelos', element: <ModelosPage /> },
       { path: '/modelos/nuevo', element: <NuevoModeloPage /> },
@@ -27,7 +35,7 @@ export const router = createBrowserRouter([
       { path: '/anticipos', element: <AnticiposPage /> },
       { path: '/liquidacion', element: <LiquidacionPage /> },
       { path: '/rendicion', element: <RendicionPage /> },
-      { path: '/configuracion', element: <EnConstruccion titulo="Configuración" nota="Rebanada 8" /> },
+      { path: '/configuracion', element: <ConfiguracionPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

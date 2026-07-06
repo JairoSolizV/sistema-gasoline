@@ -43,7 +43,7 @@ export const dashboardService = {
       if (faltan > 0) {
         alertas.push({
           tipo: 'error',
-          texto: `${c.modeloNombre} v${c.numeroVersion}: ${faltan} operación${faltan > 1 ? 'es' : ''} sin cuadrar — no se puede cerrar.`,
+          texto: `${c.modeloNombre} v${c.numeroVersion}: ${faltan} ${faltan > 1 ? 'operaciones' : 'operación'} sin cuadrar — no se puede cerrar.`,
         });
       }
     }

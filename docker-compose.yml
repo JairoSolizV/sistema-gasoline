@@ -1,8 +1,10 @@
-# Ejecución local en la máquina del taller (ARQUITECTURA §9).
-# En desarrollo se puede usar un PostgreSQL local ya instalado (ver README);
-# este compose es la vía "instalar sin pelear con Postgres".
-# El puerto host es 5433 para no chocar con un PostgreSQL local en 5432.
-# Los servicios de server y client se agregan en la Rebanada 8.
+# Ejecución local en la máquina del taller (ARQUITECTURA §9): un solo comando
+# levanta Postgres + API + panel. Las demás máquinas acceden por la IP local
+# del equipo servidor (el panel queda en el puerto 8080).
+#
+#   docker compose up --build
+#
+# Postgres se expone en 5433 para no chocar con un PostgreSQL local en 5432.
 services:
   postgres:
     image: postgres:18
@@ -16,6 +18,41 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taller -d taller_pagos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: taller-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://taller:taller@postgres:5432/taller_pagos?schema=public"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-cambiar-esta-clave}"
+      JWT_SECRET: "${JWT_SECRET:-cambiar-por-cadena-larga-aleatoria}"
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+    # migra, seedea y arranca la API
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node --import tsx src/server.ts"
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: taller-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
 
 volumes:
   pgdata:

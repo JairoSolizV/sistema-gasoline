@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { logout } from '../api/auth';
 
 function Icono({ d }: { d: string }) {
   return (
@@ -115,10 +116,20 @@ export function Layout() {
           <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#2a3644] text-xs font-semibold text-[#cdd6e2]">
             DT
           </div>
-          <div className="leading-tight">
+          <div className="flex-1 leading-tight">
             <div className="text-[12.5px] font-medium text-[#e5e9ef]">Dueño del taller</div>
             <div className="text-[11px] text-[#6b7688]">Administrador</div>
           </div>
+          <button
+            onClick={logout}
+            title="Cerrar sesión"
+            className="rounded-md p-1.5 text-[#6b7688] hover:bg-white/5 hover:text-[#cdd6e2]"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5M21 12H9" />
+            </svg>
+          </button>
         </div>
       </aside>
 

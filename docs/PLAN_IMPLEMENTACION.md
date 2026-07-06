@@ -229,14 +229,14 @@ README.md                    # cómo levantar todo en la máquina del taller
 
 **CAs que cubre:** CA-4.3 (diferencial editable desde Configuración; asignaciones ya guardadas no cambian), refuerzo de CA-5.6 (tope editable).
 
-- [ ] API `modules/configuracion`: `GET/PATCH /api/v1/configuracion` (tope, diferencial, nombre del taller; montos en centavos).
-- [ ] Test `ca-4.3`: cambiar diferencial a 15 centavos → nueva asignación de maestro sobre ct 20 cobra 35/pieza; las asignaciones previas conservan su `tarifaEfectiva` guardada.
-- [ ] API `modules/dashboard`: `GET /api/v1/dashboard` → KPIs del mes en curso (total a pagar estimado, anticipos entregados, saldo pendiente, cortes activos), cortes abiertos con progreso, alertas (operaciones sin asignar/parciales, anticipos sobre tope, fin de mes cercano sin liquidar).
-- [ ] Auth (ARQUITECTURA §6): `POST /api/v1/auth/login` (password de `.env` → JWT), `middleware/auth.ts` con `requireAuth` aplicado a todo `/api/v1` (salvo login/health) y `requireRole('admin')` disponible para Fase 2; feature Login con token en el cliente.
-- [ ] Feature Inicio según mockup (KPIs, cortes activos con barra de progreso, alertas con severidad) y feature Configuración con validaciones.
-- [ ] docker-compose completo (postgres + server + client) — levantar todo con un comando.
-- [ ] README final: `.env`, `docker compose up`, o modo desarrollo (migrar, seedear, `npm run dev`), acceso desde otras máquinas por IP local.
-- [ ] **Regresión total de los 8 grupos de CA** + marcar casillas + resumen final al dueño.
+- [x] API `modules/configuracion`: `GET/PATCH /api/v1/configuracion` (tope, diferencial, nombre del taller; montos en centavos).
+- [x] Test `ca-4.3`: cambiar diferencial a 15 centavos → nueva asignación de maestro sobre ct 20 cobra 35/pieza; las asignaciones previas conservan su `tarifaEfectiva` guardada. + refuerzo CA-5.6 (bajar el tope hace que un anticipo lo supere).
+- [x] API `modules/dashboard`: `GET /api/v1/dashboard` → KPIs del mes en curso (total a pagar, anticipos entregados, saldo pendiente, cortes activos), cortes abiertos con progreso, alertas (operaciones sin cuadrar, anticipos sobre tope, fin de mes cercano sin liquidar). Compone liquidación + cortes + config, sin acceso a datos propio.
+- [x] Auth (ARQUITECTURA §6): `POST /api/v1/auth/login` (password de `.env` → JWT 30d), `middleware/auth.ts` con `requireAuth` aplicado a todo `/api/v1` (salvo login/health) y `requireRole('admin')` disponible para Fase 2; `crearApp({authObligatoria})` activo en `server.ts`; feature Login con token en localStorage y guard `RequireAuth`. *(6 tests de auth: login ok/malo, ruta protegida sin/con token, token basura, público health/login.)*
+- [x] Feature Inicio (KPIs, cortes activos con barra de progreso, alertas con severidad) y feature Configuración con validaciones y logout en el sidebar. *Verificado en navegador: sin token redirige a /login, login entra al dashboard, config carga y persiste, alerta de corte sin cuadrar aparece.*
+- [x] docker-compose completo (postgres + server + client) con Dockerfiles y nginx (panel en :8080, proxy `/api` → server) — `docker compose up --build`.
+- [x] README final: docker compose, modo desarrollo (migrar, seedear, `npm run dev`), auth y acceso por IP local.
+- [x] **Regresión total: 119 tests en verde (14 archivos, los 8 grupos de CA) + typecheck server y client** + marcar casillas + resumen final al dueño.
 
 ---
 
@@ -295,4 +295,4 @@ Los 10 invariantes de CLAUDE.md §6 + manejo de dinero. Cada uno con su mecanism
 - [x] Rebanada 5 — Anticipos · verificadas CA-5.5, CA-5.6 · OK del dueño ✓
 - [x] Rebanada 6 — Liquidación · verificadas CA-5.1–5.4, CA-5.7, CA-6.x, CA-8.4 · OK del dueño ✓
 - [x] Rebanada 7 — Rendición de cuentas · verificadas CA-7.1, CA-7.2 · OK del dueño ✓
-- [ ] Rebanada 8 — Dashboard + Configuración + auth + compose · verificada CA-4.3 + regresión total · OK del dueño → **Fase 1 lista**
+- [x] Rebanada 8 — Dashboard + Configuración + auth + compose · verificada CA-4.3 + regresión total · **Fase 1 lista** ✓
