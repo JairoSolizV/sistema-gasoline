@@ -4,7 +4,8 @@
 #
 #   docker compose up --build
 #
-# Postgres se expone en 5433 para no chocar con un PostgreSQL local en 5432.
+# Postgres se expone en 5434 (no 5432/5433: suelen estar tomados por un
+# PostgreSQL local o por otros proyectos Docker en la misma máquina).
 services:
   postgres:
     image: postgres:18
@@ -15,7 +16,7 @@ services:
       POSTGRES_PASSWORD: taller
       POSTGRES_DB: taller_pagos
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:

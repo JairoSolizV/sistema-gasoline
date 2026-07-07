@@ -36,7 +36,7 @@ docker compose up --build
 ## Opción B — Desarrollo (Node local)
 
 1. **Base de datos.** Con PostgreSQL local ya instalado no hay que hacer nada.
-   Sin Postgres local: `docker compose up -d postgres` (queda en el puerto **5433**).
+   Sin Postgres local: `docker compose up -d postgres` (queda en el puerto **5434**).
 2. **Variables de entorno.** Copiar `server/.env.example` a `server/.env` y completar
    `DATABASE_URL`, `DATABASE_URL_TEST`, `ADMIN_PASSWORD` y `JWT_SECRET`.
    Crear la BD de test si no existe: `CREATE DATABASE taller_pagos_test;`
