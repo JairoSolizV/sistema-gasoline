@@ -7,6 +7,7 @@ import type {
   EditarAnticipoInput,
 } from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
+import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
 import { anticiposRepository, type AnticipoConOperario } from './repository.js';
 
 function aDTO(a: AnticipoConOperario): AnticipoDTO {
@@ -47,6 +48,7 @@ export const anticiposService = {
   async crear(input: CrearAnticipoInput): Promise<AnticipoGuardadoDTO> {
     const operario = await anticiposRepository.obtenerOperario(input.operarioId);
     if (!operario) throw new AppError('NO_ENCONTRADO', 'Operario no encontrado', 404);
+    await exigirFechaSinLiquidar(input.fecha, 'registrar un anticipo');
 
     const anticipo = await anticiposRepository.crear({
       operarioId: input.operarioId,
@@ -60,6 +62,9 @@ export const anticiposService = {
   async editar(id: string, input: EditarAnticipoInput): Promise<AnticipoGuardadoDTO> {
     const actual = await anticiposRepository.obtener(id);
     if (!actual) throw new AppError('NO_ENCONTRADO', 'Anticipo no encontrado', 404);
+    // ni tocar uno ya liquidado, ni moverlo hacia un mes ya liquidado
+    await exigirFechaSinLiquidar(actual.fecha, 'editar un anticipo');
+    if (input.fecha !== undefined) await exigirFechaSinLiquidar(input.fecha, 'mover un anticipo');
 
     const anticipo = await anticiposRepository.actualizar(id, {
       ...(input.fecha !== undefined ? { fecha: input.fecha } : {}),
@@ -72,6 +77,7 @@ export const anticiposService = {
   async eliminar(id: string): Promise<void> {
     const actual = await anticiposRepository.obtener(id);
     if (!actual) throw new AppError('NO_ENCONTRADO', 'Anticipo no encontrado', 404);
+    await exigirFechaSinLiquidar(actual.fecha, 'eliminar un anticipo');
     await anticiposRepository.eliminar(id);
   },
 };

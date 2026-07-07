@@ -6,6 +6,7 @@ import { useOperarios } from '../../api/operarios';
 import { Modal } from '../../components/Modal';
 import { ErrorApi } from '../../api/client';
 import { badgeEstadoCorte, etiquetaGrupo } from './estados';
+import { hoyLocalISO } from '../../lib/fechas';
 import { OperacionFila } from './OperacionFila';
 
 export function CorteDetallePage() {
@@ -18,7 +19,7 @@ export function CorteDetallePage() {
 
   const [plegados, setPlegados] = useState<Record<string, boolean>>({});
   const [modalCerrar, setModalCerrar] = useState(false);
-  const [fechaCierre, setFechaCierre] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fechaCierre, setFechaCierre] = useState(hoyLocalISO);
 
   const grupos = useMemo(() => {
     if (!corte) return [];

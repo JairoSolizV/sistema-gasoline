@@ -14,6 +14,9 @@ export const crearCorteSchema = z
   })
   .refine((d) => d.cortePorTalla.length === d.tallas.length, {
     message: 'Debe haber una cantidad de corte por cada talla',
+  })
+  .refine((d) => d.plusPorTalla.length <= d.tallas.length, {
+    message: 'El plus no puede tener más entradas que tallas',
   });
 
 export const asignacionInputSchema = z.object({

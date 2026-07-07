@@ -8,8 +8,9 @@ export function rangoMesUTC(anio: number, mes: number) {
   return { inicio: new Date(Date.UTC(anio, mes - 1, 1)), fin: new Date(Date.UTC(anio, mes, 1)) };
 }
 
-export function mesAnterior(anio: number, mes: number) {
-  return mes === 1 ? { anio: anio - 1, mes: 12 } : { anio, mes: mes - 1 };
+/** ¿(anioA, mesA) es un mes anterior a (anioB, mesB)? */
+export function mesAnteriorA(anioA: number, mesA: number, anioB: number, mesB: number): boolean {
+  return anioA < anioB || (anioA === anioB && mesA < mesB);
 }
 
 export const liquidacionRepository = {
@@ -50,16 +51,49 @@ export const liquidacionRepository = {
     });
   },
 
-  /** Liquidaciones del mes anterior → mapa operarioId ⇒ saldoSalida (arrastre). */
+  /** Liquidaciones del último Periodo cerrado ANTERIOR al mes → mapa
+   *  operarioId ⇒ saldoSalida (arrastre). Busca hacia atrás (no solo el mes
+   *  inmediato) para que el arrastre atraviese meses vacíos sin cerrar. */
   async saldosEntradaDesde(anio: number, mes: number): Promise<Map<string, number>> {
-    const prev = mesAnterior(anio, mes);
-    const periodo = await prisma.periodo.findUnique({
-      where: { anio_mes: { anio: prev.anio, mes: prev.mes } },
+    const periodo = await prisma.periodo.findFirst({
+      where: {
+        estado: 'cerrado',
+        OR: [{ anio: { lt: anio } }, { anio, mes: { lt: mes } }],
+      },
+      orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
       include: { liquidaciones: { select: { operarioId: true, saldoSalida: true } } },
     });
     const mapa = new Map<string, number>();
     for (const l of periodo?.liquidaciones ?? []) mapa.set(l.operarioId, l.saldoSalida);
     return mapa;
+  },
+
+  /** El Periodo cerrado más reciente de todos (o null si nunca se cerró un mes). */
+  ultimoPeriodoCerrado() {
+    return prisma.periodo.findFirst({
+      where: { estado: 'cerrado' },
+      orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
+      select: { anio: true, mes: true },
+    });
+  },
+
+  /** ¿Hay cortes cerrados o anticipos en los meses ESTRICTAMENTE entre el último
+   *  cierre y el mes dado? Si los hay, cerrar el mes dado los dejaría sin liquidar. */
+  async hayMovimientosEntre(
+    despuesDe: { anio: number; mes: number },
+    antesDe: { anio: number; mes: number },
+  ): Promise<boolean> {
+    const inicio = new Date(Date.UTC(despuesDe.anio, despuesDe.mes, 1)); // mes siguiente al último cierre
+    const fin = rangoMesUTC(antesDe.anio, antesDe.mes).inicio;
+    if (inicio.getTime() >= fin.getTime()) return false;
+    const [corte, anticipo] = await Promise.all([
+      prisma.corte.findFirst({
+        where: { estado: 'cerrado', fechaCierre: { gte: inicio, lt: fin } },
+        select: { id: true },
+      }),
+      prisma.anticipo.findFirst({ where: { fecha: { gte: inicio, lt: fin } }, select: { id: true } }),
+    ]);
+    return corte !== null || anticipo !== null;
   },
 
   crearCierre(

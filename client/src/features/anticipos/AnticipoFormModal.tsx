@@ -8,6 +8,7 @@ import {
 import { Modal } from '../../components/Modal';
 import { ErrorApi } from '../../api/client';
 import { useCrearAnticipo, useEditarAnticipo } from '../../api/anticipos';
+import { hoyLocalISO } from '../../lib/fechas';
 
 const PATRON_BS = /^\d+(\.\d{1,2})?$/;
 
@@ -47,7 +48,7 @@ export function AnticipoFormModal({
         }
       : {
           operarioId: '',
-          fecha: new Date().toISOString().slice(0, 10),
+          fecha: hoyLocalISO(),
           montoBs: '',
           nota: '',
         },

@@ -6,6 +6,7 @@ import { claveSemana, etiquetaSemana } from '../../lib/semana';
 import { AnticipoFormModal } from './AnticipoFormModal';
 import { Modal } from '../../components/Modal';
 import { useEliminarAnticipo } from '../../api/anticipos';
+import { ErrorApi } from '../../api/client';
 
 function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString('es-BO', {
@@ -157,6 +158,11 @@ export function AnticiposPage() {
             <span className="mono font-semibold">Bs {formatBs(modal.anticipo.monto)}</span>. Esto{' '}
             <strong>cambia el saldo</strong> del operario en la liquidación del período.
           </p>
+          {eliminar.isError && (
+            <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">
+              {eliminar.error instanceof ErrorApi ? eliminar.error.message : 'Error al eliminar'}
+            </p>
+          )}
           <div className="mt-5 flex justify-end gap-2">
             <button
               onClick={() => setModal(null)}
@@ -166,8 +172,12 @@ export function AnticiposPage() {
             </button>
             <button
               onClick={async () => {
-                await eliminar.mutateAsync(modal.anticipo.id);
-                setModal(null);
+                try {
+                  await eliminar.mutateAsync(modal.anticipo.id);
+                  setModal(null);
+                } catch {
+                  // el error queda en eliminar.error y se muestra arriba
+                }
               }}
               disabled={eliminar.isPending}
               className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-[#a52d24] disabled:opacity-60"

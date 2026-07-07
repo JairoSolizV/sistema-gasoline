@@ -11,7 +11,7 @@ import type {
 } from '@taller/shared';
 import { calcularCierreMes, calcularSaldo, semanasDelMes } from '../../domain/saldo.js';
 import { AppError } from '../../middleware/errors.js';
-import { liquidacionRepository } from './repository.js';
+import { liquidacionRepository, mesAnteriorA } from './repository.js';
 
 interface DatosOperario {
   operario: Operario;
@@ -156,6 +156,28 @@ export const liquidacionService = {
     const existente = await liquidacionRepository.periodo(anio, mes);
     if (existente) {
       throw new AppError('MES_YA_CERRADO', `El mes ${mes}/${anio} ya fue cerrado`, 409);
+    }
+
+    // Los meses se cierran hacia adelante: cerrar uno anterior al último cierre, o
+    // saltarse un mes CON movimientos, rompería la cadena de arrastre y dejaría
+    // dinero sin liquidar (los meses vacíos sí se pueden saltar: el arrastre los
+    // atraviesa vía saldosEntradaDesde). El primer cierre de la historia ancla la cadena.
+    const ultimo = await liquidacionRepository.ultimoPeriodoCerrado();
+    if (ultimo) {
+      if (mesAnteriorA(anio, mes, ultimo.anio, ultimo.mes)) {
+        throw new AppError(
+          'CIERRE_FUERA_DE_ORDEN',
+          `Ya hay un cierre más reciente (${ultimo.mes}/${ultimo.anio}); no se puede cerrar ${mes}/${anio}`,
+          409,
+        );
+      }
+      if (await liquidacionRepository.hayMovimientosEntre(ultimo, { anio, mes })) {
+        throw new AppError(
+          'CIERRE_FUERA_DE_ORDEN',
+          `Hay cortes cerrados o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
+          409,
+        );
+      }
     }
 
     const datos = await reunirDatos(anio, mes);

@@ -56,15 +56,25 @@ export const rendicionService = {
       (x.fechaCierre ?? '').localeCompare(y.fechaCierre ?? ''),
     );
 
-    const totalGanado = asignaciones.reduce((acc, a) => acc + a.total, 0);
-    const totalAnticipos = anticipos.reduce((acc, a) => acc + a.monto, 0);
-    const saldoEntrada = saldosEntrada.get(operarioId) ?? 0;
-    const saldoPeriodo = calcularSaldo(saldoEntrada, totalGanado, totalAnticipos);
-
     const cerrado = periodo?.estado === 'cerrado';
     const liquidacion = cerrado
       ? periodo!.liquidaciones.find((l) => l.operarioId === operarioId)
       : undefined;
+
+    // Mes cerrado: mandan los totales persistidos en Liquidacion (lo que de
+    // verdad se liquidó); el cálculo en vivo queda solo para meses abiertos.
+    const totalGanado = liquidacion
+      ? liquidacion.totalGanado
+      : asignaciones.reduce((acc, a) => acc + a.total, 0);
+    const totalAnticipos = liquidacion
+      ? liquidacion.totalAnticipos
+      : anticipos.reduce((acc, a) => acc + a.monto, 0);
+    const saldoEntrada = liquidacion
+      ? liquidacion.saldoEntrada
+      : (saldosEntrada.get(operarioId) ?? 0);
+    const saldoPeriodo = liquidacion
+      ? liquidacion.saldoPeriodo
+      : calcularSaldo(saldoEntrada, totalGanado, totalAnticipos);
 
     return {
       operarioId: operario.id,

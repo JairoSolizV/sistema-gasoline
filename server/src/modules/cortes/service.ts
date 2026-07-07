@@ -20,6 +20,7 @@ import {
   validarSumaExacta,
 } from '../../domain/validaciones.js';
 import { AppError } from '../../middleware/errors.js';
+import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
 import { cortesRepository, type CorteConDetalle } from './repository.js';
 
 function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
@@ -293,7 +294,9 @@ export const cortesService = {
         409,
       );
     }
-    await cortesRepository.cerrar(corteId, input.fechaCierre ?? new Date());
+    const fechaCierre = input.fechaCierre ?? new Date();
+    await exigirFechaSinLiquidar(fechaCierre, 'cerrar el corte');
+    await cortesRepository.cerrar(corteId, fechaCierre);
     return detalle(corteId);
   },
 };
