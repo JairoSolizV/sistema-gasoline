@@ -4,6 +4,7 @@ import { formatBs } from '@taller/shared';
 import { useModelos } from '../../api/modelos';
 import { useAbrirCorte, useCrearCorte } from '../../api/cortes';
 import { ErrorApi } from '../../api/client';
+import { CamposTendido, tendidoVacio, validarTendido } from './CamposTendido';
 
 interface FilaTalla {
   talla: string;
@@ -30,6 +31,9 @@ export function NuevoCortePage() {
   const [codigo, setCodigo] = useState('');
   const [filas, setFilas] = useState<FilaTalla[]>(TALLAS_INICIALES);
   const [errorLocal, setErrorLocal] = useState<string | null>(null);
+  // tendido (informativo; no afecta pagos) y servicio de corte interno
+  const [tendido, setTendido] = useState(tendidoVacio);
+  const [esInterno, setEsInterno] = useState(true);
 
   const modelo = modelos?.find((m) => m.id === modeloId);
   const version = modelo?.versiones.find((v) => v.id === versionId);
@@ -48,6 +52,8 @@ export function NuevoCortePage() {
     if (!version) return setErrorLocal('Elegí modelo y versión');
     if (usadas.length === 0) return setErrorLocal('Ingresá al menos una talla');
     if (cantidadTotal < 1) return setErrorLocal('El corte debe tener al menos una prenda');
+    const t = validarTendido(tendido);
+    if (!t.ok) return setErrorLocal(t.error);
 
     const detalle = await crear.mutateAsync({
       modeloVersionId: version.id,
@@ -55,6 +61,8 @@ export function NuevoCortePage() {
       tallas: usadas.map((f) => entero(f.talla)),
       cortePorTalla: usadas.map((f) => entero(f.corte)),
       plusPorTalla: usadas.map((f) => entero(f.plus)),
+      ...t.datos,
+      esInterno,
     });
     const abierto = await abrir.mutateAsync(detalle.id);
     navigate(`/cortes/${abierto.id}`);
@@ -147,6 +155,32 @@ export function NuevoCortePage() {
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
               />
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+            <span className="text-sm font-semibold">Datos del tendido</span>
+            <span className="text-xs text-gray-500">informativo · no afecta los pagos</span>
+          </div>
+          <div className="p-5">
+            <CamposTendido valor={tendido} onChange={setTendido} />
+            <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={esInterno}
+                onChange={(e) => setEsInterno(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <strong>Corte interno</strong>: el taller hace trazado, doblado, corte y
+                clasificación, y se pagan.
+                <span className="block text-xs text-gray-500">
+                  Desmarcalo solo si el corte llegó cortado de afuera. Las personas de cada proceso
+                  se cargan en el detalle del corte a medida que se terminan.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 

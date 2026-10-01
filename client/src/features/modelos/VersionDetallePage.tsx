@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { formatBs, type OperacionDTO } from '@taller/shared';
+import { formatBs, type ModeloVersionDetalleDTO, type OperacionDTO } from '@taller/shared';
 import {
   useAgregarOperacion,
   useCrearVersion,
@@ -9,8 +9,14 @@ import {
   useModelos,
   useVersion,
 } from '../../api/modelos';
+import { useConfiguracion } from '../../api/configuracion';
+import { useOperarios } from '../../api/operarios';
+import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
 import { OperacionFormModal } from './OperacionFormModal';
+import { HojaOperacionesImprimible } from './HojaOperacionesImprimible';
+import { CamposMolde, moldeVacio, validarMolde, type MoldeForm } from './CamposDiseno';
+import { TarjetaDiseno } from './TarjetaDiseno';
 
 type ModalAbierto =
   | { tipo: 'agregar'; grupo?: string }
@@ -18,6 +24,97 @@ type ModalAbierto =
   | { tipo: 'eliminar'; operacion: OperacionDTO }
   | { tipo: 'nueva-version' }
   | null;
+
+// Nueva versión = copia de esta. Si en la versión nueva se modificaron los
+// moldes, se registra quién y se paga la modificación (Bs 50 predeterminado).
+function ModalNuevaVersion({
+  detalle,
+  numeroNueva,
+  onCerrar,
+  onCreada,
+}: {
+  detalle: ModeloVersionDetalleDTO;
+  numeroNueva: number;
+  onCerrar: () => void;
+  onCreada: (versionId: string) => void;
+}) {
+  const crearVersion = useCrearVersion();
+  const { data: config } = useConfiguracion();
+  const { data: moldistas } = useOperarios('activos', 'moldista');
+  const [notas, setNotas] = useState('');
+  const [molde, setMolde] = useState<MoldeForm>(() => moldeVacio(undefined));
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (config && molde.montoBs === '') setMolde(moldeVacio(config.tarifaMoldeModificacion));
+  }, [config, molde.montoBs]);
+
+  const crear = async () => {
+    setError(null);
+    const m = validarMolde(molde);
+    if (!m.ok) return setError(m.error);
+    const nueva = await crearVersion.mutateAsync({
+      modeloId: detalle.modeloId,
+      desdeVersionId: detalle.id,
+      notas: notas.trim() === '' ? null : notas.trim(),
+      molde: m.datos,
+    });
+    onCreada(nueva.id);
+  };
+
+  return (
+    <Modal onCerrar={onCerrar} ancho="max-w-2xl">
+      <h2 className="text-lg font-semibold">Crear nueva versión</h2>
+      <p className="mt-2 text-sm text-gray-600">
+        Se creará la <strong>v{numeroNueva}</strong> como copia exacta de la v
+        {detalle.numeroVersion}. La versión actual queda <strong>intacta</strong> (histórico
+        conservado); después podés quitar o editar las operaciones optimizadas.
+      </p>
+      <label className="mt-4 mb-1 block text-sm font-medium">
+        Notas <span className="font-normal text-gray-400">(opcional)</span>
+      </label>
+      <input
+        value={notas}
+        onChange={(e) => setNotas(e.target.value)}
+        placeholder='ej. "optimizado: se quitó doble despunte"'
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
+      />
+      <div className="mt-4">
+        <CamposMolde
+          valor={molde}
+          onChange={setMolde}
+          moldistas={moldistas}
+          etiqueta="¿Se modificaron los moldes?"
+          ayuda={`Si solo cambian tarifas u operaciones, dejala sin marcar: no se paga${
+            config ? ` (modificación predeterminada Bs ${formatBs(config.tarifaMoldeModificacion)})` : ''
+          }.`}
+        />
+      </div>
+      {(error || crearVersion.error) && (
+        <p className="mt-4 rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+          {error ??
+            (crearVersion.error instanceof ErrorApi
+              ? crearVersion.error.message
+              : 'Error al crear la versión')}
+        </p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCerrar}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={crear}
+          disabled={crearVersion.isPending}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Crear versión
+        </button>
+      </div>
+    </Modal>
+  );
+}
 
 export function VersionDetallePage() {
   const { versionId } = useParams();
@@ -27,9 +124,7 @@ export function VersionDetallePage() {
   const agregar = useAgregarOperacion();
   const editar = useEditarOperacionModelo();
   const eliminar = useEliminarOperacionModelo();
-  const crearVersion = useCrearVersion();
   const [modal, setModal] = useState<ModalAbierto>(null);
-  const [notasVersion, setNotasVersion] = useState('');
 
   const grupos = useMemo(() => {
     if (!detalle) return [];
@@ -50,213 +145,192 @@ export function VersionDetallePage() {
     modelos?.find((m) => m.id === detalle.modeloId)?.versiones ?? [];
 
   return (
-    <div className="p-8">
-      <div className="text-xs text-gray-500">
-        <Link to="/modelos" className="hover:underline">
-          Modelos
-        </Link>{' '}
-        / {detalle.modeloNombre}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {detalle.modeloNombre}{' '}
-            <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-2 py-0.5 align-middle text-sm font-semibold text-acento">
-              v{detalle.numeroVersion}
-            </span>
-          </h1>
-          {detalle.notas && <p className="mt-1 text-sm text-gray-500">{detalle.notas}</p>}
-          <div className="mt-2 flex gap-1">
-            {versionesDelModelo.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => navigate(`/modelos/versiones/${v.id}`)}
-                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                  v.id === detalle.id
-                    ? 'bg-lateral text-white'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-              >
-                v{v.numeroVersion}
-              </button>
-            ))}
-          </div>
+    <>
+      <HojaOperacionesImprimible detalle={detalle} />
+      <div className="p-8 print:hidden">
+        <div className="text-xs text-gray-500">
+          <Link to="/modelos" className="hover:underline">
+            Modelos
+          </Link>{' '}
+          / {detalle.modeloNombre}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-right shadow-sm">
-            <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              Mano de obra / prenda
-            </div>
-            <div className="mono text-2xl font-semibold">
-              Bs {formatBs(detalle.costoManoObraPrenda)}
-            </div>
-            <div className="text-[11px] text-gray-400">{detalle.operaciones.length} operaciones</div>
-          </div>
-          <button
-            onClick={() => setModal({ tipo: 'nueva-version' })}
-            className="rounded-lg border border-acento px-4 py-2 text-sm font-semibold text-acento hover:bg-[rgba(47,111,224,0.06)]"
-          >
-            Crear nueva versión
-          </button>
-        </div>
-      </div>
 
-      <div className="mt-6 space-y-4">
-        {grupos.map(([grupo, ops]) => (
-          <div key={grupo} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-              <div className="flex items-baseline gap-3">
-                <span className="text-sm font-semibold">{grupo}</span>
-                <span className="text-xs text-gray-500">{ops.length} operaciones</span>
-              </div>
-              <span className="mono text-sm font-semibold text-gray-600">
-                Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">
+              {detalle.modeloNombre}{' '}
+              <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-2 py-0.5 align-middle text-sm font-semibold text-acento">
+                v{detalle.numeroVersion}
               </span>
+            </h1>
+            {detalle.notas && <p className="mt-1 text-sm text-gray-500">{detalle.notas}</p>}
+            <div className="mt-2 flex gap-1">
+              {versionesDelModelo.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => navigate(`/modelos/versiones/${v.id}`)}
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                    v.id === detalle.id
+                      ? 'bg-lateral text-white'
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  v{v.numeroVersion}
+                </button>
+              ))}
             </div>
-            <table className="w-full text-sm">
-              <tbody>
-                {ops.map((op) => (
-                  <tr key={op.id} className="border-b border-gray-100 last:border-0">
-                    <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
-                    <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
-                    <td className="px-3 py-2 font-medium">{op.proceso}</td>
-                    <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
-                    <td className="w-28 px-3 py-2 text-right">
-                      <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
-                    </td>
-                    <td className="w-36 px-5 py-2">
-                      <div className="flex justify-end gap-3 text-[13px] font-medium">
-                        <button
-                          onClick={() => setModal({ tipo: 'editar', operacion: op })}
-                          className="text-acento hover:underline"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => setModal({ tipo: 'eliminar', operacion: op })}
-                          className="text-error hover:underline"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="border-t border-gray-100 px-5 py-2">
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-right shadow-sm">
+              <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                Mano de obra / prenda
+              </div>
+              <div className="mono text-2xl font-semibold">
+                Bs {formatBs(detalle.costoManoObraPrenda)}
+              </div>
+              <div className="text-[11px] text-gray-400">{detalle.operaciones.length} operaciones</div>
+            </div>
+            <button
+              onClick={() => window.print()}
+              title="Hoja oficio vertical (21.5 × 33 cm)"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Imprimir operaciones
+            </button>
+            <button
+              onClick={() => setModal({ tipo: 'nueva-version' })}
+              className="rounded-lg border border-acento px-4 py-2 text-sm font-semibold text-acento hover:bg-[rgba(47,111,224,0.06)]"
+            >
+              Crear nueva versión
+            </button>
+          </div>
+        </div>
+
+        <TarjetaDiseno detalle={detalle} />
+
+        <div className="mt-6 space-y-4">
+          {grupos.map(([grupo, ops]) => (
+            <div key={grupo} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-sm font-semibold">{grupo}</span>
+                  <span className="text-xs text-gray-500">{ops.length} operaciones</span>
+                </div>
+                <span className="mono text-sm font-semibold text-gray-600">
+                  Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
+                </span>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {ops.map((op) => (
+                    <tr key={op.id} className="border-b border-gray-100 last:border-0">
+                      <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
+                      <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
+                      <td className="px-3 py-2 font-medium">{op.proceso}</td>
+                      <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
+                      <td className="w-28 px-3 py-2 text-right">
+                        <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
+                      </td>
+                      <td className="w-36 px-5 py-2">
+                        <div className="flex justify-end gap-3 text-[13px] font-medium">
+                          <button
+                            onClick={() => setModal({ tipo: 'editar', operacion: op })}
+                            className="text-acento hover:underline"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => setModal({ tipo: 'eliminar', operacion: op })}
+                            className="text-error hover:underline"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="border-t border-gray-100 px-5 py-2">
+                <button
+                  onClick={() => setModal({ tipo: 'agregar', grupo })}
+                  className="text-[13px] font-medium text-acento hover:underline"
+                >
+                  + Agregar operación a {grupo}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={() => setModal({ tipo: 'agregar' })}
+          className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
+        >
+          + Agregar operación (nuevo grupo)
+        </button>
+
+        {modal?.tipo === 'agregar' && (
+          <OperacionFormModal
+            titulo="Agregar operación"
+            operacion={null}
+            grupoSugerido={modal.grupo}
+            errorGuardar={agregar.error}
+            onGuardar={(input) => agregar.mutateAsync({ versionId: detalle.id, input })}
+            onCerrar={() => setModal(null)}
+          />
+        )}
+        {modal?.tipo === 'editar' && (
+          <OperacionFormModal
+            titulo="Editar operación"
+            operacion={modal.operacion}
+            errorGuardar={editar.error}
+            onGuardar={(input) =>
+              editar.mutateAsync({ operacionId: modal.operacion.id, cambios: input })
+            }
+            onCerrar={() => setModal(null)}
+          />
+        )}
+        {modal?.tipo === 'eliminar' && (
+          <Modal onCerrar={() => setModal(null)}>
+            <h2 className="text-lg font-semibold">Eliminar operación</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Se quitará <strong>{modal.operacion.proceso}</strong> ({modal.operacion.grupo}, Bs{' '}
+              {formatBs(modal.operacion.ct)}) de la v{detalle.numeroVersion} y el costo por prenda se
+              recalculará. Los cortes ya creados no cambian (usan su propio snapshot).
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
               <button
-                onClick={() => setModal({ tipo: 'agregar', grupo })}
-                className="text-[13px] font-medium text-acento hover:underline"
+                onClick={() => setModal(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
               >
-                + Agregar operación a {grupo}
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await eliminar.mutateAsync({ operacionId: modal.operacion.id });
+                  setModal(null);
+                }}
+                disabled={eliminar.isPending}
+                className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-[#a52d24] disabled:opacity-60"
+              >
+                Eliminar
               </button>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <button
-        onClick={() => setModal({ tipo: 'agregar' })}
-        className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
-      >
-        + Agregar operación (nuevo grupo)
-      </button>
-
-      {modal?.tipo === 'agregar' && (
-        <OperacionFormModal
-          titulo="Agregar operación"
-          operacion={null}
-          grupoSugerido={modal.grupo}
-          errorGuardar={agregar.error}
-          onGuardar={(input) => agregar.mutateAsync({ versionId: detalle.id, input })}
-          onCerrar={() => setModal(null)}
-        />
-      )}
-      {modal?.tipo === 'editar' && (
-        <OperacionFormModal
-          titulo="Editar operación"
-          operacion={modal.operacion}
-          errorGuardar={editar.error}
-          onGuardar={(input) =>
-            editar.mutateAsync({ operacionId: modal.operacion.id, cambios: input })
-          }
-          onCerrar={() => setModal(null)}
-        />
-      )}
-      {modal?.tipo === 'eliminar' && (
-        <Modal onCerrar={() => setModal(null)}>
-          <h2 className="text-lg font-semibold">Eliminar operación</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Se quitará <strong>{modal.operacion.proceso}</strong> ({modal.operacion.grupo}, Bs{' '}
-            {formatBs(modal.operacion.ct)}) de la v{detalle.numeroVersion} y el costo por prenda se
-            recalculará. Los cortes ya creados no cambian (usan su propio snapshot).
-          </p>
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              onClick={() => setModal(null)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={async () => {
-                await eliminar.mutateAsync({ operacionId: modal.operacion.id });
-                setModal(null);
-              }}
-              disabled={eliminar.isPending}
-              className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-[#a52d24] disabled:opacity-60"
-            >
-              Eliminar
-            </button>
-          </div>
-        </Modal>
-      )}
-      {modal?.tipo === 'nueva-version' && (
-        <Modal onCerrar={() => setModal(null)}>
-          <h2 className="text-lg font-semibold">Crear nueva versión</h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Se creará la <strong>v{Math.max(...versionesDelModelo.map((v) => v.numeroVersion)) + 1}</strong>{' '}
-            como copia exacta de la v{detalle.numeroVersion}. La versión actual queda{' '}
-            <strong>intacta</strong> (histórico conservado); después podés quitar o editar las
-            operaciones optimizadas.
-          </p>
-          <label className="mt-4 mb-1 block text-sm font-medium">
-            Notas <span className="font-normal text-gray-400">(opcional)</span>
-          </label>
-          <input
-            value={notasVersion}
-            onChange={(e) => setNotasVersion(e.target.value)}
-            placeholder='ej. "optimizado: se quitó doble despunte"'
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
+          </Modal>
+        )}
+        {modal?.tipo === 'nueva-version' && (
+          <ModalNuevaVersion
+            detalle={detalle}
+            numeroNueva={Math.max(...versionesDelModelo.map((v) => v.numeroVersion)) + 1}
+            onCerrar={() => setModal(null)}
+            onCreada={(id) => {
+              setModal(null);
+              navigate(`/modelos/versiones/${id}`);
+            }}
           />
-          <div className="mt-5 flex justify-end gap-2">
-            <button
-              onClick={() => setModal(null)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={async () => {
-                const nueva = await crearVersion.mutateAsync({
-                  modeloId: detalle.modeloId,
-                  desdeVersionId: detalle.id,
-                  notas: notasVersion.trim() === '' ? null : notasVersion.trim(),
-                });
-                setModal(null);
-                setNotasVersion('');
-                navigate(`/modelos/versiones/${nueva.id}`);
-              }}
-              disabled={crearVersion.isPending}
-              className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
-            >
-              Crear versión
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
 
 const app = crearApp();
 
@@ -38,7 +39,7 @@ beforeAll(async () => {
   // corte abierto y sin asignar → debe generar alerta y contar como activo
   const corte = await request(app)
     .post('/api/v1/cortes')
-    .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [50], plusPorTalla: [] });
+    .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [50], plusPorTalla: [] });
   corteAbiertoId = corte.body.data.id;
   await request(app).post(`/api/v1/cortes/${corteAbiertoId}/abrir`);
 });

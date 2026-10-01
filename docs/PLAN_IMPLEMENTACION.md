@@ -296,3 +296,5 @@ Los 10 invariantes de CLAUDE.md §6 + manejo de dinero. Cada uno con su mecanism
 - [x] Rebanada 6 — Liquidación · verificadas CA-5.1–5.4, CA-5.7, CA-6.x, CA-8.4 · OK del dueño ✓
 - [x] Rebanada 7 — Rendición de cuentas · verificadas CA-7.1, CA-7.2 · OK del dueño ✓
 - [x] Rebanada 8 — Dashboard + Configuración + auth + compose · verificada CA-4.3 + regresión total · **Fase 1 lista** ✓
+- [x] Rebanada 9 — Catálogo Máquina → Proceso → Pieza + Grupos · verificadas CAT-1–CAT-14 + regresión total · ver `docs/PLAN_CATALOGO_MAQUINAS.md` · pendiente OK del dueño
+- [x] Rebanada 10 — Plantillas de modelo (la del pantalón clásico, del Excel del taller) · verificadas PLA-1–PLA-8 + regresión total (155 tests) · ver `docs/PLAN_PLANTILLAS.md` · pendiente OK del dueño

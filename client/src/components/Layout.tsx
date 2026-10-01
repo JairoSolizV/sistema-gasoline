@@ -62,7 +62,7 @@ function TituloSeccion({ children }: { children: ReactNode }) {
 
 export function Layout() {
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-screen w-full overflow-hidden print:block print:h-auto print:overflow-visible">
       <aside className="flex h-full w-[246px] flex-none flex-col border-r border-black/40 bg-lateral">
         <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5">
           <div className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-lg bg-acento">
@@ -87,6 +87,18 @@ export function Layout() {
           </ItemMenu>
           <ItemMenu a="/modelos" icono={<Icono d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16.5l8 4 8-4" />}>
             Modelos
+          </ItemMenu>
+          <ItemMenu
+            a="/plantillas"
+            icono={<Icono d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7" />}
+          >
+            Plantillas
+          </ItemMenu>
+          <ItemMenu
+            a="/catalogo"
+            icono={<Icono d="M4 6h16M4 12h10M4 18h6M18 12v6M15 15h6" />}
+          >
+            Catálogo
           </ItemMenu>
 
           <TituloSeccion>Producción</TituloSeccion>

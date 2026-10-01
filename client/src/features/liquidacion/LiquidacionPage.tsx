@@ -38,7 +38,8 @@ export function LiquidacionPage() {
         <div>
           <h1 className="text-2xl font-semibold">Liquidación</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Consolidado por operario · ganado de cortes cerrados, anticipos y saldo con arrastre
+            Consolidado por operario · ganado (costura de cortes cerrados + servicio de corte +
+            moldes, por la fecha de cada trabajo), anticipos y saldo con arrastre
           </p>
         </div>
         <div className="no-print flex items-center gap-2">
@@ -121,9 +122,16 @@ function SemanasCards({ data }: { data: ConsolidadoDTO }) {
           <div className="mono mt-1 text-lg font-semibold">Bs {formatBs(s.ganado)}</div>
           <div className="text-[11px] text-gray-400">
             {s.cortesCerrados === 0
-              ? 'sin cierres'
+              ? 'sin cierres de costura'
               : `${s.cortesCerrados} corte${s.cortesCerrados > 1 ? 's' : ''} cerrado${s.cortesCerrados > 1 ? 's' : ''}`}
           </div>
+          {(s.desglose.servicioCorte > 0 || s.desglose.moldes > 0) && (
+            <div className="mono mt-1 text-[11px] text-gray-500">
+              costura {formatBs(s.desglose.costura)}
+              {s.desglose.servicioCorte > 0 && ` · corte ${formatBs(s.desglose.servicioCorte)}`}
+              {s.desglose.moldes > 0 && ` · moldes ${formatBs(s.desglose.moldes)}`}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -140,6 +148,9 @@ function PlanillaTabla({ data }: { data: ConsolidadoDTO }) {
           <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
             <th className="px-5 py-3">Operario</th>
             <th className="px-3 py-3 text-right">Saldo entrada</th>
+            <th className="px-3 py-3 text-right">Costura</th>
+            <th className="px-3 py-3 text-right">Servicio de corte</th>
+            <th className="px-3 py-3 text-right">Moldes</th>
             <th className="px-3 py-3 text-right">Ganado</th>
             <th className="px-3 py-3 text-right">Anticipos</th>
             <th className="px-3 py-3 text-right">Saldo período</th>
@@ -153,7 +164,7 @@ function PlanillaTabla({ data }: { data: ConsolidadoDTO }) {
           ))}
           {data.filas.length === 0 && (
             <tr>
-              <td colSpan={cerrado ? 7 : 5} className="px-5 py-10 text-center text-gray-500">
+              <td colSpan={cerrado ? 10 : 8} className="px-5 py-10 text-center text-gray-500">
                 No hay movimiento ni saldos en este mes.
               </td>
             </tr>
@@ -164,6 +175,9 @@ function PlanillaTabla({ data }: { data: ConsolidadoDTO }) {
             <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
               <td className="px-5 py-3">Totales</td>
               <td className="mono px-3 py-3 text-right">Bs {formatBs(t.saldoEntrada)}</td>
+              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.desglose.costura)}</td>
+              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.desglose.servicioCorte)}</td>
+              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.desglose.moldes)}</td>
               <td className="mono px-3 py-3 text-right">Bs {formatBs(t.ganado)}</td>
               <td className="mono px-3 py-3 text-right">Bs {formatBs(t.anticipos)}</td>
               <td className="mono px-3 py-3 text-right">Bs {formatBs(t.saldoPeriodo)}</td>
@@ -176,6 +190,15 @@ function PlanillaTabla({ data }: { data: ConsolidadoDTO }) {
         )}
       </table>
     </div>
+  );
+}
+
+/** Monto de un tipo de trabajo: "—" si no hubo, para que se lea qué hizo cada uno. */
+function MontoTenue({ centavos }: { centavos: number }) {
+  return (
+    <td className="mono px-3 py-2.5 text-right text-gray-600">
+      {centavos !== 0 ? formatBs(centavos) : <span className="text-gray-300">—</span>}
+    </td>
   );
 }
 
@@ -194,7 +217,10 @@ function FilaPlanilla({ f, cerrado }: { f: LiquidacionFilaDTO; cerrado: boolean 
       <td className="mono px-3 py-2.5 text-right text-gray-500">
         {f.saldoEntrada !== 0 ? `Bs ${formatBs(f.saldoEntrada)}` : '—'}
       </td>
-      <td className="mono px-3 py-2.5 text-right">Bs {formatBs(f.ganado)}</td>
+      <MontoTenue centavos={f.desglose.costura} />
+      <MontoTenue centavos={f.desglose.servicioCorte} />
+      <MontoTenue centavos={f.desglose.moldes} />
+      <td className="mono px-3 py-2.5 text-right font-semibold">Bs {formatBs(f.ganado)}</td>
       <td className="mono px-3 py-2.5 text-right text-gray-500">Bs {formatBs(f.anticipos)}</td>
       <td className="px-3 py-2.5 text-right">
         <SaldoBadge centavos={f.saldoPeriodo} />

@@ -7,17 +7,14 @@ import { aCentavos, formatBs } from '@taller/shared';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// Unificación de las variantes con que el Excel escribe lo mismo (máquina,
+// grupo, proceso y pieza). No afecta ningún CT — se valida al final.
+import { normalizarOperacion } from './normalizacion-equipos.js';
+import { backfillCatalogo } from './backfill-catalogo.js';
+import { sembrarPlantillaClasico } from './plantilla-clasico.js';
 
 const prisma = new PrismaClient();
 
-// Normalización de variantes ortográficas del Excel (solo máquinas; procesos y
-// piezas se conservan tal cual — PLAN §6.4). No afecta ningún CT.
-const MAPA_EQUIPOS: Record<string, string> = {
-  over: 'overlock',
-  overloc: 'overlock',
-  rect: 'recta',
-  Plancha: 'plancha',
-};
 
 interface OperacionSeed {
   orden: number;
@@ -62,13 +59,17 @@ async function main() {
     },
   });
 
-  for (const op of data.operarios_roster) {
-    const existente = await prisma.operario.findFirst({ where: { nombre: op.nombre } });
-    if (!existente) {
-      await prisma.operario.create({
-        data: { nombre: op.nombre, tipo: op.tipo, activo: op.activo },
-      });
-    }
+  // El roster solo se carga en una instalación vacía. Si se sembrara por nombre
+  // en cada arranque (docker-compose corre el seed siempre), un operario que el
+  // admin eliminó reaparecería activo al reiniciar.
+  if ((await prisma.operario.count()) === 0) {
+    await prisma.operario.createMany({
+      data: data.operarios_roster.map((op) => ({
+        nombre: op.nombre,
+        tipo: op.tipo,
+        activo: op.activo,
+      })),
+    });
   }
 
   for (const m of data.modelos) {
@@ -88,11 +89,13 @@ async function main() {
 
     const operaciones = m.operaciones.map((o) => ({
       orden: o.orden,
-      grupo: o.grupo,
       n: o.n == null ? null : String(o.n),
-      equipo: MAPA_EQUIPOS[o.equipo] ?? o.equipo,
-      proceso: o.proceso,
-      pieza: o.pieza == null ? null : String(o.pieza),
+      ...normalizarOperacion({
+        grupo: o.grupo,
+        equipo: o.equipo,
+        proceso: o.proceso,
+        pieza: o.pieza == null ? null : String(o.pieza),
+      }),
       ct: aCentavos(o.ct),
     }));
     const sumaCt = operaciones.reduce((acc, o) => acc + o.ct, 0);
@@ -125,6 +128,17 @@ async function main() {
       `✓ ${m.nombre} v${m.version}: ${version.operaciones.length} operaciones, mano de obra/prenda = Bs ${formatBs(suma)}`,
     );
   }
+
+  // Plantilla fija del pantalón clásico (va antes del backfill para que sus
+  // máquinas/procesos/piezas entren al catálogo).
+  await sembrarPlantillaClasico(prisma);
+
+  // Catálogo Máquina → Proceso → Pieza + Grupos, derivado de las operaciones
+  // recién cargadas (docs/PLAN_CATALOGO_MAQUINAS.md §6). Idempotente.
+  const catalogo = await backfillCatalogo(prisma);
+  console.log(
+    `✓ Catálogo: +${catalogo.maquinas} máquinas, +${catalogo.procesos} procesos, +${catalogo.piezas} piezas, +${catalogo.grupos} grupos`,
+  );
 }
 
 main()

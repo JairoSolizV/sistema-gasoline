@@ -3,10 +3,22 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 
+const persona = { select: { id: true, nombre: true } } as const;
+const incluirMolde = { include: { operario: persona } } as const;
+
 const incluirOperacionesOrdenadas = {
   operaciones: { orderBy: { orden: 'asc' as const } },
-  modelo: true,
+  modelo: { include: { buscador: persona } },
+  molde: incluirMolde,
 };
+
+/** Datos de un pago de moldes ya resueltos por el service (tipo y monto fijados). */
+export interface PagoMoldeData {
+  operarioId: string;
+  tipo: 'nuevo' | 'modificacion';
+  monto: number;
+  fecha: Date;
+}
 
 export type VersionConOperaciones = Prisma.ModeloVersionGetPayload<{
   include: typeof incluirOperacionesOrdenadas;
@@ -17,12 +29,34 @@ export const modelosRepository = {
     return prisma.modelo.findMany({
       orderBy: { nombre: 'asc' },
       include: {
+        buscador: persona,
         versiones: {
           orderBy: { numeroVersion: 'desc' },
-          include: { _count: { select: { operaciones: true } } },
+          include: { _count: { select: { operaciones: true } }, molde: incluirMolde },
         },
       },
     });
+  },
+
+  obtenerModelo(id: string) {
+    return prisma.modelo.findUnique({ where: { id } });
+  },
+
+  actualizarBuscador(modeloId: string, data: { buscadorId: string | null; sinBuscador: boolean }) {
+    return prisma.modelo.update({ where: { id: modeloId }, data });
+  },
+
+  /** Registra o reemplaza los moldes de una versión (a lo sumo uno por versión). */
+  guardarMolde(versionId: string, data: PagoMoldeData) {
+    return prisma.pagoMolde.upsert({
+      where: { modeloVersionId: versionId },
+      create: { ...data, modeloVersionId: versionId },
+      update: data,
+    });
+  },
+
+  eliminarMolde(versionId: string) {
+    return prisma.pagoMolde.delete({ where: { modeloVersionId: versionId } });
   },
 
   obtenerVersion(id: string): Promise<VersionConOperaciones | null> {
@@ -40,15 +74,19 @@ export const modelosRepository = {
     nombre: string,
     operaciones: Prisma.OperacionCreateManyVersionInput[],
     costo: number,
+    diseno: { buscadorId: string | null; sinBuscador: boolean; molde: PagoMoldeData | null },
   ) {
     return prisma.modelo.create({
       data: {
         nombre,
+        buscadorId: diseno.buscadorId,
+        sinBuscador: diseno.sinBuscador,
         versiones: {
           create: {
             numeroVersion: 1,
             costoManoObraPrenda: costo,
             operaciones: { create: operaciones },
+            ...(diseno.molde ? { molde: { create: diseno.molde } } : {}),
           },
         },
       },
@@ -56,8 +94,14 @@ export const modelosRepository = {
     });
   },
 
-  /** Duplica la versión origen como numeroVersion siguiente. Solo CREA filas. */
-  duplicarVersion(modeloId: string, origen: VersionConOperaciones, notas: string | null) {
+  /** Duplica la versión origen como numeroVersion siguiente. Solo CREA filas
+   *  (los moldes de la origen NO se copian: se pagan una vez, en su versión). */
+  duplicarVersion(
+    modeloId: string,
+    origen: VersionConOperaciones,
+    notas: string | null,
+    molde: PagoMoldeData | null,
+  ) {
     return prisma.$transaction(async (tx) => {
       const ultima = await tx.modeloVersion.aggregate({
         where: { modeloId },
@@ -80,6 +124,7 @@ export const modelosRepository = {
               ct: o.ct,
             })),
           },
+          ...(molde ? { molde: { create: molde } } : {}),
         },
       });
     });

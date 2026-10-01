@@ -45,6 +45,46 @@ export const rendicionRepository = {
     });
   },
 
+  /** Trabajos del servicio de corte de ESTE operario con fecha en el mes. Solo
+   *  su propia fila: en el doblado no se trae al compañero ni su parte. */
+  trabajosCorteDelOperario(operarioId: string, anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.trabajoCorte.findMany({
+      where: { operarioId, fecha: { gte: inicio, lt: fin } },
+      orderBy: [{ fecha: 'asc' }, { proceso: 'asc' }],
+      select: {
+        proceso: true,
+        fecha: true,
+        cantidad: true,
+        tarifa: true,
+        total: true,
+        corte: {
+          select: {
+            id: true,
+            codigo: true,
+            modalidadDoblado: true,
+            version: { select: { numeroVersion: true, modelo: { select: { nombre: true } } } },
+          },
+        },
+      },
+    });
+  },
+
+  /** Pagos de moldes de ESTE operario con fecha en el mes. */
+  moldesDelOperario(operarioId: string, anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.pagoMolde.findMany({
+      where: { operarioId, fecha: { gte: inicio, lt: fin } },
+      orderBy: { fecha: 'asc' },
+      select: {
+        tipo: true,
+        fecha: true,
+        monto: true,
+        version: { select: { numeroVersion: true, modelo: { select: { nombre: true } } } },
+      },
+    });
+  },
+
   anticiposDelOperario(operarioId: string, anio: number, mes: number) {
     const { inicio, fin } = rangoMesUTC(anio, mes);
     return prisma.anticipo.findMany({

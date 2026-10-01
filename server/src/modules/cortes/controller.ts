@@ -3,7 +3,11 @@ import type {
   AsignarGrupoInput,
   CerrarCorteInput,
   CrearCorteInput,
+  EditarServicioInput,
+  EditarTendidoInput,
+  ProcesoCorte,
   ReemplazarAsignacionesInput,
+  RegistrarProcesoInput,
 } from '@taller/shared';
 import { cortesService } from './service.js';
 
@@ -27,6 +31,33 @@ export const cortesController = {
 
   async abrir(req: Request, res: Response) {
     res.json({ data: await cortesService.abrir(String(req.params.id)) });
+  },
+
+  async editarTendido(req: Request, res: Response) {
+    const dto = await cortesService.editarTendido(
+      String(req.params.id),
+      req.body as EditarTendidoInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async editarServicio(req: Request, res: Response) {
+    const dto = await cortesService.editarServicio(
+      String(req.params.id),
+      req.body as EditarServicioInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async registrarProceso(req: Request, res: Response) {
+    const { id, proceso } = res.locals.params as { id: string; proceso: ProcesoCorte };
+    const dto = await cortesService.registrarProceso(id, proceso, req.body as RegistrarProcesoInput);
+    res.json({ data: dto });
+  },
+
+  async quitarProceso(req: Request, res: Response) {
+    const { id, proceso } = res.locals.params as { id: string; proceso: ProcesoCorte };
+    res.json({ data: await cortesService.quitarProceso(id, proceso) });
   },
 
   async reemplazarAsignaciones(req: Request, res: Response) {

@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CrearModeloInput,
   CrearVersionInput,
+  EditarBuscadorInput,
   EditarOperacionInput,
   ModeloDTO,
   ModeloVersionDetalleDTO,
+  MoldeInput,
   OperacionInput,
 } from '@taller/shared';
 import { api } from './client';
@@ -51,6 +53,44 @@ export function useCrearVersion() {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+    onSuccess: aplicar,
+  });
+}
+
+/** Buscador del modelo: asignar, "sin buscador" o pendiente (ambos vacíos). */
+export function useEditarBuscador() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ modeloId, ...input }: EditarBuscadorInput & { modeloId: string }) =>
+      api<ModeloDTO>(`/modelos/${modeloId}/buscador`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modelos'] });
+      qc.invalidateQueries({ queryKey: ['version'] }); // el detalle muestra el buscador
+    },
+  });
+}
+
+/** Moldes de una versión: registrar o corregir (PUT) y quitar (DELETE). */
+export function useGuardarMolde() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ versionId, input }: { versionId: string; input: MoldeInput }) =>
+      api<ModeloVersionDetalleDTO>(`/versiones/${versionId}/molde`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useEliminarMolde() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: (versionId: string) =>
+      api<ModeloVersionDetalleDTO>(`/versiones/${versionId}/molde`, { method: 'DELETE' }),
     onSuccess: aplicar,
   });
 }

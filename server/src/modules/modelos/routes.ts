@@ -2,7 +2,9 @@ import { Router } from 'express';
 import {
   crearModeloSchema,
   crearVersionSchema,
+  editarBuscadorSchema,
   editarOperacionSchema,
+  moldeInputSchema,
   operacionInputSchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
@@ -18,7 +20,14 @@ modelosRouter.post(
   validar(crearVersionSchema),
   modelosController.crearVersion,
 );
+modelosRouter.patch(
+  '/modelos/:id/buscador',
+  validar(editarBuscadorSchema),
+  modelosController.editarBuscador,
+);
 modelosRouter.get('/versiones/:id', modelosController.obtenerVersion);
+modelosRouter.put('/versiones/:id/molde', validar(moldeInputSchema), modelosController.guardarMolde);
+modelosRouter.delete('/versiones/:id/molde', modelosController.eliminarMolde);
 modelosRouter.post(
   '/versiones/:id/operaciones',
   validar(operacionInputSchema),

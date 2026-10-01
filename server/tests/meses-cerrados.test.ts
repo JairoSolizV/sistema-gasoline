@@ -9,6 +9,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
+import { datosOperario } from './helpers/operario.js';
 
 const app = crearApp();
 
@@ -16,7 +18,7 @@ const app = crearApp();
 let versionId: string;
 
 async function crearOperario(nombre: string): Promise<string> {
-  const res = await request(app).post('/api/v1/operarios').send({ nombre });
+  const res = await request(app).post('/api/v1/operarios').send({ nombre, ...datosOperario() });
   return res.body.data.id;
 }
 
@@ -24,7 +26,7 @@ async function crearOperario(nombre: string): Promise<string> {
 async function corteAsignado(operarioId: string, monto: number): Promise<string> {
   const creado = await request(app)
     .post('/api/v1/cortes')
-    .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [monto], plusPorTalla: [] });
+    .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [monto], plusPorTalla: [] });
   const corteId = creado.body.data.id;
   const abierto = await request(app).post(`/api/v1/cortes/${corteId}/abrir`);
   const opId = abierto.body.data.operaciones[0].id;
@@ -198,7 +200,7 @@ describe('validación de plus por talla', () => {
   test('el plus no puede tener más entradas que tallas', async () => {
     const res = await request(app)
       .post('/api/v1/cortes')
-      .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [10], plusPorTalla: [1, 2] });
+      .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [10], plusPorTalla: [1, 2] });
     expect(res.status).toBe(400);
   });
 });

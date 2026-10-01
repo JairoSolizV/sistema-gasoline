@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
+import { datosOperario } from './helpers/operario.js';
 
 const app = crearApp();
 
@@ -12,7 +14,7 @@ const app = crearApp();
 let versionId: string;
 
 async function crearOperario(nombre: string): Promise<string> {
-  const res = await request(app).post('/api/v1/operarios').send({ nombre });
+  const res = await request(app).post('/api/v1/operarios').send({ nombre, ...datosOperario() });
   return res.body.data.id;
 }
 
@@ -20,7 +22,7 @@ async function crearOperario(nombre: string): Promise<string> {
 async function corteCerrado(operarioId: string, monto: number, fechaCierreISO: string) {
   const creado = await request(app)
     .post('/api/v1/cortes')
-    .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [monto], plusPorTalla: [] });
+    .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [monto], plusPorTalla: [] });
   const corteId = creado.body.data.id;
   const abierto = await request(app).post(`/api/v1/cortes/${corteId}/abrir`);
   const opId = abierto.body.data.operaciones[0].id;
@@ -107,7 +109,7 @@ describe('GET /api/v1/liquidacion — consolidado en vivo', () => {
     // corte abierto (no cerrado) en mayo 2099
     const creado = await request(app)
       .post('/api/v1/cortes')
-      .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [99999], plusPorTalla: [] });
+      .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [99999], plusPorTalla: [] });
     const abierto = await request(app).post(`/api/v1/cortes/${creado.body.data.id}/abrir`);
     await request(app)
       .put(`/api/v1/cortes/${creado.body.data.id}/operaciones/${abierto.body.data.operaciones[0].id}/asignaciones`)

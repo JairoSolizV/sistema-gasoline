@@ -1,0 +1,335 @@
+{
+  "_meta": {
+    "descripcion": "Plantilla del pantalon clasico, extraida de la hoja 'CLAS GSLN BJO' del Excel del taller (AJUSTE MARIO LUIS MIGUEL.xlsm).",
+    "nota": "Textos TAL CUAL vienen del Excel, incluidas sus abreviaturas y erratas (pope, bolsill, delant, entrepier, atraqie, atrque). El seed las normaliza con normalizacion-equipos.ts, igual que los modelos.",
+    "precios": "Cada fila trae \"ct\" (Bs) de la columna CT de la hoja: se guarda como CT de REFERENCIA y precarga el alta de modelo, donde se puede cambiar.",
+    "control": "36 operaciones; los CT suman 7.16 Bs por prenda (celda F8 del Excel)."
+  },
+  "nombre": "Pantalón clásico",
+  "operaciones": [
+    {
+      "orden": 1,
+      "grupo": "TRAS",
+      "n": "1",
+      "equipo": "codo",
+      "proceso": "Herraje",
+      "pieza": "trasero",
+      "ct": 0.2
+    },
+    {
+      "orden": 2,
+      "grupo": "TRAS",
+      "n": "2",
+      "equipo": "codo",
+      "proceso": "urlado",
+      "pieza": "trasero",
+      "ct": 0.3
+    },
+    {
+      "orden": 3,
+      "grupo": "TRAS",
+      "n": "3",
+      "equipo": "plana",
+      "proceso": "boca",
+      "pieza": "bolsillo",
+      "ct": 0.2
+    },
+    {
+      "orden": 4,
+      "grupo": "TRAS",
+      "n": "4",
+      "equipo": "plancha",
+      "proceso": "planchado",
+      "pieza": "bolsillo",
+      "ct": 0.2
+    },
+    {
+      "orden": 5,
+      "grupo": "TRAS",
+      "n": "5",
+      "equipo": "plana",
+      "proceso": "parchado",
+      "pieza": "bolsillo",
+      "ct": 0.5
+    },
+    {
+      "orden": 6,
+      "grupo": "DEL",
+      "n": "1",
+      "equipo": "collareta",
+      "proceso": "refuerzo",
+      "pieza": "popelina",
+      "ct": 0.2
+    },
+    {
+      "orden": 7,
+      "grupo": "DEL",
+      "n": "2",
+      "equipo": "collareta",
+      "proceso": "vista",
+      "pieza": "popelina",
+      "ct": 0.2
+    },
+    {
+      "orden": 8,
+      "grupo": "DEL",
+      "n": "3",
+      "equipo": "over",
+      "proceso": "remalle",
+      "pieza": "reloj",
+      "ct": 0.05
+    },
+    {
+      "orden": 9,
+      "grupo": "DEL",
+      "n": "4",
+      "equipo": "recta",
+      "proceso": "despunte",
+      "pieza": "reloj",
+      "ct": 0.1
+    },
+    {
+      "orden": 10,
+      "grupo": "DEL",
+      "n": "5",
+      "equipo": "plana",
+      "proceso": "parchado",
+      "pieza": "reloj",
+      "ct": 0.2
+    },
+    {
+      "orden": 11,
+      "grupo": "DEL",
+      "n": "6",
+      "equipo": "over",
+      "proceso": "overeado",
+      "pieza": "pope",
+      "ct": 0.1
+    },
+    {
+      "orden": 12,
+      "grupo": "DEL",
+      "n": "7",
+      "equipo": "recta",
+      "proceso": "despunte",
+      "pieza": "pope",
+      "ct": 0.2
+    },
+    {
+      "orden": 13,
+      "grupo": "DEL",
+      "n": "8",
+      "equipo": "recta",
+      "proceso": "pegado vista",
+      "pieza": "bolsill",
+      "ct": 0.2
+    },
+    {
+      "orden": 14,
+      "grupo": "DEL",
+      "n": "9",
+      "equipo": "plana",
+      "proceso": "despunte vista",
+      "pieza": "bolsill",
+      "ct": 0.2
+    },
+    {
+      "orden": 15,
+      "grupo": "DEL",
+      "n": "10",
+      "equipo": "recta",
+      "proceso": "pegado",
+      "pieza": "talla",
+      "ct": 0.05
+    },
+    {
+      "orden": 16,
+      "grupo": "DEL",
+      "n": "11",
+      "equipo": "recta",
+      "proceso": "asegurado",
+      "pieza": "pope",
+      "ct": 0.3
+    },
+    {
+      "orden": 17,
+      "grupo": "ENSA",
+      "n": "1",
+      "equipo": "over",
+      "proceso": "overeado",
+      "pieza": "aleta",
+      "ct": 0.05
+    },
+    {
+      "orden": 18,
+      "grupo": "ENSA",
+      "n": "2",
+      "equipo": "over",
+      "proceso": "overeado",
+      "pieza": "contra",
+      "ct": 0.1
+    },
+    {
+      "orden": 19,
+      "grupo": "ENSA",
+      "n": "3",
+      "equipo": "recta",
+      "proceso": "cierre",
+      "pieza": "aleta",
+      "ct": 0.1
+    },
+    {
+      "orden": 20,
+      "grupo": "ENSA",
+      "n": "4",
+      "equipo": "recta",
+      "proceso": "aleta",
+      "pieza": "cuerpo",
+      "ct": 0.1
+    },
+    {
+      "orden": 21,
+      "grupo": "ENSA",
+      "n": "5",
+      "equipo": "recta",
+      "proceso": "despunte aleta",
+      "pieza": "cuerpo",
+      "ct": 0.1
+    },
+    {
+      "orden": 22,
+      "grupo": "ENSA",
+      "n": "6",
+      "equipo": "plana",
+      "proceso": "jota",
+      "pieza": "delant",
+      "ct": 0.15
+    },
+    {
+      "orden": 23,
+      "grupo": "ENSA",
+      "n": "7",
+      "equipo": "plana",
+      "proceso": "ensamble",
+      "pieza": "delant",
+      "ct": 0.35
+    },
+    {
+      "orden": 24,
+      "grupo": "CERR",
+      "n": "1",
+      "equipo": "overlock",
+      "proceso": "cerrado",
+      "pieza": "lateral",
+      "ct": 0.35
+    },
+    {
+      "orden": 25,
+      "grupo": "CERR",
+      "n": "2",
+      "equipo": "recta",
+      "proceso": "despunte",
+      "pieza": "lateral",
+      "ct": 0.2
+    },
+    {
+      "orden": 26,
+      "grupo": "CERR",
+      "n": "3",
+      "equipo": "codo",
+      "proceso": "despunte",
+      "pieza": "entrepier",
+      "ct": 0.2
+    },
+    {
+      "orden": 27,
+      "grupo": "CERR",
+      "n": "4",
+      "equipo": "overlock",
+      "proceso": "cerrado",
+      "pieza": "entrepier",
+      "ct": 0.2
+    },
+    {
+      "orden": 28,
+      "grupo": "ACAB",
+      "n": "1",
+      "equipo": "pretina",
+      "proceso": "cintura 3 hilo",
+      "pieza": "pretina",
+      "ct": 0.6
+    },
+    {
+      "orden": 29,
+      "grupo": "ACAB",
+      "n": "2",
+      "equipo": "recta",
+      "proceso": "asegurado",
+      "pieza": "pretina",
+      "ct": 0.35
+    },
+    {
+      "orden": 30,
+      "grupo": "ACAB",
+      "n": "3",
+      "equipo": "recta",
+      "proceso": "boteado",
+      "pieza": "clasico",
+      "ct": 0.3
+    },
+    {
+      "orden": 31,
+      "grupo": "PRESI",
+      "n": "1",
+      "equipo": "collareta",
+      "proceso": "pasador",
+      "pieza": "presilla",
+      "ct": 0.15
+    },
+    {
+      "orden": 32,
+      "grupo": "PRESI",
+      "n": "2",
+      "equipo": "tijera",
+      "proceso": "corte",
+      "pieza": "presilla",
+      "ct": 0.05
+    },
+    {
+      "orden": 33,
+      "grupo": "PRESI",
+      "n": "3",
+      "equipo": "atraque",
+      "proceso": "pasador",
+      "pieza": "presilla",
+      "ct": 0.4
+    },
+    {
+      "orden": 34,
+      "grupo": "PRESI",
+      "n": "4",
+      "equipo": "atraqie",
+      "proceso": "atrque",
+      "pieza": "reloj",
+      "ct": 0.03
+    },
+    {
+      "orden": 35,
+      "grupo": "PRESI",
+      "n": "5",
+      "equipo": "atraqie",
+      "proceso": "atraque",
+      "pieza": "bolsillo",
+      "ct": 0.12
+    },
+    {
+      "orden": 36,
+      "grupo": "PRESI",
+      "n": "6",
+      "equipo": "atraqie",
+      "proceso": "jota",
+      "pieza": "delantero",
+      "ct": 0.06
+    }
+  ]
+}

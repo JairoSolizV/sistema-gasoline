@@ -48,7 +48,15 @@ docker compose up --build
    ```
    El seed carga `docs/seed_datos_taller.json` (operarios, configuración y los 5
    modelos reales) y **valida** que las sumas de CT den 8.10 / 5.97 / 7.68 / 6.29 / 7.18 Bs.
-   Es idempotente: se puede re-ejecutar sin duplicar datos.
+   Es idempotente: se puede re-ejecutar sin duplicar datos. Al cargar unifica las variantes con que el
+   Excel escribe lo mismo (`server/prisma/normalizacion-equipos.ts`: DELANTERO/DELANTEROS, 3 pinza/pinza,
+   entrep./entrep…, columnas invertidas), carga la **plantilla del pantalón clásico** (36 operaciones de la
+   hoja "CLAS GSLN BJO" del Excel) y arma el **catálogo**: 11 máquinas, 63 procesos, 109 piezas, 8 grupos.
+   Ojo: un número en el nombre de una operación (`corrida 2`, `3 pinzas`) es una segunda pasada o una
+   cantidad, no el número de paso — nunca se unifica con la operación simple.
+
+   Si ya tenías modelos cargados de antes del catálogo, podés armarlo aparte con
+   `npm run catalogo:backfill` (también idempotente, no modifica ni borra nada).
 5. **Levantar la API.** En `server/`: `npm run dev` → `http://localhost:3001/api/v1`.
    Escucha en `0.0.0.0` (acceso por IP local).
 6. **Levantar el panel.** En `client/`: `npm run dev` → `http://localhost:5173`
@@ -82,3 +90,10 @@ Los tests están nombrados por criterio de aceptación (`ca-1.test.ts`, `domain-
 - [x] **Rebanada 6 — Liquidación**: consolidado mensual con saldo y arrastre, cierre de mes, planilla imprimible.
 - [x] **Rebanada 7 — Rendición de cuentas**: vista filtrada por operario sin fuga de terceros, imprimible.
 - [x] **Rebanada 8 — Dashboard + Configuración + auth**: KPIs y alertas, config editable, login JWT, docker-compose.
+- [x] **Rebanada 9 — Catálogo Máquina → Proceso → Pieza**: catálogo jerárquico (+ grupos, que envuelven
+  a las operaciones) que alimenta el alta de modelos con selectores en cascada, en vez de escribir los
+  nombres a mano. **Renombrar** y **unir** entradas actualizan los modelos que las usaban, y nunca el
+  snapshot de los cortes. Ver `docs/PLAN_CATALOGO_MAQUINAS.md`.
+- [x] **Rebanada 10 — Plantillas de modelo**: recetas de operaciones (con CT de referencia editable) para crear un modelo
+  sin cargar 36 filas a mano. Viene la del **pantalón clásico**, fija: se edita pero no se borra, y se
+  duplica para armar variantes. Ver `docs/PLAN_PLANTILLAS.md`.

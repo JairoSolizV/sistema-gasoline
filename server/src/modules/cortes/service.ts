@@ -1,6 +1,6 @@
 // Corazón de la Rebanada 4. Reglas que este service hace cumplir:
 //  - snapshot inmutable al abrir (CA-1.4), PLUS pagado (CA-2.2)
-//  - suma exacta / máx. 3 / operario activo en cada mutación (CA-3.x)
+//  - suma exacta / máx. 3 / operario activo y con rol costurero en cada mutación (CA-3.x)
 //  - diferencial de maestro copiado del config a la asignación (CA-4.x)
 //  - cierre solo con todo asignada (CA-8.3); cerrado = inmutable
 import type {
@@ -10,9 +10,14 @@ import type {
   CorteOperacionDTO,
   CorteResumenDTO,
   CrearCorteInput,
+  EditarServicioInput,
+  EditarTendidoInput,
+  ProcesoCorte,
   ReemplazarAsignacionesInput,
+  RegistrarProcesoInput,
   TotalPorOperarioDTO,
 } from '@taller/shared';
+import { ETIQUETA_PROCESO } from '@taller/shared';
 import { cantidadTotal, sumaCt, tarifaEfectiva, totalAsignacion } from '../../domain/calculo.js';
 import {
   puedeCerrarCorte,
@@ -21,7 +26,9 @@ import {
 } from '../../domain/validaciones.js';
 import { AppError } from '../../middleware/errors.js';
 import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
+import { exigirOperariosHabilitados } from '../operarios/habilitados.js';
 import { cortesRepository, type CorteConDetalle } from './repository.js';
+import { aServicioDTO, faltantesServicio, prepararTrabajos, tarifasDeConfig } from './servicio.js';
 
 function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
   const operaciones: CorteOperacionDTO[] = corte.operaciones.map((op) => {
@@ -79,6 +86,10 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
   }
 
   const costoManoObraPrenda = sumaCt(corte.operaciones);
+  // tres costos separados (PLAN_SERVICIO_CORTE §2.11): costura · servicio · total
+  const costoCostura = corte.cantidadTotal * costoManoObraPrenda;
+  const servicio = aServicioDTO(corte);
+  const costoServicioCorte = servicio?.total ?? 0;
   return {
     id: corte.id,
     codigo: corte.codigo,
@@ -89,11 +100,18 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     cortePorTalla: corte.cortePorTalla as number[],
     plusPorTalla: corte.plusPorTalla as number[],
     cantidadTotal: corte.cantidadTotal,
+    tela: corte.tela,
+    anchoCm: corte.anchoCm,
+    trazadoCm: corte.trazadoCm,
+    esInterno: corte.esInterno,
+    servicio,
     estado: corte.estado,
     fechaInicio: corte.fechaInicio.toISOString(),
     fechaCierre: corte.fechaCierre ? corte.fechaCierre.toISOString() : null,
     costoManoObraPrenda,
-    costoTotalCorte: corte.cantidadTotal * costoManoObraPrenda,
+    costoTotalCorte: costoCostura,
+    costoServicioCorte,
+    costoTotal: costoCostura + costoServicioCorte,
     operaciones,
     totalesPorOperario: [...porOperario.values()].sort((a, b) => b.total - a.total),
   };
@@ -117,16 +135,20 @@ async function corteAbiertoOError(corteId: string): Promise<CorteConDetalle> {
   return corte;
 }
 
-async function operariosActivosOError(ids: string[]) {
-  const operarios = await cortesRepository.listarOperariosPorIds(ids);
-  if (operarios.length !== ids.length) {
-    throw new AppError('NO_ENCONTRADO', 'Algún operario no existe', 404);
+async function corteNoCerradoOError(corteId: string): Promise<CorteConDetalle> {
+  const corte = await cortesRepository.obtenerDetalle(corteId);
+  if (!corte) throw new AppError('NO_ENCONTRADO', 'Corte no encontrado', 404);
+  if (corte.estado === 'cerrado') {
+    throw new AppError('ESTADO_INVALIDO', 'El corte ya está cerrado y no se puede editar', 409);
   }
-  const inactivo = operarios.find((o) => !o.activo);
-  if (inactivo) {
+  return corte;
+}
+
+function exigirInterno(corte: CorteConDetalle) {
+  if (!corte.esInterno) {
     throw new AppError(
-      'OPERARIO_INACTIVO',
-      `${inactivo.nombre} está dado de baja y no puede recibir asignaciones nuevas`,
+      'CORTE_EXTERNO',
+      'Es un corte externo (llegó cortado de afuera): no lleva procesos del servicio de corte',
       409,
     );
   }
@@ -169,7 +191,6 @@ export const cortesService = {
     if (cantidad < 1) {
       throw new AppError('VALIDACION', 'El corte debe tener al menos una prenda', 400);
     }
-
     const corte = await cortesRepository.crearBorrador({
       modeloVersionId: input.modeloVersionId,
       codigo: input.codigo ?? null,
@@ -177,8 +198,73 @@ export const cortesService = {
       cortePorTalla: input.cortePorTalla,
       plusPorTalla: input.plusPorTalla,
       cantidadTotal: cantidad,
+      tela: input.tela,
+      anchoCm: input.anchoCm,
+      trazadoCm: input.trazadoCm,
+      esInterno: input.esInterno,
+      // snapshot: cambiar Configuración después no altera este corte
+      tarifas: input.esInterno ? await tarifasDeConfig() : null,
     });
     return detalle(corte.id);
+  },
+
+  // Completar/corregir el tendido (informativo: no toca pagos). Cerrado = inmutable.
+  async editarTendido(corteId: string, input: EditarTendidoInput): Promise<CorteDetalleDTO> {
+    const corte = await corteNoCerradoOError(corteId);
+    await cortesRepository.actualizarTendido(corte.id, {
+      tela: input.tela,
+      anchoCm: input.anchoCm,
+      trazadoCm: input.trazadoCm,
+    });
+    return detalle(corteId);
+  },
+
+  /** Interno ↔ externo. Para pasar a externo no puede tener procesos pagados;
+   *  al pasar a interno se copian las tarifas de Configuración si no las tenía. */
+  async editarServicio(corteId: string, input: EditarServicioInput): Promise<CorteDetalleDTO> {
+    const corte = await corteNoCerradoOError(corteId);
+    if (!input.esInterno && corte.trabajos.length > 0) {
+      throw new AppError(
+        'SERVICIO_CON_TRABAJOS',
+        'Este corte ya tiene procesos del servicio registrados: quitalos antes de marcarlo como externo',
+        409,
+      );
+    }
+    const tarifas =
+      input.esInterno && corte.tarifaBusqueda == null ? await tarifasDeConfig() : undefined;
+    await cortesRepository.actualizarServicio(corteId, { esInterno: input.esInterno, tarifas });
+    return detalle(corteId);
+  },
+
+  /** Registra o reemplaza un proceso del servicio de corte (todas sus personas).
+   *  Se paga en `fecha`: ni la nueva ni la de lo ya registrado pueden caer en
+   *  un mes liquidado. */
+  async registrarProceso(
+    corteId: string,
+    proceso: ProcesoCorte,
+    input: RegistrarProcesoInput,
+  ): Promise<CorteDetalleDTO> {
+    const corte = await corteNoCerradoOError(corteId);
+    exigirInterno(corte);
+    const previos = corte.trabajos.filter((t) => t.proceso === proceso);
+    if (previos.length > 0) {
+      await exigirFechaSinLiquidar(previos[0].fecha, `modificar ${ETIQUETA_PROCESO[proceso].toLowerCase()}`);
+    }
+    await exigirFechaSinLiquidar(input.fecha, `registrar ${ETIQUETA_PROCESO[proceso].toLowerCase()}`);
+    const { filas, modalidad, extra } = await prepararTrabajos(corte, proceso, input);
+    await cortesRepository.reemplazarTrabajos(corteId, proceso, filas, { modalidad, extra });
+    return detalle(corteId);
+  },
+
+  async quitarProceso(corteId: string, proceso: ProcesoCorte): Promise<CorteDetalleDTO> {
+    const corte = await corteNoCerradoOError(corteId);
+    const previos = corte.trabajos.filter((t) => t.proceso === proceso);
+    if (previos.length === 0) {
+      throw new AppError('NO_ENCONTRADO', 'Ese proceso no está registrado en el corte', 404);
+    }
+    await exigirFechaSinLiquidar(previos[0].fecha, `quitar ${ETIQUETA_PROCESO[proceso].toLowerCase()}`);
+    await cortesRepository.eliminarTrabajos(corteId, proceso);
+    return detalle(corteId);
   },
 
   async abrir(corteId: string): Promise<CorteDetalleDTO> {
@@ -228,7 +314,7 @@ export const cortesService = {
     if (new Set(ids).size !== ids.length) {
       throw new AppError('VALIDACION', 'No se puede repetir un operario en la misma operación', 400);
     }
-    if (ids.length > 0) await operariosActivosOError(ids);
+    await exigirOperariosHabilitados(ids, 'costurero', 'recibir asignaciones de costura');
 
     const diferencialConfig = await diferencialDeConfig();
     const filas = input.asignaciones.map((a) => {
@@ -258,7 +344,11 @@ export const cortesService = {
     if (operaciones.length === 0) {
       throw new AppError('NO_ENCONTRADO', `El corte no tiene grupo "${input.grupo}"`, 404);
     }
-    await operariosActivosOError([input.operarioId]);
+    await exigirOperariosHabilitados(
+      [input.operarioId],
+      'costurero',
+      'recibir asignaciones de costura',
+    );
 
     const diferencialConfig = await diferencialDeConfig();
     const diferencial = input.esMaestroExterno ? diferencialConfig : 0;
@@ -291,6 +381,15 @@ export const cortesService = {
       throw new AppError(
         'CORTE_INCOMPLETO',
         `No se puede cerrar: ${sinAsignar} operaciones sin asignar y ${parciales} con descuadre`,
+        409,
+      );
+    }
+    // corte interno: todos los procesos del servicio registrados (PLAN §2.7)
+    const faltan = faltantesServicio(corte);
+    if (faltan.length > 0) {
+      throw new AppError(
+        'SERVICIO_INCOMPLETO',
+        `No se puede cerrar: falta registrar ${faltan.map((p) => ETIQUETA_PROCESO[p].toLowerCase()).join(', ')} del servicio de corte`,
         409,
       );
     }

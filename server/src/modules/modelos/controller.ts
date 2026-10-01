@@ -2,7 +2,9 @@ import type { Request, Response } from 'express';
 import type {
   CrearModeloInput,
   CrearVersionInput,
+  EditarBuscadorInput,
   EditarOperacionInput,
+  MoldeInput,
   OperacionInput,
 } from '@taller/shared';
 import { modelosService } from './service.js';
@@ -23,6 +25,23 @@ export const modelosController = {
       req.body as CrearVersionInput,
     );
     res.status(201).json({ data: dto });
+  },
+
+  async editarBuscador(req: Request, res: Response) {
+    const dto = await modelosService.editarBuscador(
+      String(req.params.id),
+      req.body as EditarBuscadorInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async guardarMolde(req: Request, res: Response) {
+    const dto = await modelosService.guardarMolde(String(req.params.id), req.body as MoldeInput);
+    res.json({ data: dto });
+  },
+
+  async eliminarMolde(req: Request, res: Response) {
+    res.json({ data: await modelosService.eliminarMolde(String(req.params.id)) });
   },
 
   async obtenerVersion(req: Request, res: Response) {

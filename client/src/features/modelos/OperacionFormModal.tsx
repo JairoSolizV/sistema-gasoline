@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { aCentavos, formatBs, type OperacionDTO, type OperacionInput } from '@taller/shared';
 import { Modal } from '../../components/Modal';
 import { ErrorApi } from '../../api/client';
+import { useSelectoresCatalogo } from './useSelectoresCatalogo';
 
 // El form trabaja el CT en Bs (texto); se convierte a centavos UNA vez al enviar.
 export const PATRON_BS = /^\d+(\.\d{1,2})?$/;
@@ -47,6 +48,8 @@ export function OperacionFormModal({
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<OperacionFormValores>({
     defaultValues: operacion
@@ -61,6 +64,20 @@ export function OperacionFormModal({
       : { grupo: grupoSugerido ?? '', n: '', equipo: '', proceso: '', pieza: '', ctBs: '' },
   });
 
+  // Grupo, máquina, proceso y pieza salen del catálogo (cascada máquina →
+  // proceso → pieza); N y CT se siguen escribiendo a mano.
+  const actuales = watch();
+  const selectores = useSelectoresCatalogo<OperacionFormValores>({
+    register,
+    setValue,
+    valores: {
+      grupo: actuales.grupo,
+      equipo: actuales.equipo,
+      proceso: actuales.proceso,
+      pieza: actuales.pieza,
+    },
+  });
+
   const onSubmit = handleSubmit(async (valores) => {
     await onGuardar(aOperacionInput(valores));
     onCerrar();
@@ -73,11 +90,7 @@ export function OperacionFormModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium">Grupo</label>
-            <input
-              {...register('grupo', { required: 'El grupo es obligatorio' })}
-              placeholder="ej. TRASEROS"
-              className={claseInput}
-            />
+            {selectores.grupo}
             {errors.grupo && <p className="mt-1 text-xs text-error">{errors.grupo.message}</p>}
           </div>
           <div>
@@ -88,27 +101,19 @@ export function OperacionFormModal({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Máquina</label>
-            <input
-              {...register('equipo', { required: 'La máquina es obligatoria' })}
-              placeholder="ej. recta"
-              className={claseInput}
-            />
+            {selectores.maquina}
             {errors.equipo && <p className="mt-1 text-xs text-error">{errors.equipo.message}</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Proceso</label>
-            <input
-              {...register('proceso', { required: 'El proceso es obligatorio' })}
-              placeholder="ej. pinza"
-              className={claseInput}
-            />
+            {selectores.proceso}
             {errors.proceso && <p className="mt-1 text-xs text-error">{errors.proceso.message}</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">
               Pieza <span className="font-normal text-gray-400">(opcional)</span>
             </label>
-            <input {...register('pieza')} placeholder="ej. trasero" className={claseInput} />
+            {selectores.pieza}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">CT — Bs por pieza</label>

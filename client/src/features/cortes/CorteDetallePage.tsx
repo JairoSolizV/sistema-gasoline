@@ -1,24 +1,150 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { formatBs, type CorteOperacionDTO } from '@taller/shared';
-import { useAbrirCorte, useAsignarGrupo, useCerrarCorte, useCorte } from '../../api/cortes';
+import {
+  ETIQUETA_PROCESO,
+  formatBs,
+  formatMetros,
+  type CorteDetalleDTO,
+  type CorteOperacionDTO,
+} from '@taller/shared';
+import {
+  useAbrirCorte,
+  useAsignarGrupo,
+  useCerrarCorte,
+  useCorte,
+  useEditarTendido,
+} from '../../api/cortes';
 import { useOperarios } from '../../api/operarios';
 import { Modal } from '../../components/Modal';
 import { ErrorApi } from '../../api/client';
 import { badgeEstadoCorte, etiquetaGrupo } from './estados';
 import { hoyLocalISO } from '../../lib/fechas';
 import { OperacionFila } from './OperacionFila';
+import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendido';
+import { ServicioCorte } from './ServicioCorte';
+
+// Datos del tendido: informativos, no entran al cálculo de pagos. Mientras el
+// corte no esté cerrado se pueden completar (cortes creados antes de pedirlos)
+// o corregir.
+function TarjetaTendido({
+  corte,
+  onEditar,
+}: {
+  corte: CorteDetalleDTO;
+  onEditar: (() => void) | null; // null = no editable (corte cerrado)
+}) {
+  if (!corte.tela) {
+    return (
+      <div className="rounded-xl border border-dashed border-amber-300 bg-amber-50 px-4 py-2.5 text-xs">
+        <div className="mb-1 text-[11px] font-semibold tracking-wider text-amber-700 uppercase">
+          Tendido
+        </div>
+        <p className="text-amber-800">Este corte no tiene cargados los datos del tendido.</p>
+        {onEditar && (
+          <button
+            onClick={onEditar}
+            className="mt-2 rounded-lg bg-acento px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#265dc2]"
+          >
+            Completar datos
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const filas: [string, string][] = [
+    ['Tela', corte.tela ?? '—'],
+    ['Ancho', corte.anchoCm != null ? `${formatMetros(corte.anchoCm)} m` : '—'],
+    ['Trazado', corte.trazadoCm != null ? `${formatMetros(corte.trazadoCm)} m` : '—'],
+  ];
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+      <div className="mb-1 flex items-center justify-between gap-4">
+        <span className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+          Tendido
+        </span>
+        {onEditar && (
+          <button onClick={onEditar} className="text-xs font-medium text-acento hover:underline">
+            Editar
+          </button>
+        )}
+      </div>
+      <table className="text-xs">
+        <tbody>
+          {filas.map(([etiqueta, valor]) => (
+            <tr key={etiqueta}>
+              <td className="py-0.5 pr-3 font-semibold text-gray-400 uppercase">{etiqueta}</td>
+              <td className="max-w-72 py-0.5">{valor}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ModalTendido({ corte, onCerrar }: { corte: CorteDetalleDTO; onCerrar: () => void }) {
+  const editar = useEditarTendido();
+  const [valor, setValor] = useState(() => tendidoDesdeCorte(corte));
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  const guardar = async () => {
+    setErrorLocal(null);
+    const t = validarTendido(valor);
+    if (!t.ok) return setErrorLocal(t.error);
+    await editar.mutateAsync({ corteId: corte.id, input: t.datos });
+    onCerrar();
+  };
+
+  return (
+    <Modal onCerrar={onCerrar} ancho="max-w-2xl">
+      <h2 className="text-lg font-semibold">
+        {corte.tela ? 'Editar' : 'Completar'} datos del tendido
+      </h2>
+      <p className="mt-1 text-sm text-gray-500">
+        {corte.modeloNombre} v{corte.numeroVersion}
+        {corte.codigo ? ` · ${corte.codigo}` : ''} · informativo, no afecta los pagos
+      </p>
+      <div className="mt-4">
+        <CamposTendido valor={valor} onChange={setValor} />
+      </div>
+      {(errorLocal || editar.error) && (
+        <p className="mt-4 rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+          {errorLocal ??
+            (editar.error instanceof ErrorApi ? editar.error.message : 'Error al guardar')}
+        </p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCerrar}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={guardar}
+          disabled={editar.isPending}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Guardar
+        </button>
+      </div>
+    </Modal>
+  );
+}
 
 export function CorteDetallePage() {
   const { corteId } = useParams();
   const { data: corte, isLoading, error } = useCorte(corteId);
-  const { data: operarios } = useOperarios('activos');
+  // asignación de costura: solo costureros activos (restricción estricta de roles)
+  const { data: operarios } = useOperarios('activos', 'costurero');
   const abrir = useAbrirCorte();
   const asignarGrupo = useAsignarGrupo();
   const cerrar = useCerrarCorte();
 
   const [plegados, setPlegados] = useState<Record<string, boolean>>({});
   const [modalCerrar, setModalCerrar] = useState(false);
+  const [modalTendido, setModalTendido] = useState(false);
   const [fechaCierre, setFechaCierre] = useState(hoyLocalISO);
 
   const grupos = useMemo(() => {
@@ -39,7 +165,14 @@ export function CorteDetallePage() {
   const editable = corte.estado === 'abierto';
   const asignadas = corte.operaciones.filter((o) => o.estado === 'asignada').length;
   const totalOps = corte.operaciones.length;
-  const puedeCerrar = editable && totalOps > 0 && asignadas === totalOps;
+  const costuraCompleta = totalOps > 0 && asignadas === totalOps;
+  const faltaServicio = corte.servicio?.faltantes ?? [];
+  const puedeCerrar = editable && costuraCompleta && faltaServicio.length === 0;
+  const motivoNoCierre = !costuraCompleta
+    ? 'Todas las operaciones de costura deben cuadrar para cerrar'
+    : `Falta registrar del servicio de corte: ${faltaServicio
+        .map((p) => ETIQUETA_PROCESO[p].toLowerCase())
+        .join(', ')}`;
   const badge = badgeEstadoCorte(corte.estado);
   const totalAsignado = corte.totalesPorOperario.reduce((a, t) => a + t.total, 0);
   const maxPago = Math.max(1, ...corte.totalesPorOperario.map((t) => t.total));
@@ -89,14 +222,33 @@ export function CorteDetallePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 text-right shadow-sm">
+          {/* tres costos separados: costura · servicio de corte · total */}
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
             <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              Costo total del corte
+              Costura
             </div>
-            <div className="mono text-2xl font-semibold">Bs {formatBs(corte.costoTotalCorte)}</div>
+            <div className="mono text-lg font-semibold">Bs {formatBs(corte.costoTotalCorte)}</div>
             <div className="text-[11px] text-gray-400">
               {corte.cantidadTotal} × Bs {formatBs(corte.costoManoObraPrenda)}
             </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
+            <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+              Servicio de corte
+            </div>
+            <div className="mono text-lg font-semibold">
+              {corte.esInterno ? `Bs ${formatBs(corte.costoServicioCorte)}` : '—'}
+            </div>
+            <div className="text-[11px] text-gray-400">
+              {corte.esInterno ? 'trazado, doblado, corte…' : 'corte externo'}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-right shadow-sm">
+            <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+              Costo total del corte
+            </div>
+            <div className="mono text-2xl font-semibold">Bs {formatBs(corte.costoTotal)}</div>
+            <div className="text-[11px] text-gray-400">costura + servicio</div>
           </div>
           {corte.estado === 'borrador' ? (
             <button
@@ -110,11 +262,7 @@ export function CorteDetallePage() {
               <button
                 onClick={() => setModalCerrar(true)}
                 disabled={!puedeCerrar}
-                title={
-                  puedeCerrar
-                    ? 'Fijar fecha de cierre/liquidación'
-                    : 'Todas las operaciones deben cuadrar para cerrar'
-                }
+                title={puedeCerrar ? 'Fijar fecha de cierre/liquidación' : motivoNoCierre}
                 className="rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-white hover:bg-[#0e6238] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Cerrar corte
@@ -124,39 +272,50 @@ export function CorteDetallePage() {
         </div>
       </div>
 
-      <div className="mt-4 inline-block rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
-        <table className="text-xs">
-          <tbody>
-            <tr className="text-gray-400">
-              <td className="pr-3 font-semibold uppercase">Talla</td>
-              {corte.tallas.map((t, i) => (
-                <td key={i} className="mono px-2 text-center text-gray-600">
-                  {t}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className="pr-3 font-semibold text-gray-400 uppercase">Corte</td>
-              {corte.cortePorTalla.map((c, i) => (
-                <td key={i} className="mono px-2 text-center">
-                  {c}
-                </td>
-              ))}
-            </tr>
-            <tr>
-              <td className="pr-3 font-semibold text-gray-400 uppercase">Plus</td>
-              {corte.tallas.map((_, i) => (
-                <td key={i} className="mono px-2 text-center text-acento">
-                  {corte.plusPorTalla[i] || '·'}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-        <div className="mt-1 text-[10px] text-gray-400">
-          referencia de producción — el pago usa solo la cantidad total ({corte.cantidadTotal})
+      <div className="mt-4 flex flex-wrap items-start gap-3">
+        <div className="inline-block rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">
+          <table className="text-xs">
+            <tbody>
+              <tr className="text-gray-400">
+                <td className="pr-3 font-semibold uppercase">Talla</td>
+                {corte.tallas.map((t, i) => (
+                  <td key={i} className="mono px-2 text-center text-gray-600">
+                    {t}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="pr-3 font-semibold text-gray-400 uppercase">Corte</td>
+                {corte.cortePorTalla.map((c, i) => (
+                  <td key={i} className="mono px-2 text-center">
+                    {c}
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="pr-3 font-semibold text-gray-400 uppercase">Plus</td>
+                {corte.tallas.map((_, i) => (
+                  <td key={i} className="mono px-2 text-center text-acento">
+                    {corte.plusPorTalla[i] || '·'}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+          <div className="mt-1 text-[10px] text-gray-400">
+            referencia de producción — el pago usa solo la cantidad total ({corte.cantidadTotal})
+          </div>
         </div>
+        <TarjetaTendido
+          corte={corte}
+          onEditar={corte.estado === 'cerrado' ? null : () => setModalTendido(true)}
+        />
+        {modalTendido && (
+          <ModalTendido corte={corte} onCerrar={() => setModalTendido(false)} />
+        )}
       </div>
+
+      <ServicioCorte corte={corte} />
 
       {corte.estado === 'borrador' ? (
         <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">

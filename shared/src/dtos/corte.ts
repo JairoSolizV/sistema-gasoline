@@ -1,3 +1,5 @@
+import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
+
 export type EstadoCorte = 'borrador' | 'abierto' | 'cerrado';
 export type EstadoCorteOperacion = 'sin_asignar' | 'parcial' | 'asignada';
 
@@ -27,6 +29,49 @@ export interface CorteOperacionDTO {
   diferencia: number; // objetivo − asignado (>0 faltan, <0 sobran)
   totalOperacion: number; // centavos, Σ totales de sus asignaciones
   asignaciones: AsignacionDTO[];
+}
+
+export interface PersonaDTO {
+  id: string;
+  nombre: string;
+}
+
+// ── Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md) ──
+
+export interface TrabajoCorteDTO {
+  id: string;
+  operario: PersonaDTO;
+  orden: number;
+  tarifa: number; // centavos/prenda aplicada (doblado: la del proceso completo)
+  cantidad: number; // prendas
+  total: number; // centavos, fijado al guardar
+}
+
+export interface ProcesoServicioDTO {
+  proceso: ProcesoCorte;
+  fecha: string; // ISO: cuándo se terminó; define la semana/mes en que se paga
+  modalidad: ModalidadDoblado | null; // solo doblado
+  trabajos: TrabajoCorteDTO[];
+  subtotal: number; // centavos
+}
+
+export interface ServicioCorteDTO {
+  procesos: ProcesoServicioDTO[]; // solo los registrados, en orden del proceso
+  total: number; // centavos
+  /** Procesos que faltan para poder cerrar el corte. */
+  faltantes: ProcesoCorte[];
+  // tarifas predeterminadas copiadas al corte al crearlo (centavos)
+  tarifas: {
+    busqueda: number;
+    trazado: number;
+    dobladoHoja: number;
+    dobladoPares: number;
+    corteRespaldo: number;
+    clasificacionRespaldo: number;
+  };
+  // búsqueda: del modelo. Buscador de baja = no cobra en cortes nuevos.
+  buscadorModelo: (PersonaDTO & { activo: boolean }) | null;
+  sinBuscador: boolean;
 }
 
 export interface CorteResumenDTO {
@@ -60,11 +105,19 @@ export interface CorteDetalleDTO {
   cortePorTalla: number[];
   plusPorTalla: number[];
   cantidadTotal: number;
+  // tendido (null en cortes creados antes de pedir estos datos)
+  tela: string | null;
+  anchoCm: number | null;
+  trazadoCm: number | null;
+  esInterno: boolean;
+  servicio: ServicioCorteDTO | null; // null en cortes externos
   estado: EstadoCorte;
   fechaInicio: string;
   fechaCierre: string | null;
   costoManoObraPrenda: number; // centavos, Σ ct del snapshot
-  costoTotalCorte: number; // centavos = cantidadTotal × costoManoObraPrenda (CA-2.3)
+  costoTotalCorte: number; // costura: centavos = cantidadTotal × costoManoObraPrenda (CA-2.3)
+  costoServicioCorte: number; // Σ trabajos del servicio de corte interno (0 si externo)
+  costoTotal: number; // costura + servicio de corte
   operaciones: CorteOperacionDTO[];
   totalesPorOperario: TotalPorOperarioDTO[];
 }

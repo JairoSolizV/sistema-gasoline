@@ -1,7 +1,7 @@
 export interface DashboardKpisDTO {
   anio: number;
   mes: number;
-  totalAPagar: number; // centavos, ganado del mes (mano de obra a pagar)
+  totalAPagar: number; // centavos, ganado del mes: costura + servicio de corte + moldes
   anticiposEntregados: number; // centavos
   saldoPendiente: number; // centavos, neto por liquidar (con arrastre)
   cortesActivos: number;

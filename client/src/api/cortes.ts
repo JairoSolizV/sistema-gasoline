@@ -5,6 +5,10 @@ import type {
   CorteDetalleDTO,
   CorteResumenDTO,
   CrearCorteInput,
+  EditarServicioInput,
+  EditarTendidoInput,
+  ProcesoCorte,
+  RegistrarProcesoInput,
   ReemplazarAsignacionesInput,
 } from '@taller/shared';
 import { api } from './client';
@@ -49,6 +53,61 @@ export function useAbrirCorte() {
   return useMutation({
     mutationFn: (corteId: string) =>
       api<CorteDetalleDTO>(`/cortes/${corteId}/abrir`, { method: 'POST' }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useEditarTendido() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: EditarTendidoInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/tendido`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+/** Servicio de corte interno: marcar interno/externo y registrar o quitar un
+ *  proceso (todas sus personas). Devuelven el detalle actualizado. */
+export function useEditarServicio() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: EditarServicioInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/servicio`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useRegistrarProceso() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({
+      corteId,
+      proceso,
+      input,
+    }: {
+      corteId: string;
+      proceso: ProcesoCorte;
+      input: RegistrarProcesoInput;
+    }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/procesos/${proceso}`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useQuitarProceso() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, proceso }: { corteId: string; proceso: ProcesoCorte }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/procesos/${proceso}`, { method: 'DELETE' }),
     onSuccess: aplicar,
   });
 }

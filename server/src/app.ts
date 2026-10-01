@@ -4,6 +4,8 @@ import { requireAuth } from './middleware/auth.js';
 import { authRouter } from './modules/auth/routes.js';
 import { operariosRouter } from './modules/operarios/routes.js';
 import { modelosRouter } from './modules/modelos/routes.js';
+import { catalogoRouter } from './modules/catalogo/routes.js';
+import { plantillasRouter } from './modules/plantillas/routes.js';
 import { cortesRouter } from './modules/cortes/routes.js';
 import { anticiposRouter } from './modules/anticipos/routes.js';
 import { liquidacionRouter } from './modules/liquidacion/routes.js';
@@ -27,6 +29,7 @@ export function crearApp({ authObligatoria = false } = {}) {
   if (authObligatoria) app.use('/api/v1', requireAuth);
 
   app.use('/api/v1/operarios', operariosRouter);
+  app.use('/api/v1/catalogo', catalogoRouter);
   app.use('/api/v1/cortes', cortesRouter);
   app.use('/api/v1/anticipos', anticiposRouter);
   app.use('/api/v1/liquidacion', liquidacionRouter);
@@ -34,6 +37,7 @@ export function crearApp({ authObligatoria = false } = {}) {
   app.use('/api/v1/configuracion', configuracionRouter);
   app.use('/api/v1/dashboard', dashboardRouter);
   app.use('/api/v1', modelosRouter);
+  app.use('/api/v1', plantillasRouter);
 
   app.use(noEncontrado);
   app.use(errorHandler);

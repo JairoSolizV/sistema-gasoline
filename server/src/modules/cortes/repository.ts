@@ -1,10 +1,40 @@
 // Único acceso a Prisma del módulo. El snapshot al abrir y el reemplazo de
 // asignaciones son transaccionales (ARQUITECTURA §3.2): nunca quedan a medias.
-import type { EstadoCorteOp, Prisma } from '@prisma/client';
+import type { EstadoCorteOp, ModalidadDoblado, Prisma, ProcesoCorte } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 
+/** Tarifas predeterminadas copiadas al corte (mismos nombres que las columnas). */
+export interface TarifasServicioData {
+  tarifaBusqueda: number;
+  tarifaTrazado: number;
+  tarifaDobladoHoja: number;
+  tarifaDobladoPares: number;
+  tarifaCorteRespaldo: number;
+  tarifaClasificacionRespaldo: number;
+}
+
+/** Una fila de TrabajoCorte ya calculada por el service (total fijado). */
+export interface FilaTrabajo {
+  proceso: ProcesoCorte;
+  operarioId: string;
+  orden: number;
+  tarifa: number;
+  cantidad: number;
+  total: number;
+  fecha: Date;
+}
+
 const incluirDetalle = {
-  version: { include: { modelo: true } },
+  version: {
+    include: {
+      modelo: { include: { buscador: { select: { id: true, nombre: true, activo: true } } } },
+    },
+  },
+  // servicio de corte interno: por proceso (orden del enum) y orden dentro de él
+  trabajos: {
+    orderBy: [{ proceso: 'asc' as const }, { orden: 'asc' as const }],
+    include: { operario: { select: { id: true, nombre: true } } },
+  },
   operaciones: {
     orderBy: { orden: 'asc' as const },
     include: { asignaciones: { include: { operario: true } } },
@@ -46,8 +76,64 @@ export const cortesRepository = {
     cortePorTalla: number[];
     plusPorTalla: number[];
     cantidadTotal: number;
+    tela: string;
+    anchoCm: number;
+    trazadoCm: number;
+    esInterno: boolean;
+    tarifas: TarifasServicioData | null; // snapshot de Configuración (null si externo)
   }) {
-    return prisma.corte.create({ data });
+    const { tarifas, ...resto } = data;
+    return prisma.corte.create({ data: { ...resto, ...(tarifas ?? {}) } });
+  },
+
+  actualizarTendido(
+    corteId: string,
+    data: { tela: string; anchoCm: number; trazadoCm: number },
+  ) {
+    return prisma.corte.update({ where: { id: corteId }, data });
+  },
+
+  /** Marca interno/externo; al pasar a interno se copian las tarifas si faltan. */
+  actualizarServicio(
+    corteId: string,
+    data: { esInterno: boolean; tarifas?: TarifasServicioData },
+  ) {
+    return prisma.corte.update({
+      where: { id: corteId },
+      data: { esInterno: data.esInterno, ...(data.tarifas ?? {}) },
+    });
+  },
+
+  /** Reemplaza el set completo de un proceso (todas sus personas), atómico.
+   *  `extra` agrega filas de otro proceso en la misma transacción (búsqueda
+   *  automática al registrar el corte). */
+  reemplazarTrabajos(
+    corteId: string,
+    proceso: ProcesoCorte,
+    filas: FilaTrabajo[],
+    opciones: { modalidad?: ModalidadDoblado | null; extra?: FilaTrabajo[] } = {},
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.trabajoCorte.deleteMany({ where: { corteId, proceso } });
+      await tx.trabajoCorte.createMany({
+        data: [...filas, ...(opciones.extra ?? [])].map((f) => ({ ...f, corteId })),
+      });
+      if (opciones.modalidad !== undefined) {
+        await tx.corte.update({
+          where: { id: corteId },
+          data: { modalidadDoblado: opciones.modalidad },
+        });
+      }
+    });
+  },
+
+  eliminarTrabajos(corteId: string, proceso: ProcesoCorte) {
+    return prisma.$transaction(async (tx) => {
+      await tx.trabajoCorte.deleteMany({ where: { corteId, proceso } });
+      if (proceso === 'doblado') {
+        await tx.corte.update({ where: { id: corteId }, data: { modalidadDoblado: null } });
+      }
+    });
   },
 
   /** Snapshot: copia las operaciones de la versión (ct congelado) y abre el corte. */
@@ -112,9 +198,5 @@ export const cortesRepository = {
 
   obtenerConfiguracion() {
     return prisma.configuracion.findUnique({ where: { id: 1 } });
-  },
-
-  listarOperariosPorIds(ids: string[]) {
-    return prisma.operario.findMany({ where: { id: { in: ids } } });
   },
 };

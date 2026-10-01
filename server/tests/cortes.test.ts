@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
+import { datosOperario } from './helpers/operario.js';
 
 const app = crearApp();
 
@@ -56,6 +58,7 @@ async function crearCorteAbierto(
   versionId = versionTestId,
 ) {
   const creado = await request(app).post('/api/v1/cortes').send({
+    ...(await datosCorte()),
     modeloVersionId: versionId,
     tallas: [28, 30, 32, 34, 36, 38].slice(0, cortePorTalla.length),
     cortePorTalla,
@@ -86,12 +89,92 @@ describe('crear y abrir corte (snapshot)', () => {
 
   test('corte sin piezas no se puede crear', async () => {
     const res = await request(app).post('/api/v1/cortes').send({
+      ...(await datosCorte()),
       modeloVersionId: versionTestId,
       tallas: [28],
       cortePorTalla: [0],
       plusPorTalla: [],
     });
     expect(res.status).toBe(400);
+  });
+
+  test('guarda los datos del tendido y crea interno con las tarifas de Configuración', async () => {
+    const res = await request(app)
+      .post('/api/v1/cortes')
+      .send({
+        ...(await datosCorte({ esInterno: true })),
+        modeloVersionId: versionTestId,
+        tallas: [28],
+        cortePorTalla: [10],
+      });
+    expect(res.status).toBe(201);
+    const d = res.body.data;
+    expect(d.tela).toBe('DENIM 14 OZ');
+    expect(d.anchoCm).toBe(160);
+    expect(d.trazadoCm).toBe(525);
+    expect(d.esInterno).toBe(true);
+    expect(d.servicio.tarifas).toEqual({
+      busqueda: 10,
+      trazado: 30,
+      dobladoHoja: 15,
+      dobladoPares: 10,
+      corteRespaldo: 15,
+      clasificacionRespaldo: 10,
+    });
+  });
+
+  test('corte externo: sin servicio, costo total = costura', async () => {
+    const detalle = await crearCorteAbierto(); // datosCorte() = externo
+    expect(detalle.esInterno).toBe(false);
+    expect(detalle.servicio).toBeNull();
+    expect(detalle.costoServicioCorte).toBe(0);
+    expect(detalle.costoTotal).toBe(detalle.costoTotalCorte);
+  });
+
+  test.each(['tela', 'anchoCm', 'trazadoCm'])('sin %s el corte no se crea (400)', async (campo) => {
+    const res = await request(app)
+      .post('/api/v1/cortes')
+      .send({
+        ...(await datosCorte()),
+        [campo]: undefined,
+        modeloVersionId: versionTestId,
+        tallas: [28],
+        cortePorTalla: [10],
+      });
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain(campo);
+  });
+
+  test('PUT tendido corrige tela/medidas; cerrado 409; inexistente 404', async () => {
+    const detalle = await crearCorteAbierto();
+    const res = await request(app)
+      .put(`/api/v1/cortes/${detalle.id}/tendido`)
+      .send({ tela: 'GABARDINA', anchoCm: 152, trazadoCm: 600 });
+    expect(res.status).toBe(200);
+    expect([res.body.data.tela, res.body.data.anchoCm, res.body.data.trazadoCm]).toEqual([
+      'GABARDINA',
+      152,
+      600,
+    ]);
+
+    const cerrado = await prisma.corte.create({
+      data: {
+        modeloVersionId: versionTestId,
+        tallas: [28],
+        cortePorTalla: [10],
+        plusPorTalla: [],
+        cantidadTotal: 10,
+        estado: 'cerrado',
+        esInterno: false,
+        fechaCierre: new Date('2026-09-15T12:00:00Z'),
+      },
+    });
+    const tendido = { tela: 'X', anchoCm: 100, trazadoCm: 100 };
+    expect((await request(app).put(`/api/v1/cortes/${cerrado.id}/tendido`).send(tendido)).status).toBe(409);
+    expect(
+      (await request(app).put('/api/v1/cortes/00000000-0000-0000-0000-000000000000/tendido').send(tendido))
+        .status,
+    ).toBe(404);
   });
 
   test('abrir dos veces responde 409', async () => {
@@ -130,6 +213,29 @@ describe('crear y abrir corte (snapshot)', () => {
 
     // restaurar la plantilla para no ensuciar otros tests
     await request(app).patch(`/api/v1/operaciones/${plantillaPinza.id}`).send({ ct: 15 });
+  });
+});
+
+describe('roles: restricción estricta (PLAN_SERVICIO_CORTE §3)', () => {
+  test('costura solo a costureros: operario sin el rol → 409 OPERARIO_SIN_ROL', async () => {
+    const alta = await request(app)
+      .post('/api/v1/operarios')
+      .send({ nombre: 'TEST SOLO TRAZADOR', ...datosOperario({ roles: ['trazador'] }) });
+    const id = alta.body.data.id;
+    const detalle = await crearCorteAbierto();
+    const op = detalle.operaciones[0];
+
+    const res = await request(app)
+      .put(`/api/v1/cortes/${detalle.id}/operaciones/${op.id}/asignaciones`)
+      .send({ asignaciones: [{ operarioId: id, cantidad: 372 }] });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('OPERARIO_SIN_ROL');
+
+    const grupo = await request(app)
+      .post(`/api/v1/cortes/${detalle.id}/asignar-grupo`)
+      .send({ grupo: op.grupo, operarioId: id });
+    expect(grupo.status).toBe(409);
+    expect(grupo.body.error.code).toBe('OPERARIO_SIN_ROL');
   });
 });
 
@@ -224,7 +330,7 @@ describe('asignaciones — suma exacta y límites', () => {
       });
     expect(repetido.status).toBe(400);
 
-    const baja = await request(app).post('/api/v1/operarios').send({ nombre: 'TEST INACTIVO R4' });
+    const baja = await request(app).post('/api/v1/operarios').send({ nombre: 'TEST INACTIVO R4', ...datosOperario() });
     await request(app).patch(`/api/v1/operarios/${baja.body.data.id}`).send({ activo: false });
     const inactivo = await request(app)
       .put(ruta)
@@ -346,7 +452,7 @@ describe('cierre del corte y CA-8.1 (cuadre de centavos)', () => {
   });
 
   test('CA-8.2: la baja de un operario conserva sus asignaciones históricas', async () => {
-    const alta = await request(app).post('/api/v1/operarios').send({ nombre: 'TEST HISTORICO R4' });
+    const alta = await request(app).post('/api/v1/operarios').send({ nombre: 'TEST HISTORICO R4', ...datosOperario() });
     const operarioId = alta.body.data.id;
 
     const detalle = await crearCorteAbierto();

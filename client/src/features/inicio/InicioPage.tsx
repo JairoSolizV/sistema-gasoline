@@ -40,7 +40,7 @@ export function InicioPage() {
       {data && (
         <>
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Kpi titulo={`Total a pagar · ${MESES[data.kpis.mes - 1]}`} valor={`Bs ${formatBs(data.kpis.totalAPagar)}`} sub="mano de obra del período" />
+            <Kpi titulo={`Total a pagar · ${MESES[data.kpis.mes - 1]}`} valor={`Bs ${formatBs(data.kpis.totalAPagar)}`} sub="costura + servicio de corte + moldes" />
             <Kpi titulo="Anticipos entregados" valor={`Bs ${formatBs(data.kpis.anticiposEntregados)}`} sub="del período" />
             <Kpi titulo="Saldo pendiente" valor={`Bs ${formatBs(data.kpis.saldoPendiente)}`} sub="por liquidar" acento />
             <Kpi titulo="Cortes activos" valor={String(data.kpis.cortesActivos)} sub="en producción" />

@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
 
 const app = crearApp();
 
@@ -69,12 +70,53 @@ describe('GET / PATCH /api/v1/configuracion', () => {
   });
 });
 
+describe('tarifas del servicio de corte (PLAN_SERVICIO_CORTE)', () => {
+  const PREDETERMINADAS = {
+    tarifaBusqueda: 10, // Bs 0.10 por prenda
+    tarifaMoldeNuevo: 20000, // Bs 200
+    tarifaMoldeModificacion: 5000, // Bs 50
+    tarifaTrazado: 30,
+    tarifaDobladoHoja: 15, // total del proceso, 2 dobladores
+    tarifaDobladoPares: 10,
+    tarifaCorteRespaldo: 15,
+    tarifaClasificacionRespaldo: 10,
+  };
+
+  afterEach(async () => {
+    await prisma.configuracion.update({ where: { id: 1 }, data: PREDETERMINADAS });
+  });
+
+  test('GET trae los predeterminados del dueño', async () => {
+    const res = await request(app).get('/api/v1/configuracion');
+    expect(res.body.data).toMatchObject(PREDETERMINADAS);
+  });
+
+  test('PATCH edita solo las tarifas enviadas', async () => {
+    const res = await request(app)
+      .patch('/api/v1/configuracion')
+      .send({ tarifaTrazado: 35, tarifaMoldeNuevo: 25000 });
+    expect(res.status).toBe(200);
+    expect(res.body.data.tarifaTrazado).toBe(35);
+    expect(res.body.data.tarifaMoldeNuevo).toBe(25000);
+    expect(res.body.data.tarifaDobladoHoja).toBe(15); // sin tocar
+  });
+
+  test('tarifa negativa o con decimales de centavo: 400', async () => {
+    const negativa = await request(app).patch('/api/v1/configuracion').send({ tarifaTrazado: -1 });
+    expect(negativa.status).toBe(400);
+    const fraccion = await request(app)
+      .patch('/api/v1/configuracion')
+      .send({ tarifaDobladoHoja: 7.5 });
+    expect(fraccion.status).toBe(400);
+  });
+});
+
 describe('CA-4.3 — diferencial editable afecta solo asignaciones nuevas', () => {
   test('maestro antes (dif 10 → tarifa 30) y después del cambio (dif 15 → tarifa 35)', async () => {
     // corte con 1 operación (ct 20), cantidad 100
     const corte = await request(app)
       .post('/api/v1/cortes')
-      .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [100], plusPorTalla: [] });
+      .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [100], plusPorTalla: [] });
     const abierto = await request(app).post(`/api/v1/cortes/${corte.body.data.id}/abrir`);
     const opId = abierto.body.data.operaciones[0].id;
 

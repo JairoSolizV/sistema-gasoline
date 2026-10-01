@@ -36,6 +36,25 @@ export const liquidacionRepository = {
     });
   },
 
+  /** Trabajos del servicio de corte con `fecha` en el mes: se pagan cuando se
+   *  terminó el proceso, no al cerrar el corte (PLAN_SERVICIO_CORTE §2.5). */
+  trabajosCorteDelMes(anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.trabajoCorte.findMany({
+      where: { fecha: { gte: inicio, lt: fin } },
+      select: { operarioId: true, total: true, fecha: true },
+    });
+  },
+
+  /** Pagos de moldes con `fecha` en el mes (una vez por versión). */
+  pagosMoldeDelMes(anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.pagoMolde.findMany({
+      where: { fecha: { gte: inicio, lt: fin } },
+      select: { operarioId: true, monto: true, fecha: true },
+    });
+  },
+
   anticiposDelMes(anio: number, mes: number) {
     const { inicio, fin } = rangoMesUTC(anio, mes);
     return prisma.anticipo.findMany({
@@ -77,8 +96,9 @@ export const liquidacionRepository = {
     });
   },
 
-  /** ¿Hay cortes cerrados o anticipos en los meses ESTRICTAMENTE entre el último
-   *  cierre y el mes dado? Si los hay, cerrar el mes dado los dejaría sin liquidar. */
+  /** ¿Hay dinero (cortes cerrados, anticipos, trabajos del servicio de corte o
+   *  moldes) en los meses ESTRICTAMENTE entre el último cierre y el mes dado? Si
+   *  lo hay, cerrar el mes dado lo dejaría sin liquidar. */
   async hayMovimientosEntre(
     despuesDe: { anio: number; mes: number },
     antesDe: { anio: number; mes: number },
@@ -86,14 +106,17 @@ export const liquidacionRepository = {
     const inicio = new Date(Date.UTC(despuesDe.anio, despuesDe.mes, 1)); // mes siguiente al último cierre
     const fin = rangoMesUTC(antesDe.anio, antesDe.mes).inicio;
     if (inicio.getTime() >= fin.getTime()) return false;
-    const [corte, anticipo] = await Promise.all([
+    const enRango = { gte: inicio, lt: fin };
+    const hallazgos = await Promise.all([
       prisma.corte.findFirst({
-        where: { estado: 'cerrado', fechaCierre: { gte: inicio, lt: fin } },
+        where: { estado: 'cerrado', fechaCierre: enRango },
         select: { id: true },
       }),
-      prisma.anticipo.findFirst({ where: { fecha: { gte: inicio, lt: fin } }, select: { id: true } }),
+      prisma.anticipo.findFirst({ where: { fecha: enRango }, select: { id: true } }),
+      prisma.trabajoCorte.findFirst({ where: { fecha: enRango }, select: { id: true } }),
+      prisma.pagoMolde.findFirst({ where: { fecha: enRango }, select: { id: true } }),
     ]);
-    return corte !== null || anticipo !== null;
+    return hallazgos.some((h) => h !== null);
   },
 
   crearCierre(

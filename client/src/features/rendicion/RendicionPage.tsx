@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { formatBs, type RendicionDTO } from '@taller/shared';
+import {
+  ETIQUETA_MODALIDAD,
+  ETIQUETA_PROCESO,
+  formatBs,
+  type RendicionDTO,
+} from '@taller/shared';
 import { useOperarios } from '../../api/operarios';
 import { useRendicion } from '../../api/rendicion';
 import { MESES } from '../../lib/meses';
@@ -128,7 +133,17 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
       {/* Resumen numérico */}
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tarjeta titulo="Saldo entrada" valor={data.saldoEntrada} tenue />
-        <Tarjeta titulo="Ganado" valor={data.totalGanado} />
+        <Tarjeta
+          titulo="Ganado"
+          valor={data.totalGanado}
+          detalle={[
+            data.desglose.costura > 0 && `costura ${formatBs(data.desglose.costura)}`,
+            data.desglose.servicioCorte > 0 && `corte ${formatBs(data.desglose.servicioCorte)}`,
+            data.desglose.moldes > 0 && `moldes ${formatBs(data.desglose.moldes)}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        />
         <Tarjeta titulo="Anticipos" valor={data.totalAnticipos} tenue />
         {data.cerrado ? (
           <Tarjeta titulo="Pagado" valor={data.pagado ?? 0} />
@@ -137,13 +152,16 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         )}
       </div>
 
-      {/* Cortes trabajados */}
-      <h2 className="mb-2 text-sm font-semibold text-gray-700">
-        Trabajo del mes ({data.cortes.length} corte{data.cortes.length === 1 ? '' : 's'})
+      {/* Costura: cortes cerrados en el mes */}
+      <h2 className="mb-2 flex justify-between text-sm font-semibold text-gray-700">
+        <span>
+          Costura ({data.cortes.length} corte{data.cortes.length === 1 ? '' : 's'})
+        </span>
+        <span className="mono">Bs {formatBs(data.desglose.costura)}</span>
       </h2>
       {data.cortes.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          No trabajó en cortes cerrados este mes.
+          Sin costura en cortes cerrados este mes.
         </div>
       ) : (
         <div className="space-y-3">
@@ -191,6 +209,84 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         </div>
       )}
 
+      {/* Servicio de corte interno: cada trabajo en su línea */}
+      {data.servicioCorte.length > 0 && (
+        <>
+          <h2 className="mt-6 mb-2 flex justify-between text-sm font-semibold text-gray-700">
+            <span>Servicio de corte ({data.servicioCorte.length})</span>
+            <span className="mono">Bs {formatBs(data.desglose.servicioCorte)}</span>
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <tbody>
+                {data.servicioCorte.map((t, i) => (
+                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                    <td className="px-5 py-2 text-gray-500">{fechaCorta(t.fecha)}</td>
+                    <td className="px-3 py-2 font-medium">
+                      {ETIQUETA_PROCESO[t.proceso]}
+                      {t.modalidad && (
+                        <span className="font-normal text-gray-500">
+                          {' '}
+                          · {ETIQUETA_MODALIDAD[t.modalidad].toLowerCase()}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {t.modeloNombre}
+                      <span className="ml-1 text-[11px] font-semibold text-gray-400">
+                        v{t.numeroVersion}
+                        {t.codigo ? ` · ${t.codigo}` : ''}
+                      </span>
+                    </td>
+                    <td className="mono px-3 py-2 text-right text-gray-500">{t.cantidad} prendas</td>
+                    <td className="mono px-3 py-2 text-right text-gray-500">
+                      Bs {formatBs(t.tarifa)}
+                      {t.proceso === 'doblado' && <span className="text-[10px]"> ÷ 2</span>}
+                    </td>
+                    <td className="mono w-24 px-5 py-2 text-right font-semibold">
+                      Bs {formatBs(t.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Moldes / patronaje */}
+      {data.moldes.length > 0 && (
+        <>
+          <h2 className="mt-6 mb-2 flex justify-between text-sm font-semibold text-gray-700">
+            <span>Moldes ({data.moldes.length})</span>
+            <span className="mono">Bs {formatBs(data.desglose.moldes)}</span>
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <tbody>
+                {data.moldes.map((m, i) => (
+                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                    <td className="px-5 py-2 text-gray-500">{fechaCorta(m.fecha)}</td>
+                    <td className="px-3 py-2 font-medium">
+                      {m.tipo === 'nuevo' ? 'Modelo nuevo' : 'Modificación de moldes'}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {m.modeloNombre}
+                      <span className="ml-1 text-[11px] font-semibold text-gray-400">
+                        v{m.numeroVersion}
+                      </span>
+                    </td>
+                    <td className="mono w-24 px-5 py-2 text-right font-semibold">
+                      Bs {formatBs(m.monto)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
       {/* Anticipos */}
       <h2 className="mt-6 mb-2 text-sm font-semibold text-gray-700">
         Anticipos del mes ({data.anticipos.length})
@@ -224,13 +320,27 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
   );
 }
 
-function Tarjeta({ titulo, valor, tenue }: { titulo: string; valor: number; tenue?: boolean }) {
+function Tarjeta({
+  titulo,
+  valor,
+  tenue,
+  detalle,
+}: {
+  titulo: string;
+  valor: number;
+  tenue?: boolean;
+  detalle?: string;
+}) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
       <div className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">{titulo}</div>
       <div className={`mono mt-1 text-lg font-semibold ${tenue ? 'text-gray-500' : ''}`}>
         Bs {formatBs(valor)}
       </div>
+      {detalle && <div className="mono mt-0.5 text-[11px] text-gray-500">{detalle}</div>}
     </div>
   );
 }
+
+const fechaCorta = (iso: string) =>
+  new Date(iso).toLocaleDateString('es-BO', { weekday: 'short', day: '2-digit', month: 'short' });

@@ -36,6 +36,7 @@ export function ModelosPage() {
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
                 <th className="px-5 py-3">Modelo</th>
                 <th className="px-5 py-3">Versiones</th>
+                <th className="px-5 py-3">Búsqueda</th>
                 <th className="px-5 py-3">Operaciones</th>
                 <th className="px-5 py-3 text-right">Mano de obra / prenda</th>
               </tr>
@@ -70,6 +71,17 @@ export function ModelosPage() {
                         ))}
                       </div>
                     </td>
+                    <td className="px-5 py-3 text-sm">
+                      {m.buscador ? (
+                        <span className="text-gray-700">{m.buscador.nombre}</span>
+                      ) : m.sinBuscador ? (
+                        <span className="text-gray-400">sin buscador</span>
+                      ) : (
+                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                          pendiente
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-gray-600">{ultima?.cantidadOperaciones ?? 0}</td>
                     <td className="px-5 py-3 text-right">
                       <span className="mono font-semibold">
@@ -81,7 +93,7 @@ export function ModelosPage() {
               })}
               {modelos.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
                     No hay modelos todavía. Creá el primero con "+ Nuevo modelo".
                   </td>
                 </tr>

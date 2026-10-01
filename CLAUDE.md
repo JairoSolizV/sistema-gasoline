@@ -27,7 +27,7 @@ Panel web **administrativo** para un taller de confección en Bolivia que calcul
 
 ## 2. Alcance: qué SÍ y qué NO construir
 
-**SÍ (Fase 1):** operarios, modelos con versiones y tarifas, cortes, asignación de trabajo (por grupo o por operación, dividida hasta en 3 operarios), anticipos, consolidado semanal/mensual con saldos y arrastre, cierre de mes, rendición de cuentas filtrada por operario, configuración.
+**SÍ (Fase 1):** operarios, modelos con versiones y tarifas, cortes, asignación de trabajo (por grupo o por operación, dividida hasta en 3 operarios), anticipos, consolidado semanal/mensual con saldos y arrastre, cierre de mes, rendición de cuentas filtrada por operario, configuración. **Ampliación (2026-10-01):** roles de operario y servicio de corte interno pagado — búsqueda, moldes, trazado, doblado, corte y clasificación — según `docs/PLAN_SERVICIO_CORTE.md`.
 
 **NO (no lo construyas todavía, aunque parezca útil):**
 - Rol operario / login de operarios / app móvil (es Fase 2).
@@ -98,12 +98,12 @@ Estas son fuente de errores de pago reales. Trátalas como sagradas:
 2. **Snapshot inmutable.** Al crear un corte, **copia** las operaciones y su `ct` a `CorteOperacion`. Editar tarifas de una versión **no** debe alterar cortes ya creados. (CA-1.4)
 3. **El PLUS se paga.** `cantidad_total = Σ corte_por_talla + Σ plus_por_talla`. (CA-2.2)
 4. **Versionar conserva el original.** Nueva versión = copia; la anterior queda intacta. (CA-1.3)
-5. **Ganado solo de cortes cerrados**, agrupados por `fecha_cierre`. Un corte a medias no se paga. (CA-5.2, CA-5.7)
+5. **Costura: ganado solo de cortes cerrados**, agrupados por `fecha_cierre`. Un corte a medias no paga costura. (CA-5.2, CA-5.7) El **servicio de corte interno** (búsqueda, trazado, doblado, corte, clasificación) y los **moldes** se ganan en la **fecha de cada trabajo**, aunque el corte siga abierto; nunca en un mes ya liquidado. Ganado = costura + servicio + moldes, con desglose persistido al cerrar el mes. (`docs/PLAN_SERVICIO_CORTE.md`)
 6. **Saldo = saldo_entrada + ganado − anticipos.** Se arrastra semana a semana; el negativo también se arrastra. Cierre de mes deja saldo en 0 salvo la excepción `arrastra_saldo`. (CA-5.3 a CA-6.3)
 7. **Maestro externo** = tarifa base + diferencial (0.10 por defecto, editable). El diferencial se guarda en la asignación. (CA-4.1 a CA-4.3)
 8. **Privacidad.** La vista/endpoint de un operario devuelve **solo** sus datos; verifica que el payload no filtre a otros. (CA-7.1, CA-7.2)
 9. **Máximo 3 operarios por operación.** (CA-3.5)
-10. **Baja de operario = lógica** (`activo=false`); nunca borrado físico. (CA-8.2)
+10. **Baja de operario = lógica** (`activo=false`). Borrado físico solo de un operario **ya de baja y sin historial** (sin asignaciones, anticipos, liquidaciones, trabajos del servicio de corte, pagos de moldes ni modelos donde figure como buscador); con historial se conserva siempre. (CA-8.2)
 
 ---
 

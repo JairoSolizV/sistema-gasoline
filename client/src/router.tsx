@@ -7,6 +7,9 @@ import { OperariosPage } from './features/operarios/OperariosPage';
 import { ModelosPage } from './features/modelos/ModelosPage';
 import { NuevoModeloPage } from './features/modelos/NuevoModeloPage';
 import { VersionDetallePage } from './features/modelos/VersionDetallePage';
+import { CatalogoPage } from './features/catalogo/CatalogoPage';
+import { PlantillasPage } from './features/plantillas/PlantillasPage';
+import { PlantillaDetallePage } from './features/plantillas/PlantillaDetallePage';
 import { CortesPage } from './features/cortes/CortesPage';
 import { NuevoCortePage } from './features/cortes/NuevoCortePage';
 import { CorteDetallePage } from './features/cortes/CorteDetallePage';
@@ -29,6 +32,9 @@ export const router = createBrowserRouter([
       { path: '/modelos', element: <ModelosPage /> },
       { path: '/modelos/nuevo', element: <NuevoModeloPage /> },
       { path: '/modelos/versiones/:versionId', element: <VersionDetallePage /> },
+      { path: '/plantillas', element: <PlantillasPage /> },
+      { path: '/plantillas/:plantillaId', element: <PlantillaDetallePage /> },
+      { path: '/catalogo', element: <CatalogoPage /> },
       { path: '/cortes', element: <CortesPage /> },
       { path: '/cortes/nuevo', element: <NuevoCortePage /> },
       { path: '/cortes/:corteId', element: <CorteDetallePage /> },

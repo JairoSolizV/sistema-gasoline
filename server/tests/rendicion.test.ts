@@ -6,6 +6,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosCorte } from './helpers/corte.js';
+import { datosOperario } from './helpers/operario.js';
 
 const app = crearApp();
 
@@ -35,8 +37,8 @@ async function limpiar() {
 
 beforeAll(async () => {
   await limpiar();
-  clarisId = (await request(app).post('/api/v1/operarios').send({ nombre: NOMBRE_CLARIS })).body.data.id;
-  rubenId = (await request(app).post('/api/v1/operarios').send({ nombre: NOMBRE_RUBEN })).body.data.id;
+  clarisId = (await request(app).post('/api/v1/operarios').send({ nombre: NOMBRE_CLARIS, ...datosOperario() })).body.data.id;
+  rubenId = (await request(app).post('/api/v1/operarios').send({ nombre: NOMBRE_RUBEN, ...datosOperario() })).body.data.id;
 
   // modelo con 2 operaciones: op1 ct=15 (CLARIS), op2 ct=20 (RUBEN)
   const modelo = await request(app)
@@ -53,7 +55,7 @@ beforeAll(async () => {
   // corte de 100, cerrado en marzo 2098: CLARIS hace op1, RUBEN op2
   const corte = await request(app)
     .post('/api/v1/cortes')
-    .send({ modeloVersionId: versionId, tallas: [1], cortePorTalla: [100], plusPorTalla: [] });
+    .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [1], cortePorTalla: [100], plusPorTalla: [] });
   const abierto = await request(app).post(`/api/v1/cortes/${corte.body.data.id}/abrir`);
   const [op1, op2] = abierto.body.data.operaciones;
   await request(app)

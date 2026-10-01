@@ -2,10 +2,11 @@
 // la suma de CT en cada mutación de operaciones (CA-1.1/CA-1.2 en vivo).
 // Limpieza: todo lo creado aquí se borra en afterAll para no alterar los
 // conteos del seed que verifica ca-1.test.ts.
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { datosOperario } from './helpers/operario.js';
 
 const app = crearApp();
 
@@ -153,5 +154,194 @@ describe('CA-1.3 — versionado conserva el original', () => {
     const v1 = await request(app).get(`/api/v1/versiones/${v1Id}`);
     expect(v1.body.data.costoManoObraPrenda).toBe(810);
     expect(v1.body.data.operaciones).toHaveLength(47);
+  });
+});
+
+// ── Servicio de corte: buscador del modelo y moldes (PLAN_SERVICIO_CORTE §2.8-2.9) ──
+describe('buscador del modelo y pago de moldes', () => {
+  let buscadorId: string;
+  let moldistaId: string;
+  let soloCostureroId: string;
+
+  async function operario(nombre: string, roles: string[]) {
+    const res = await request(app)
+      .post('/api/v1/operarios')
+      .send({ nombre, ...datosOperario({ roles }) });
+    return res.body.data.id as string;
+  }
+
+  beforeAll(async () => {
+    buscadorId = await operario('TEST MOL BUSCADOR', ['buscador']);
+    moldistaId = await operario('TEST MOL MOLDISTA', ['moldista']);
+    soloCostureroId = await operario('TEST MOL COSTURERO', ['costurero']);
+  });
+
+  afterAll(async () => {
+    // los modelos TEST (y sus moldes, en cascada) se borran en el afterAll general;
+    // acá se sueltan las referencias para poder borrar estos operarios
+    await prisma.pagoMolde.deleteMany({
+      where: { operario: { nombre: { startsWith: 'TEST MOL' } } },
+    });
+    await prisma.modelo.updateMany({
+      where: { buscador: { nombre: { startsWith: 'TEST MOL' } } },
+      data: { buscadorId: null },
+    });
+    await prisma.operario.deleteMany({ where: { nombre: { startsWith: 'TEST MOL' } } });
+  });
+
+  const molde = (extra: Record<string, unknown> = {}) => ({
+    moldistaId,
+    fecha: '2026-09-10T12:00:00.000Z',
+    ...extra,
+  });
+
+  test('modelo nuevo con buscador y moldes: Bs 200 de Configuración, tipo nuevo', async () => {
+    const res = await request(app)
+      .post('/api/v1/modelos')
+      .send({ nombre: 'TEST MODELO DISENO', operaciones: OPS_BASE, buscadorId, molde: molde() });
+    expect(res.status).toBe(201);
+    const d = res.body.data;
+    expect(d.buscador).toEqual({ id: buscadorId, nombre: 'TEST MOL BUSCADOR' });
+    expect(d.sinBuscador).toBe(false);
+    expect(d.molde.tipo).toBe('nuevo');
+    expect(d.molde.monto).toBe(20000);
+    expect(d.molde.operario.nombre).toBe('TEST MOL MOLDISTA');
+    expect(d.molde.fecha).toBe('2026-09-10T12:00:00.000Z');
+  });
+
+  test('el monto de los moldes se puede editar al registrarlos', async () => {
+    const res = await request(app)
+      .post('/api/v1/modelos')
+      .send({ nombre: 'TEST MODELO MONTO', operaciones: OPS_BASE, molde: molde({ monto: 18000 }) });
+    expect(res.body.data.molde.monto).toBe(18000);
+    expect(res.body.data.buscador).toBeNull(); // pendiente
+    expect(res.body.data.sinBuscador).toBe(false);
+  });
+
+  test('roles estrictos: buscador y creador de moldes necesitan su rol', async () => {
+    const malBuscador = await request(app)
+      .post('/api/v1/modelos')
+      .send({ nombre: 'TEST MODELO ROL B', operaciones: OPS_BASE, buscadorId: soloCostureroId });
+    expect(malBuscador.status).toBe(409);
+    expect(malBuscador.body.error.code).toBe('OPERARIO_SIN_ROL');
+
+    const malMoldista = await request(app)
+      .post('/api/v1/modelos')
+      .send({
+        nombre: 'TEST MODELO ROL M',
+        operaciones: OPS_BASE,
+        molde: molde({ moldistaId: soloCostureroId }),
+      });
+    expect(malMoldista.status).toBe(409);
+    expect(malMoldista.body.error.code).toBe('OPERARIO_SIN_ROL');
+  });
+
+  test('buscador y "sin buscador" a la vez: 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/modelos')
+      .send({ nombre: 'TEST MODELO AMBOS', operaciones: OPS_BASE, buscadorId, sinBuscador: true });
+    expect(res.status).toBe(400);
+  });
+
+  test('versión nueva: moldes modificados = Bs 50; sin casilla no paga; no copia los de v1', async () => {
+    const v1 = await request(app)
+      .post('/api/v1/modelos')
+      .send({ nombre: 'TEST MODELO VERSIONES', operaciones: OPS_BASE, molde: molde() });
+    const modeloId = v1.body.data.modeloId;
+
+    const sinMoldes = await request(app).post(`/api/v1/modelos/${modeloId}/versiones`).send({});
+    expect(sinMoldes.status).toBe(201);
+    expect(sinMoldes.body.data.molde).toBeNull();
+
+    const conMoldes = await request(app)
+      .post(`/api/v1/modelos/${modeloId}/versiones`)
+      .send({ molde: molde() });
+    expect(conMoldes.body.data.molde.tipo).toBe('modificacion');
+    expect(conMoldes.body.data.molde.monto).toBe(5000);
+
+    const lista = await request(app).get('/api/v1/modelos');
+    const modelo = lista.body.data.find((m: { id: string }) => m.id === modeloId);
+    expect(
+      modelo.versiones.map((v: { numeroVersion: number; molde: { monto: number } | null }) => [
+        v.numeroVersion,
+        v.molde?.monto ?? null,
+      ]),
+    ).toEqual([
+      [3, 5000],
+      [2, null],
+      [1, 20000],
+    ]);
+  });
+
+  test('PATCH buscador: asignar, marcar "sin buscador" y volver a pendiente', async () => {
+    const creado = await crearModeloTest('TEST MODELO BUSCADOR');
+    const modeloId = creado.body.data.modeloId;
+
+    const asignar = await request(app)
+      .patch(`/api/v1/modelos/${modeloId}/buscador`)
+      .send({ buscadorId, sinBuscador: false });
+    expect(asignar.status).toBe(200);
+    expect(asignar.body.data.buscador.nombre).toBe('TEST MOL BUSCADOR');
+
+    const sin = await request(app)
+      .patch(`/api/v1/modelos/${modeloId}/buscador`)
+      .send({ buscadorId: null, sinBuscador: true });
+    expect(sin.body.data.buscador).toBeNull();
+    expect(sin.body.data.sinBuscador).toBe(true);
+
+    const pendiente = await request(app)
+      .patch(`/api/v1/modelos/${modeloId}/buscador`)
+      .send({ buscadorId: null, sinBuscador: false });
+    expect(pendiente.body.data.sinBuscador).toBe(false);
+  });
+
+  test('PUT / DELETE moldes de una versión existente', async () => {
+    const creado = await crearModeloTest('TEST MODELO MOLDE TARDE');
+    const versionId = creado.body.data.id;
+
+    const puesto = await request(app).put(`/api/v1/versiones/${versionId}/molde`).send(molde());
+    expect(puesto.status).toBe(200);
+    expect(puesto.body.data.molde.tipo).toBe('nuevo'); // es la v1
+
+    const corregido = await request(app)
+      .put(`/api/v1/versiones/${versionId}/molde`)
+      .send(molde({ monto: 19000 }));
+    expect(corregido.body.data.molde.monto).toBe(19000); // reemplaza, no duplica
+
+    const quitado = await request(app).delete(`/api/v1/versiones/${versionId}/molde`);
+    expect(quitado.status).toBe(200);
+    expect(quitado.body.data.molde).toBeNull();
+
+    const otraVez = await request(app).delete(`/api/v1/versiones/${versionId}/molde`);
+    expect(otraVez.status).toBe(404);
+  });
+
+  test('moldes con fecha en un mes liquidado: 409 MES_LIQUIDADO', async () => {
+    const periodo = await prisma.periodo.create({
+      data: {
+        anio: 2020,
+        mes: 1,
+        estado: 'cerrado',
+        fechaCierre: new Date('2020-02-01T12:00:00Z'),
+      },
+    });
+    try {
+      const creado = await crearModeloTest('TEST MODELO MES CERRADO');
+      const res = await request(app)
+        .put(`/api/v1/versiones/${creado.body.data.id}/molde`)
+        .send(molde({ fecha: '2020-01-15T12:00:00.000Z' }));
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('MES_LIQUIDADO');
+    } finally {
+      await prisma.periodo.delete({ where: { id: periodo.id } });
+    }
+  });
+
+  test('quien hizo moldes cuenta como historial: no se puede eliminar', async () => {
+    await request(app).patch(`/api/v1/operarios/${moldistaId}`).send({ activo: false });
+    const res = await request(app).delete(`/api/v1/operarios/${moldistaId}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CON_HISTORIAL');
+    await request(app).patch(`/api/v1/operarios/${moldistaId}`).send({ activo: true });
   });
 });

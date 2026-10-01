@@ -35,16 +35,42 @@ enum EstadoPeriodo {
   cerrado
 }
 
+enum RolOperario {
+  costurero
+  cortador
+  doblador
+  moldista // creador de moldes / patronaje
+  buscador // buscador de diseño
+  trazador
+  clasificador // clasificador y codificador de piezas
+}
+
 model Operario {
   id            String        @id @default(uuid())
   nombre        String
   tipo          TipoOperario  @default(regular)
   activo        Boolean       @default(true)
+  // Oficios (uno o varios). Restringen en qué selectores aparece el operario
+  // (docs/PLAN_SERVICIO_CORTE.md §3). Maestro externo NO es un rol: es el `tipo`.
+  roles               RolOperario[] @default([costurero])
+  // Tarifas personales (centavos/prenda) según habilidad/velocidad; se precargan
+  // al elegirlo en un corte. null = usar el respaldo de Configuración.
+  tarifaCorte         Int?
+  tarifaClasificacion Int?
+  // Datos personales: obligatorios en el alta (validado en la API), opcionales
+  // en BD porque el roster original del seed no los trae.
+  ci              String?       @unique // cédula de identidad, normalizada a mayúsculas
+  celular         String?
+  fechaNacimiento DateTime?
   fechaIngreso  DateTime      @default(now())
-  fechaBaja     DateTime?
+  fechaSalida   DateTime? // salida prevista/pactada; informativa, NO da de baja
+  fechaBaja     DateTime? // la fija el sistema al dar de baja (activo=false)
   asignaciones  Asignacion[]
   anticipos     Anticipo[]
   liquidaciones Liquidacion[]
+  trabajosCorte   TrabajoCorte[]
+  modelosBuscados Modelo[]    @relation("ModeloBuscador")
+  pagosMolde      PagoMolde[]
 }
 
 model Modelo {
@@ -52,6 +78,13 @@ model Modelo {
   nombre    String          @unique
   activo    Boolean         @default(true)
   versiones ModeloVersion[]
+  // Búsqueda del diseño (docs/PLAN_SERVICIO_CORTE.md §2.8): quien lo encontró
+  // cobra tarifaBusqueda × prenda en cada corte interno de este modelo. O se
+  // marca sinBuscador (modelo del cliente / anterior al módulo): no se paga y
+  // no bloquea el cierre. Ninguno de los dos = pendiente (bloquea el cierre).
+  buscador    Operario? @relation("ModeloBuscador", fields: [buscadorId], references: [id])
+  buscadorId  String?
+  sinBuscador Boolean   @default(false)
 }
 
 model ModeloVersion {
@@ -66,6 +99,7 @@ model ModeloVersion {
   createdAt           DateTime    @default(now())
   operaciones         Operacion[]
   cortes              Corte[]
+  molde               PagoMolde? // moldes de ESTA versión (v1 = nuevo, otras = modificación)
 
   @@unique([modeloId, numeroVersion])
 }
@@ -93,6 +127,24 @@ model Corte {
   cortePorTalla   Json
   plusPorTalla    Json
   cantidadTotal   Int // = Σ corte_por_talla + Σ plus_por_talla; base de todo el pago
+  // Datos del tendido (informativos, NO entran al cálculo de pagos). Obligatorios
+  // al crear (validado en la API); opcionales en BD por cortes anteriores.
+  tela            String?
+  anchoCm         Int? // ancho de la tela, en cm (se ingresa en metros con 2 decimales)
+  trazadoCm       Int? // largo del trazado, en cm
+  // Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md). Un corte externo
+  // (llega cortado de afuera) no paga ningún proceso.
+  esInterno       Boolean          @default(true)
+  // Snapshot de las tarifas predeterminadas de Configuración al crear el corte
+  // (centavos). Cambiar Configuración después NO las altera. null en externos.
+  tarifaBusqueda              Int?
+  tarifaTrazado               Int?
+  tarifaDobladoHoja           Int? // total del proceso por prenda (2 dobladores)
+  tarifaDobladoPares          Int?
+  tarifaCorteRespaldo         Int? // por persona, si el cortador no tiene tarifa propia
+  tarifaClasificacionRespaldo Int?
+  modalidadDoblado            ModalidadDoblado?
+  trabajos                    TrabajoCorte[]
   estado          EstadoCorte      @default(borrador)
   fechaInicio     DateTime         @default(now())
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
@@ -167,7 +219,11 @@ model Liquidacion {
   operario       Operario @relation(fields: [operarioId], references: [id])
   operarioId     String
   saldoEntrada   Int      @default(0) // centavos; arrastre del mes anterior (puede ser negativo)
-  totalGanado    Int      @default(0)
+  totalGanado    Int      @default(0) // = costura + servicio de corte + moldes
+  // desglose persistido del ganado (docs/PLAN_SERVICIO_CORTE.md §2.12); la
+  // costura es totalGanado − estos dos
+  ganadoServicioCorte Int  @default(0)
+  ganadoMoldes        Int  @default(0)
   totalAnticipos Int      @default(0)
   saldoPeriodo   Int      @default(0) // = saldoEntrada + totalGanado − totalAnticipos
   pagado         Int      @default(0)
@@ -183,4 +239,167 @@ model Configuracion {
   diferencialMaestroExterno Int     @default(10) // centavos (Bs 0.10)
   redondeoDecimales         Int     @default(2)
   nombreTaller              String?
+
+  // Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md). Centavos. Son los
+  // PREDETERMINADOS: al crear un corte se copian al corte (snapshot) y ahí se
+  // editan; cambiarlos acá no toca cortes ya creados.
+  tarifaBusqueda              Int @default(10) // por prenda, al buscador del modelo, en cada corte
+  tarifaMoldeNuevo            Int @default(20000) // monto fijo, una vez por modelo nuevo
+  tarifaMoldeModificacion     Int @default(5000) // monto fijo, por versión con moldes modificados
+  tarifaTrazado               Int @default(30) // por prenda
+  tarifaDobladoHoja           Int @default(15) // por prenda, TOTAL del proceso (se reparte en 2)
+  tarifaDobladoPares          Int @default(10) // por prenda, TOTAL del proceso (se reparte en 2)
+  tarifaCorteRespaldo         Int @default(15) // por prenda y por cortador sin tarifa propia
+  tarifaClasificacionRespaldo Int @default(10) // por prenda y por clasificador sin tarifa propia
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogo: jerarquía Máquina → Proceso → Pieza (dentro de cada operación) +
+// Grupos (los bloques que envuelven a esas operaciones, sin filtrarlas)
+// (docs/PLAN_CATALOGO_MAQUINAS.md). Es una AYUDA DE CAPTURA para el alta de
+// modelos: `Operacion` y `CorteOperacion` siguen guardando texto y no tienen
+// FK a estas tablas, porque el snapshot pagable no puede depender de una fila
+// viva del catálogo (CA-1.4 / PLAN §2.1). Sin precios: el CT es siempre manual.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Maquina {
+  id        String    @id @default(uuid())
+  nombre    String    @unique // normalizado a minúsculas: "recta", "overlock"
+  orden     Int       @default(0)
+  activo    Boolean   @default(true) // baja lógica; nunca borrado si está en uso
+  createdAt DateTime  @default(now())
+  procesos  Proceso[]
+}
+
+model Proceso {
+  id        String   @id @default(uuid())
+  maquina   Maquina  @relation(fields: [maquinaId], references: [id], onDelete: Cascade)
+  maquinaId String
+  nombre    String // minúsculas: "pinza", "despunte"
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  piezas    Pieza[]
+
+  @@unique([maquinaId, nombre]) // "pinza" puede existir en recta y en plana
+  @@index([maquinaId, activo])
+}
+
+model Pieza {
+  id        String   @id @default(uuid())
+  proceso   Proceso  @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  procesoId String
+  nombre    String // minúsculas: "trasero", "bolsillo"
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([procesoId, nombre])
+  @@index([procesoId, activo])
+}
+
+// Grupos: los bloques que envuelven a las operaciones de un modelo (TRASEROS,
+// DELANTEROS…). No cuelgan de Maquina ni nada cuelga de ellos: elegir un grupo
+// NO limita qué máquina/proceso/pieza se puede usar.
+model Grupo {
+  id        String   @id @default(uuid())
+  nombre    String   @unique // MAYÚSCULAS: "TRASEROS", "ENSAMBLE"
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plantillas de modelo: la receta de operaciones de una prenda típica (el
+// pantalón clásico y las variantes que salgan de duplicarla). Al crear un
+// modelo se copian sus filas al formulario con el CT precargado.
+//
+// Cada operación guarda un CT de REFERENCIA (opcional): es solo una sugerencia.
+// El CT que vale es el que queda escrito en cada modelo, porque la misma
+// operación vale distinto según la prenda; cambiar la referencia después no
+// toca ningún modelo ni corte.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Plantilla {
+  id          String               @id @default(uuid())
+  nombre      String               @unique
+  notas       String?
+  // la del pantalón clásico: se puede editar, no borrar
+  protegida   Boolean              @default(false)
+  createdAt   DateTime             @default(now())
+  operaciones PlantillaOperacion[]
+}
+
+model PlantillaOperacion {
+  id           String    @id @default(uuid())
+  plantilla    Plantilla @relation(fields: [plantillaId], references: [id], onDelete: Cascade)
+  plantillaId  String
+  orden        Int
+  grupo        String
+  n            String? // número de paso dentro del grupo
+  equipo       String
+  proceso      String
+  pieza        String?
+  // centavos; precio sugerido al crear un modelo (null = sin referencia)
+  ctReferencia Int?
+
+  @@index([plantillaId, orden])
+}
+
+// Pago por moldes / patronaje (docs/PLAN_SERVICIO_CORTE.md §2.9). A lo sumo uno
+// por versión: la v1 es "nuevo" (Bs 200) y las siguientes "modificacion" (Bs 50),
+// solo si se marcó que se modificaron los moldes. Se paga UNA vez, en la `fecha`
+// (define la semana/mes de la liquidación). `monto` se fija al registrarlo.
+enum TipoMolde {
+  nuevo
+  modificacion
+}
+
+model PagoMolde {
+  id              String        @id @default(uuid())
+  version         ModeloVersion @relation(fields: [modeloVersionId], references: [id], onDelete: Cascade)
+  modeloVersionId String        @unique
+  operario        Operario      @relation(fields: [operarioId], references: [id])
+  operarioId      String
+  tipo            TipoMolde
+  monto           Int // centavos
+  fecha           DateTime
+  createdAt       DateTime      @default(now())
+
+  @@index([fecha])
+}
+
+// ── Servicio de corte interno: procesos pagados por corte ────────────────────
+enum ProcesoCorte {
+  busqueda // al buscador del modelo, en cada corte
+  trazado
+  doblado
+  corte
+  clasificacion // clasificación y codificación de piezas
+}
+
+enum ModalidadDoblado {
+  hoja // por hoja / cara: se estira, se corta y se vuelve a estirar cara arriba
+  pares // por pares: continuo, una cara arriba y otra abajo
+}
+
+// Una fila por persona y proceso. `total` se fija al guardar (inmutable, como
+// Asignacion.total) y se paga en la `fecha` en que se terminó el proceso (no al
+// cerrar el corte). Doblado: `tarifa` es la del proceso completo y el total se
+// reparte en 2 con el centavo sobrante al primero anotado (orden 1).
+model TrabajoCorte {
+  id         String       @id @default(uuid())
+  corte      Corte        @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  corteId    String
+  proceso    ProcesoCorte
+  operario   Operario     @relation(fields: [operarioId], references: [id])
+  operarioId String
+  orden      Int // 1, 2, 3 dentro del proceso (en doblado define quién lleva el centavo)
+  tarifa     Int // centavos por prenda que se aplicó
+  cantidad   Int // prendas del corte (cantidad total, PLUS incluido)
+  total      Int // centavos
+  fecha      DateTime
+
+  @@unique([corteId, proceso, operarioId])
+  @@index([fecha])
 }

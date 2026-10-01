@@ -23,7 +23,8 @@ Antes de costurar, ocurre el proceso de corte de tela:
 4. De ahí se sacan **muchísimos cortes de piezas** (una misma pieza se corta cientos de veces).
 5. Esas piezas cortadas pasan a **costura**, que es donde entra el cálculo de pagos.
 
-> Este flujo se documenta solo como contexto. El sistema **no** modela el trazado ni el corte físico de tela; empieza a operar en la etapa de **costura y pago**.
+> ~~Este flujo se documenta solo como contexto. El sistema **no** modela el trazado ni el corte físico de tela; empieza a operar en la etapa de **costura y pago**.~~
+> **Actualización 2026-10-01 (decisión del dueño):** el servicio de corte interno —búsqueda del modelo, moldes/patronaje, trazado, doblado de tela, corte y clasificación/codificación de piezas— ahora **sí se modela y se paga**, con roles de operario y tarifas configurables. Reglas completas en `docs/PLAN_SERVICIO_CORTE.md`.
 
 ---
 
@@ -278,7 +279,7 @@ Esto evita **comparaciones y roces** entre operarios (que uno vea que otro gana 
 - **Vista filtrada por operario** para rendición de cuentas (Sección 9).
 
 ### Fuera de Fase 1 (contexto, no se implementa ahora)
-- Trazado de moldes y corte físico de tela (Sección 1.1).
+- ~~Trazado de moldes y corte físico de tela (Sección 1.1).~~ Incorporado el 2026-10-01 como servicio de corte interno (`docs/PLAN_SERVICIO_CORTE.md`).
 - **Alimentación** y otros costos del taller (se registran, si acaso, en una fase posterior; **no** afectan el pago).
 - Modelado de tablas / base de datos / relaciones (**paso posterior**, aún no solicitado).
 
