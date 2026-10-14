@@ -43,6 +43,7 @@ enum RolOperario {
   buscador // buscador de diseño
   trazador
   clasificador // clasificador y codificador de piezas
+  ayudante // sueldo semanal + asistencia; también recibe operaciones (docs/PLAN_AYUDANTES.md)
 }
 
 model Operario {
@@ -71,6 +72,7 @@ model Operario {
   trabajosCorte   TrabajoCorte[]
   modelosBuscados Modelo[]    @relation("ModeloBuscador")
   pagosMolde      PagoMolde[]
+  sueldos         SueldoAyudante[]
 }
 
 model Modelo {
@@ -122,8 +124,10 @@ model Corte {
   id              String           @id @default(uuid())
   version         ModeloVersion    @relation(fields: [modeloVersionId], references: [id])
   modeloVersionId String
-  codigo          String?
-  tallas          Json // referencia visual; NO entra al cálculo
+  // Numeración del corte (N° 1, 2, 3…): automática (máximo + 1) si no se
+  // indica, editable, nunca repetida. Informativo; no entra al cálculo.
+  codigo          Int              @unique
+  tallas         Json // referencia visual; NO entra al cálculo
   cortePorTalla   Json
   plusPorTalla    Json
   cantidadTotal   Int // = Σ corte_por_talla + Σ plus_por_talla; base de todo el pago
@@ -149,6 +153,7 @@ model Corte {
   fechaInicio     DateTime         @default(now())
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
   operaciones     CorteOperacion[]
+  cambios         CorteCambio[]
 
   @@index([estado, fechaCierre])
 }
@@ -168,11 +173,43 @@ model CorteOperacion {
   proceso           String
   pieza             String?
   ct                Int // centavos, congelado al abrir el corte
+  // segundos por prenda del catálogo, congelado al abrir (solo para el estimado
+  // de duración; no afecta pagos). null = el catálogo no tenía tiempo.
+  tiempoSeg         Int?
   cantidadObjetivo  Int // lo que debe sumar la asignación (suma exacta)
   estado            EstadoCorteOp @default(sin_asignar)
   asignaciones      Asignacion[]
+  cambios           CorteCambio[]
 
   @@index([corteId, estado])
+}
+
+enum TipoCambioCorte {
+  reordenar
+  editar
+  agregar
+  quitar
+}
+
+// Historial de modificaciones de último momento a las operaciones de UN corte
+// (máquina que se fregó, operación extra…). Solo tocan el snapshot del corte,
+// nunca el modelo. Se registra en la misma transacción que el cambio.
+model CorteCambio {
+  id                String           @id @default(uuid())
+  corte             Corte            @relation(fields: [corteId], references: [id], onDelete: Cascade)
+  corteId           String
+  // null al quitar la operación (el historial la describe en `etiqueta`/`detalle`)
+  corteOperacion    CorteOperacion?  @relation(fields: [corteOperacionId], references: [id], onDelete: SetNull)
+  corteOperacionId  String?
+  tipo              TipoCambioCorte
+  grupo             String
+  etiqueta          String // "proceso · pieza" al momento del cambio
+  // editar: { campos: [{ campo, antes, despues }] } · agregar/quitar: { operacion }
+  // reordenar: { antes: string[], despues: string[] } (etiquetas del grupo)
+  detalle           Json
+  fecha             DateTime         @default(now())
+
+  @@index([corteId, fecha])
 }
 
 model Asignacion {
@@ -277,6 +314,8 @@ model Proceso {
   maquinaId String
   nombre    String // minúsculas: "pinza", "despunte"
   orden     Int      @default(0)
+  // segundos por prenda (estimado). La pieza puede tener el suyo, que manda.
+  tiempoSeg Int?
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
   piezas    Pieza[]
@@ -291,6 +330,7 @@ model Pieza {
   procesoId String
   nombre    String // minúsculas: "trasero", "bolsillo"
   orden     Int      @default(0)
+  tiempoSeg Int? // segundos por prenda; si falta se usa el del proceso
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -402,4 +442,18 @@ model TrabajoCorte {
 
   @@unique([corteId, proceso, operarioId])
   @@index([fecha])
+}
+
+// ── Ayudantes: sueldo semanal con historial (docs/PLAN_AYUDANTES.md) ─────────
+// El sueldo vigente para un día es el último con vigenteDesde ≤ ese día; así
+// "se ajusta cada mes" sin perder lo anterior. Fechas sin hora (@db.Date).
+model SueldoAyudante {
+  id           String   @id @default(uuid())
+  operario     Operario @relation(fields: [operarioId], references: [id], onDelete: Cascade)
+  operarioId   String
+  montoSemanal Int // centavos por semana completa (lunes a sábado)
+  vigenteDesde DateTime @db.Date
+  createdAt    DateTime @default(now())
+
+  @@unique([operarioId, vigenteDesde])
 }

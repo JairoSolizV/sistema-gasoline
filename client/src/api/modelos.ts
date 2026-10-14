@@ -127,3 +127,30 @@ export function useEliminarOperacionModelo() {
     onSuccess: aplicar,
   });
 }
+
+/** Reordenar (arrastrar) operaciones de la versión. Optimista: la lista queda
+ *  en su nuevo orden al instante; si el server rechaza, se recarga. */
+export function useReordenarOperacionesModelo() {
+  const qc = useQueryClient();
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ versionId, operacionIds }: { versionId: string; operacionIds: string[] }) =>
+      api<ModeloVersionDetalleDTO>(`/versiones/${versionId}/operaciones/orden`, {
+        method: 'PUT',
+        body: JSON.stringify({ operacionIds }),
+      }),
+    onMutate: ({ versionId, operacionIds }) => {
+      qc.setQueryData<ModeloVersionDetalleDTO>(['version', versionId], (previo) =>
+        previo ? { ...previo, operaciones: ordenarPorIds(previo.operaciones, operacionIds) } : previo,
+      );
+    },
+    onSuccess: aplicar,
+    onError: (_e, { versionId }) => qc.invalidateQueries({ queryKey: ['version', versionId] }),
+  });
+}
+
+/** Ordena una lista según los ids recibidos (los que falten quedan al final). */
+export function ordenarPorIds<T extends { id: string }>(lista: T[], ids: string[]): T[] {
+  const pos = new Map(ids.map((id, i) => [id, i]));
+  return [...lista].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
+}

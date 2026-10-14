@@ -19,6 +19,8 @@ import {
   useCrearOperario,
   useEditarOperario,
   useEliminarOperario,
+  useEliminarSueldo,
+  useGuardarSueldo,
   useOperarios,
 } from '../../api/operarios';
 import { ErrorApi } from '../../api/client';
@@ -63,6 +65,7 @@ function crearFormSchema(esAlta: boolean) {
         : z.string(),
       fechaIngreso: z.string().min(1, 'La fecha de ingreso es obligatoria'),
       fechaSalida: z.string(),
+      sueldoSemanal: z.string(), // solo alta de ayudante; luego se cambia con historial
     })
     .refine((v) => !v.fechaNacimiento || v.fechaNacimiento <= hoyLocalISO(), {
       path: ['fechaNacimiento'],
@@ -76,6 +79,14 @@ function crearFormSchema(esAlta: boolean) {
       for (const [campo, rol] of TARIFAS_POR_ROL) {
         const error = v.roles.includes(rol) ? errorTarifa(v[campo]) : null;
         if (error) ctx.addIssue({ code: 'custom', path: [campo], message: error });
+      }
+      if (esAlta && v.roles.includes('ayudante')) {
+        const s = v.sueldoSemanal.trim();
+        const error =
+          s === ''
+            ? 'El sueldo semanal es obligatorio para un ayudante'
+            : errorTarifa(s) && 'Monto inválido (ej. 400.00)';
+        if (error) ctx.addIssue({ code: 'custom', path: ['sueldoSemanal'], message: error });
       }
     });
 }
@@ -141,6 +152,113 @@ function BadgeEstado({ activo }: { activo: boolean }) {
   );
 }
 
+/** Historial del sueldo semanal de un ayudante: "se ajusta cada mes". Cada
+ *  sueldo rige desde su fecha; el vigente es el último que ya empezó. Lee el
+ *  operario fresco de la lista para reflejar los cambios al instante. */
+function SueldosAyudante({ operarioId }: { operarioId: string }) {
+  const { data: todos } = useOperarios('todos');
+  const operario = todos?.find((o) => o.id === operarioId);
+  const guardar = useGuardarSueldo();
+  const eliminar = useEliminarSueldo();
+  const [montoBs, setMontoBs] = useState('');
+  const [desde, setDesde] = useState(() => {
+    // por defecto, el 1.º del mes siguiente
+    const d = new Date();
+    return aFechaInput(new Date(d.getFullYear(), d.getMonth() + 1, 1, 12).toISOString());
+  });
+  const [error, setError] = useState<string | null>(null);
+  const hoy = hoyLocalISO();
+
+  const agregar = async () => {
+    setError(null);
+    const e = montoBs.trim() === '' ? 'Ingresá el monto semanal' : errorTarifa(montoBs);
+    if (e) return setError(e === 'La tarifa debe ser mayor a 0' ? 'El monto debe ser mayor a 0' : e);
+    if (!desde) return setError('Elegí desde qué fecha rige');
+    await guardar.mutateAsync({
+      operarioId,
+      input: { montoSemanal: aCentavos(montoBs.trim().replace(',', '.')), vigenteDesde: desde },
+    });
+    setMontoBs('');
+  };
+
+  const fallo = error ?? (guardar.error ?? eliminar.error ? mensajeError(guardar.error ?? eliminar.error) : null);
+
+  return (
+    <div className="rounded-lg border border-gray-200 p-3">
+      <div className="text-sm font-medium">
+        Sueldo semanal
+        {operario?.sueldoVigente != null && (
+          <span className="mono ml-2 font-semibold">Bs {formatBs(operario.sueldoVigente)}</span>
+        )}
+        <span className="ml-1 text-xs font-normal text-gray-400">vigente hoy · lunes a sábado</span>
+      </div>
+      <ul className="mt-2 space-y-1 text-sm">
+        {operario?.sueldos.map((s) => {
+          const futuro = s.vigenteDesde > hoy;
+          return (
+            <li key={s.id} className="flex items-center justify-between gap-2">
+              <span className="text-gray-600">
+                desde {new Date(`${s.vigenteDesde}T12:00:00`).toLocaleDateString('es-BO')}
+                {futuro && <span className="ml-1 text-xs text-acento">(programado)</span>}
+              </span>
+              <span className="flex items-center gap-3">
+                <span className="mono">Bs {formatBs(s.montoSemanal)}</span>
+                {operario.sueldos.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => eliminar.mutate({ operarioId, sueldoId: s.id })}
+                    className="text-xs text-gray-400 hover:text-error"
+                    title="Quitar este sueldo"
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            </li>
+          );
+        })}
+        {operario && operario.sueldos.length === 0 && (
+          <li className="text-xs text-amber-700">Todavía no tiene sueldo: cargalo abajo.</li>
+        )}
+      </ul>
+      <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">
+        <div>
+          <label className="mb-1 block text-xs text-gray-500">Nuevo sueldo (Bs/semana)</label>
+          <input
+            value={montoBs}
+            onChange={(e) => setMontoBs(e.target.value.replace(/[^\d.,]/g, ''))}
+            inputMode="decimal"
+            placeholder="ej. 450.00"
+            className="mono w-32 rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-acento"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-gray-500">Desde</label>
+          <input
+            type="date"
+            value={desde}
+            onChange={(e) => setDesde(e.target.value)}
+            className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm outline-none focus:border-acento"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={agregar}
+          disabled={guardar.isPending}
+          className="rounded-lg border border-acento px-3 py-1.5 text-sm font-semibold text-acento hover:bg-acento/5 disabled:opacity-60"
+        >
+          Guardar sueldo
+        </button>
+      </div>
+      {fallo && <p className="mt-2 text-xs text-error">{fallo}</p>}
+    </div>
+  );
+}
+
+function mensajeError(e: unknown) {
+  return e instanceof ErrorApi ? e.message : 'Error al guardar';
+}
+
 function FormOperario({
   operario,
   onCerrar,
@@ -175,6 +293,7 @@ function FormOperario({
           fechaNacimiento: aFechaInput(operario.fechaNacimiento),
           fechaIngreso: aFechaInput(operario.fechaIngreso),
           fechaSalida: aFechaInput(operario.fechaSalida),
+          sueldoSemanal: '',
         }
       : {
           tipo: 'regular',
@@ -186,12 +305,14 @@ function FormOperario({
           fechaNacimiento: '',
           fechaIngreso: hoyLocalISO(),
           fechaSalida: '',
+          sueldoSemanal: '',
         },
   });
 
   const roles = watch('roles') ?? [];
   const esCortador = roles.includes('cortador');
   const esClasificador = roles.includes('clasificador');
+  const esAyudante = roles.includes('ayudante');
 
   const onSubmit = handleSubmit(async (v) => {
     const fechaSalida = v.fechaSalida ? deFechaInput(v.fechaSalida) : null;
@@ -225,6 +346,9 @@ function FormOperario({
         fechaNacimiento: deFechaInput(v.fechaNacimiento),
         fechaIngreso: deFechaInput(v.fechaIngreso),
         fechaSalida,
+        ...(v.roles.includes('ayudante')
+          ? { sueldoSemanal: aCentavos(v.sueldoSemanal.trim().replace(',', '.')) }
+          : {}),
       });
     }
     onCerrar();
@@ -309,6 +433,27 @@ function FormOperario({
             )}
           </div>
         )}
+        {esAyudante &&
+          (!operario ? (
+            <Campo
+              etiqueta="Sueldo semanal (Bs)"
+              opcional="lunes a sábado; rige desde el ingreso"
+              error={errors.sueldoSemanal?.message}
+            >
+              <input
+                {...register('sueldoSemanal')}
+                inputMode="decimal"
+                placeholder="ej. 400.00"
+                className={`mono ${claseInput} max-w-48`}
+              />
+            </Campo>
+          ) : operario.roles.includes('ayudante') ? (
+            <SueldosAyudante operarioId={operario.id} />
+          ) : (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Guardá los cambios y volvé a abrir la ficha para cargarle el sueldo semanal.
+            </p>
+          ))}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Campo etiqueta="Cédula de identidad" error={errors.ci?.message}>
             <input {...register('ci')} placeholder="ej. 6543210 LP" className={claseInput} />
@@ -559,6 +704,10 @@ export function OperariosPage() {
                             {r === 'clasificador' &&
                               o.tarifaClasificacion != null &&
                               ` · ${formatBs(o.tarifaClasificacion)}`}
+                            {r === 'ayudante' &&
+                              (o.sueldoVigente != null
+                                ? ` · ${formatBs(o.sueldoVigente)}/sem`
+                                : ' · sin sueldo')}
                           </span>
                         ))}
                       </div>

@@ -46,6 +46,19 @@ export const catalogoRepository = {
     return [...deModelos, ...dePlantillas];
   },
 
+  /** Procesos y piezas (activos o no) con su tiempo estimado, para congelarlo
+   *  en las operaciones de los cortes (tiempos.ts). */
+  tiempos() {
+    return prisma.proceso.findMany({
+      select: {
+        nombre: true,
+        tiempoSeg: true,
+        maquina: { select: { nombre: true } },
+        piezas: { select: { nombre: true, tiempoSeg: true } },
+      },
+    });
+  },
+
   maquina: (id: string) => prisma.maquina.findUnique({ where: { id } }),
   proceso: (id: string) =>
     prisma.proceso.findUnique({ where: { id }, include: { maquina: true } }),

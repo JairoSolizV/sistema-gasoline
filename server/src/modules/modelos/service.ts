@@ -14,8 +14,10 @@ import type {
   MoldeInput,
   OperacionInput,
   PagoMoldeDTO,
+  ReordenarOperacionesInput,
 } from '@taller/shared';
 import { sumaCt } from '../../domain/calculo.js';
+import { esReordenValido } from '../../domain/validaciones.js';
 import { AppError } from '../../middleware/errors.js';
 import { configuracionRepository } from '../configuracion/repository.js';
 import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
@@ -229,6 +231,24 @@ export const modelosService = {
     const operacion = await versionDeOperacion(operacionId);
     await modelosRepository.editarOperacion(operacionId, operacion.modeloVersionId, input);
     return detalleDeVersion(operacion.modeloVersionId);
+  },
+
+  /** Reordenar (arrastrar) las operaciones de la versión. Solo cambia el orden:
+   *  el costo no varía y los cortes ya creados conservan su propio orden. */
+  async reordenarOperaciones(
+    versionId: string,
+    input: ReordenarOperacionesInput,
+  ): Promise<ModeloVersionDetalleDTO> {
+    const actual = await detalleDeVersion(versionId); // 404 si no existe
+    if (!esReordenValido(actual.operaciones.map((o) => o.id), input.operacionIds)) {
+      throw new AppError(
+        'ORDEN_INVALIDO',
+        'El nuevo orden no coincide con las operaciones de la versión; recargá la página',
+        409,
+      );
+    }
+    await modelosRepository.reordenarOperaciones(input.operacionIds);
+    return detalleDeVersion(versionId);
   },
 
   async eliminarOperacion(operacionId: string): Promise<ModeloVersionDetalleDTO> {

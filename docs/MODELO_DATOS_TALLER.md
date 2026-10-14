@@ -98,7 +98,7 @@ En el Excel, cada hoja era un corte. Referencia una versión y congela su cantid
 |---|---|---|
 | `id` | uuid | PK |
 | `modelo_version_id` | fk → ModeloVersion | qué versión se produce |
-| `codigo` | text? | etiqueta legible opcional |
+| `codigo` | int, único | numeración del corte (N° 23): automática (mayor + 1) si no se indica, editable, nunca repetida; no afecta pagos |
 | `tallas` | jsonb | ej. `[28,30,32,34,36,38]` (referencia) |
 | `corte_por_talla` | jsonb | ej. `[62,62,62,62,62,62]` (referencia) |
 | `plus_por_talla` | jsonb | tallas repetidas para cuadrar docenas (referencia) |
@@ -327,7 +327,7 @@ model Corte {
   id               String @id @default(uuid())
   version          ModeloVersion @relation(fields: [modeloVersionId], references: [id])
   modeloVersionId  String
-  codigo           String?
+  codigo           Int           @unique
   tallas           Json
   cortePorTalla    Json
   plusPorTalla     Json

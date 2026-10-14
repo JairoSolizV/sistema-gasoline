@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { PROCESOS_CORTE } from '../servicioCorte.js';
 
-const textoOpcional = (max: number) =>
-  z.preprocess((v) => (v === '' || v == null ? null : v), z.string().trim().max(max).nullable());
-
 // Datos del tendido (informativos; no afectan pagos). Los mismos campos se
 // piden al crear el corte y al completarlos/editarlos después. Quién cortó y
 // quién dobló ahora son procesos pagados (registrarProcesoSchema).
@@ -14,6 +11,16 @@ const camposTendido = {
 };
 
 export const editarTendidoSchema = z.object(camposTendido);
+
+// Numeración del corte (N° 1, 2, 3…). Al crear es opcional: si falta, el server
+// asigna el siguiente (mayor + 1). Nunca se repite (lo valida el server).
+const codigoCorte = z
+  .number({ error: 'El código debe ser un número' })
+  .int('El código debe ser un número entero')
+  .min(1, 'El código debe ser mayor a 0')
+  .max(999_999, 'El código es demasiado grande');
+
+export const editarCodigoSchema = z.object({ codigo: codigoCorte });
 
 // ── Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md) ──
 const centavos = z.number().int().min(0, 'La tarifa no puede ser negativa').max(1_000_000);
@@ -44,7 +51,7 @@ export const editarServicioSchema = z.object({ esInterno: z.boolean() });
 export const crearCorteSchema = z
   .object({
     modeloVersionId: z.uuid(),
-    codigo: textoOpcional(30),
+    codigo: z.preprocess((v) => (v === '' || v == null ? undefined : v), codigoCorte.optional()),
     tallas: z.array(z.number().int().min(0)).min(1, 'Ingresá al menos una talla'),
     cortePorTalla: z.array(z.number().int().min(0, 'Cantidades no negativas')),
     // el PLUS son tallas repetidas para cuadrar docenas; SÍ se paga (CA-2.2)
@@ -92,6 +99,7 @@ export const listarCortesQuerySchema = z.object({
 
 export type CrearCorteInput = z.infer<typeof crearCorteSchema>;
 export type EditarTendidoInput = z.infer<typeof editarTendidoSchema>;
+export type EditarCodigoInput = z.infer<typeof editarCodigoSchema>;
 export type RegistrarProcesoInput = z.infer<typeof registrarProcesoSchema>;
 export type EditarServicioInput = z.infer<typeof editarServicioSchema>;
 export type AsignacionInput = z.infer<typeof asignacionInputSchema>;

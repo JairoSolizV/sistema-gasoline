@@ -1,6 +1,11 @@
 // HTTP puro: lee lo validado, llama al service, responde { data } (ARQUITECTURA §2.1).
 import type { Request, Response } from 'express';
-import type { CrearOperarioInput, EditarOperarioInput, RolOperario } from '@taller/shared';
+import type {
+  CrearOperarioInput,
+  EditarOperarioInput,
+  RolOperario,
+  SueldoInput,
+} from '@taller/shared';
 import { operariosService } from './service.js';
 
 export const operariosController = {
@@ -32,5 +37,18 @@ export const operariosController = {
   async eliminar(req: Request, res: Response) {
     await operariosService.eliminar(String(req.params.id));
     res.json({ data: { eliminado: true } });
+  },
+
+  async guardarSueldo(req: Request, res: Response) {
+    const dto = await operariosService.guardarSueldo(String(req.params.id), req.body as SueldoInput);
+    res.json({ data: dto });
+  },
+
+  async eliminarSueldo(req: Request, res: Response) {
+    const dto = await operariosService.eliminarSueldo(
+      String(req.params.id),
+      String(req.params.sueldoId),
+    );
+    res.json({ data: dto });
   },
 };

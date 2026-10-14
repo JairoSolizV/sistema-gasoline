@@ -345,3 +345,36 @@ describe('buscador del modelo y pago de moldes', () => {
     await request(app).patch(`/api/v1/operarios/${moldistaId}`).send({ activo: true });
   });
 });
+
+describe('PUT /versiones/:id/operaciones/orden — reordenar (arrastrar)', () => {
+  test('cambia el orden sin tocar el costo; los cortes ya creados conservan el suyo', async () => {
+    const modelo = await crearModeloTest('TEST MODELO ORDEN');
+    const v = modelo.body.data;
+    const [pinza, urlado, ensamble] = v.operaciones.map((o: { id: string }) => o.id);
+
+    const res = await request(app)
+      .put(`/api/v1/versiones/${v.id}/operaciones/orden`)
+      .send({ operacionIds: [urlado, pinza, ensamble] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.operaciones.map((o: { proceso: string }) => o.proceso)).toEqual([
+      'urlado',
+      'pinza',
+      'ensamble',
+    ]);
+    expect(res.body.data.operaciones.map((o: { orden: number }) => o.orden)).toEqual([1, 2, 3]);
+    expect(res.body.data.costoManoObraPrenda).toBe(85);
+  });
+
+  test('rechaza un orden que no tiene exactamente las mismas operaciones', async () => {
+    const modelo = await crearModeloTest('TEST MODELO ORDEN MAL');
+    const v = modelo.body.data;
+    const [a, b, c] = v.operaciones.map((o: { id: string }) => o.id);
+    const url = `/api/v1/versiones/${v.id}/operaciones/orden`;
+    expect((await request(app).put(url).send({ operacionIds: [a, b] })).status).toBe(409); // falta una
+    expect((await request(app).put(url).send({ operacionIds: [a, b, 'otra'] })).status).toBe(409);
+    expect((await request(app).put(url).send({ operacionIds: [a, a, c] })).status).toBe(400); // repetida
+    expect(
+      (await request(app).put('/api/v1/versiones/00000000-0000-0000-0000-000000000000/operaciones/orden').send({ operacionIds: [a] })).status,
+    ).toBe(404);
+  });
+});

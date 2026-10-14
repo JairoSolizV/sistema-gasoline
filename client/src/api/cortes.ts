@@ -5,13 +5,17 @@ import type {
   CorteDetalleDTO,
   CorteResumenDTO,
   CrearCorteInput,
+  EditarCodigoInput,
+  EditarOperacionInput,
   EditarServicioInput,
   EditarTendidoInput,
+  OperacionInput,
   ProcesoCorte,
   RegistrarProcesoInput,
   ReemplazarAsignacionesInput,
 } from '@taller/shared';
 import { api } from './client';
+import { ordenarPorIds } from './modelos';
 
 export function useCortes(estado?: 'borrador' | 'abierto' | 'cerrado') {
   const query = estado ? `?estado=${estado}` : '';
@@ -44,6 +48,26 @@ export function useCrearCorte() {
   return useMutation({
     mutationFn: (input: CrearCorteInput) =>
       api<CorteDetalleDTO>('/cortes', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess: aplicar,
+  });
+}
+
+/** Número que el server asignaría al próximo corte si no se elige uno. */
+export function useSiguienteCodigo() {
+  return useQuery({
+    queryKey: ['cortes', 'siguiente-codigo'],
+    queryFn: () => api<{ codigo: number }>('/cortes/siguiente-codigo'),
+  });
+}
+
+export function useEditarCodigo() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: EditarCodigoInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/codigo`, {
+        method: 'PATCH',
+        body: JSON.stringify(input),
+      }),
     onSuccess: aplicar,
   });
 }
@@ -151,6 +175,72 @@ export function useCerrarCorte() {
       api<CorteDetalleDTO>(`/cortes/${corteId}/cerrar`, {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+// ── Cambios de último momento a las operaciones del corte (no tocan el modelo;
+//    cada uno queda en el historial del corte) ──
+
+export function useReordenarOperacionesCorte() {
+  const qc = useQueryClient();
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, operacionIds }: { corteId: string; operacionIds: string[] }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/operaciones/orden`, {
+        method: 'PUT',
+        body: JSON.stringify({ operacionIds }),
+      }),
+    // optimista: la fila queda donde se soltó mientras el server confirma
+    onMutate: ({ corteId, operacionIds }) => {
+      qc.setQueryData<CorteDetalleDTO>(['corte', corteId], (previo) =>
+        previo ? { ...previo, operaciones: ordenarPorIds(previo.operaciones, operacionIds) } : previo,
+      );
+    },
+    onSuccess: aplicar,
+    onError: (_e, { corteId }) => qc.invalidateQueries({ queryKey: ['corte', corteId] }),
+  });
+}
+
+export function useAgregarOperacionCorte() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: OperacionInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/operaciones`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useEditarOperacionCorte() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({
+      corteId,
+      corteOperacionId,
+      cambios,
+    }: {
+      corteId: string;
+      corteOperacionId: string;
+      cambios: EditarOperacionInput;
+    }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/operaciones/${corteOperacionId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(cambios),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useQuitarOperacionCorte() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, corteOperacionId }: { corteId: string; corteOperacionId: string }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/operaciones/${corteOperacionId}`, {
+        method: 'DELETE',
       }),
     onSuccess: aplicar,
   });

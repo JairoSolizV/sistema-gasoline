@@ -15,6 +15,7 @@ import {
   normalizarNombreGrupo,
   type CatalogoArbolDTO,
   type CatalogoNodoDTO,
+  type CatalogoNodoConTiempoDTO,
   type FusionDTO,
   type CrearNodoCatalogoInput,
   type EditarNodoCatalogoInput,
@@ -78,6 +79,7 @@ function datosEdicion(input: EditarNodoCatalogoInput) {
     ...(input.nombre !== undefined ? { nombre: input.nombre } : {}),
     ...(input.activo !== undefined ? { activo: input.activo } : {}),
     ...(input.orden !== undefined ? { orden: input.orden } : {}),
+    ...(input.tiempoSeg !== undefined ? { tiempoSeg: input.tiempoSeg } : {}),
   };
 }
 
@@ -104,9 +106,11 @@ export const catalogoService = {
         ...nodo(m, usos.maquinas, m.nombre),
         procesos: m.procesos.map((p) => ({
           ...nodo(p, usos.procesos, `${m.nombre}|${p.nombre}`),
-          piezas: p.piezas.map((pz) =>
-            nodo(pz, usos.piezas, `${m.nombre}|${p.nombre}|${pz.nombre}`),
-          ),
+          tiempoSeg: p.tiempoSeg,
+          piezas: p.piezas.map((pz) => ({
+            ...nodo(pz, usos.piezas, `${m.nombre}|${p.nombre}|${pz.nombre}`),
+            tiempoSeg: pz.tiempoSeg,
+          })),
         })),
       })),
       grupos: grupos.map((g) => nodo(g, usos.grupos, g.nombre)),
@@ -152,7 +156,7 @@ export const catalogoService = {
     return nodo(m, usos.maquinas, m.nombre);
   },
 
-  async editarProceso(id: string, input: EditarNodoCatalogoInput): Promise<CatalogoNodoDTO> {
+  async editarProceso(id: string, input: EditarNodoCatalogoInput): Promise<CatalogoNodoConTiempoDTO> {
     const actual = await catalogoRepository.proceso(id);
     if (!actual) throw new AppError('NO_ENCONTRADO', 'Proceso no encontrado', 404);
     const p = await comoDuplicado(
@@ -160,10 +164,10 @@ export const catalogoService = {
       `un proceso en "${actual.maquina.nombre}"`,
     );
     const usos = await contarUsos();
-    return nodo(p, usos.procesos, `${actual.maquina.nombre}|${p.nombre}`);
+    return { ...nodo(p, usos.procesos, `${actual.maquina.nombre}|${p.nombre}`), tiempoSeg: p.tiempoSeg };
   },
 
-  async editarPieza(id: string, input: EditarNodoCatalogoInput): Promise<CatalogoNodoDTO> {
+  async editarPieza(id: string, input: EditarNodoCatalogoInput): Promise<CatalogoNodoConTiempoDTO> {
     const actual = await catalogoRepository.pieza(id);
     if (!actual) throw new AppError('NO_ENCONTRADO', 'Pieza no encontrada', 404);
     const pz = await comoDuplicado(
@@ -172,7 +176,7 @@ export const catalogoService = {
     );
     const usos = await contarUsos();
     const clave = `${actual.proceso.maquina.nombre}|${actual.proceso.nombre}|${pz.nombre}`;
-    return nodo(pz, usos.piezas, clave);
+    return { ...nodo(pz, usos.piezas, clave), tiempoSeg: pz.tiempoSeg };
   },
 
   async editarGrupo(id: string, input: EditarNodoCatalogoInput): Promise<CatalogoNodoDTO> {

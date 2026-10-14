@@ -7,8 +7,10 @@ import {
   useEditarOperacionModelo,
   useEliminarOperacionModelo,
   useModelos,
+  useReordenarOperacionesModelo,
   useVersion,
 } from '../../api/modelos';
+import { claseIndicador, useArrastrarOrden } from '../../lib/useArrastrarOrden';
 import { useConfiguracion } from '../../api/configuracion';
 import { useOperarios } from '../../api/operarios';
 import { ErrorApi } from '../../api/client';
@@ -116,6 +118,84 @@ function ModalNuevaVersion({
   );
 }
 
+// Un grupo de operaciones de la versión. Se reordena arrastrando la manija ⠿,
+// solo dentro del grupo (para cambiar de grupo se usa Editar).
+function GrupoModelo({
+  grupo,
+  ops,
+  onReordenar,
+  onEditar,
+  onEliminar,
+  onAgregar,
+}: {
+  grupo: string;
+  ops: OperacionDTO[];
+  onReordenar: (idsGrupo: string[]) => void;
+  onEditar: (op: OperacionDTO) => void;
+  onEliminar: (op: OperacionDTO) => void;
+  onAgregar: () => void;
+}) {
+  const { arrastrado, manija, fila, indicador } = useArrastrarOrden(
+    ops.map((o) => o.id),
+    onReordenar,
+  );
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+        <div className="flex items-baseline gap-3">
+          <span className="text-sm font-semibold">{grupo}</span>
+          <span className="text-xs text-gray-500">{ops.length} operaciones</span>
+        </div>
+        <span className="mono text-sm font-semibold text-gray-600">
+          Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
+        </span>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {ops.map((op) => (
+            <tr
+              key={op.id}
+              {...fila(op.id)}
+              className={`border-b border-gray-100 last:border-0 ${
+                arrastrado === op.id ? 'opacity-40' : ''
+              } ${claseIndicador(indicador(op.id))}`}
+            >
+              <td
+                {...manija(op.id)}
+                className="w-6 cursor-grab pl-3 text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
+              >
+                ⠿
+              </td>
+              <td className="w-14 px-3 py-2 text-gray-400">{op.n ?? '—'}</td>
+              <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
+              <td className="px-3 py-2 font-medium">{op.proceso}</td>
+              <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
+              <td className="w-28 px-3 py-2 text-right">
+                <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
+              </td>
+              <td className="w-36 px-5 py-2">
+                <div className="flex justify-end gap-3 text-[13px] font-medium">
+                  <button onClick={() => onEditar(op)} className="text-acento hover:underline">
+                    Editar
+                  </button>
+                  <button onClick={() => onEliminar(op)} className="text-error hover:underline">
+                    Eliminar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="border-t border-gray-100 px-5 py-2">
+        <button onClick={onAgregar} className="text-[13px] font-medium text-acento hover:underline">
+          + Agregar operación a {grupo}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function VersionDetallePage() {
   const { versionId } = useParams();
   const navigate = useNavigate();
@@ -124,6 +204,7 @@ export function VersionDetallePage() {
   const agregar = useAgregarOperacion();
   const editar = useEditarOperacionModelo();
   const eliminar = useEliminarOperacionModelo();
+  const reordenar = useReordenarOperacionesModelo();
   const [modal, setModal] = useState<ModalAbierto>(null);
 
   const grupos = useMemo(() => {
@@ -210,57 +291,31 @@ export function VersionDetallePage() {
 
         <div className="mt-6 space-y-4">
           {grupos.map(([grupo, ops]) => (
-            <div key={grupo} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-sm font-semibold">{grupo}</span>
-                  <span className="text-xs text-gray-500">{ops.length} operaciones</span>
-                </div>
-                <span className="mono text-sm font-semibold text-gray-600">
-                  Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
-                </span>
-              </div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {ops.map((op) => (
-                    <tr key={op.id} className="border-b border-gray-100 last:border-0">
-                      <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
-                      <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
-                      <td className="px-3 py-2 font-medium">{op.proceso}</td>
-                      <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
-                      <td className="w-28 px-3 py-2 text-right">
-                        <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
-                      </td>
-                      <td className="w-36 px-5 py-2">
-                        <div className="flex justify-end gap-3 text-[13px] font-medium">
-                          <button
-                            onClick={() => setModal({ tipo: 'editar', operacion: op })}
-                            className="text-acento hover:underline"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => setModal({ tipo: 'eliminar', operacion: op })}
-                            className="text-error hover:underline"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="border-t border-gray-100 px-5 py-2">
-                <button
-                  onClick={() => setModal({ tipo: 'agregar', grupo })}
-                  className="text-[13px] font-medium text-acento hover:underline"
-                >
-                  + Agregar operación a {grupo}
-                </button>
-              </div>
-            </div>
+            <GrupoModelo
+              key={grupo}
+              grupo={grupo}
+              ops={ops}
+              // arrastrar dentro del grupo: se manda el orden completo de la versión
+              onReordenar={(idsGrupo) =>
+                reordenar.mutate({
+                  versionId: detalle.id,
+                  operacionIds: grupos.flatMap(([g, os]) =>
+                    g === grupo ? idsGrupo : os.map((o) => o.id),
+                  ),
+                })
+              }
+              onEditar={(op) => setModal({ tipo: 'editar', operacion: op })}
+              onEliminar={(op) => setModal({ tipo: 'eliminar', operacion: op })}
+              onAgregar={() => setModal({ tipo: 'agregar', grupo })}
+            />
           ))}
+          {reordenar.error != null && (
+            <p className="rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+              {reordenar.error instanceof ErrorApi
+                ? reordenar.error.message
+                : 'No se pudo guardar el nuevo orden'}
+            </p>
+          )}
         </div>
 
         <button

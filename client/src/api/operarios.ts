@@ -4,6 +4,7 @@ import type {
   EditarOperarioInput,
   OperarioDTO,
   RolOperario,
+  SueldoInput,
 } from '@taller/shared';
 import { api } from './client';
 
@@ -39,6 +40,28 @@ export function useEliminarOperario() {
   return useMutation({
     mutationFn: (id: string) =>
       api<{ eliminado: boolean }>(`/operarios/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operarios'] }),
+  });
+}
+
+/** Ayudantes: sueldo semanal desde una fecha (historial) y quitar uno. */
+export function useGuardarSueldo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ operarioId, input }: { operarioId: string; input: SueldoInput }) =>
+      api<OperarioDTO>(`/operarios/${operarioId}/sueldos`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operarios'] }),
+  });
+}
+
+export function useEliminarSueldo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ operarioId, sueldoId }: { operarioId: string; sueldoId: string }) =>
+      api<OperarioDTO>(`/operarios/${operarioId}/sueldos/${sueldoId}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['operarios'] }),
   });
 }

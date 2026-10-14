@@ -64,6 +64,7 @@ export function CortesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                <th className="px-5 py-3">COD</th>
                 <th className="px-5 py-3">Corte</th>
                 <th className="px-5 py-3">Cantidad</th>
                 <th className="px-5 py-3">Estado</th>
@@ -82,13 +83,13 @@ export function CortesPage() {
                     : 0;
                 return (
                   <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
+                    <td className="mono px-5 py-3 font-semibold">{c.codigo}</td>
                     <td className="px-5 py-3">
                       <Link to={`/cortes/${c.id}`} className="font-medium text-acento hover:underline">
                         {c.modeloNombre}
                       </Link>{' '}
                       <span className="text-[11px] font-semibold text-gray-400">
                         v{c.numeroVersion}
-                        {c.codigo ? ` · ${c.codigo}` : ''}
                       </span>
                     </td>
                     <td className="mono px-5 py-3">{c.cantidadTotal}</td>
@@ -134,7 +135,7 @@ export function CortesPage() {
               })}
               {cortes.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
                     No hay cortes {estado ? `en estado "${estado}"` : ''} todavía.
                   </td>
                 </tr>

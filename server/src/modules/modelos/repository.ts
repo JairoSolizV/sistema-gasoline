@@ -151,6 +151,13 @@ export const modelosRepository = {
     });
   },
 
+  /** Fija orden = posición (1..n) según la lista recibida, atómico. */
+  reordenarOperaciones(operacionIds: string[]) {
+    return prisma.$transaction(
+      operacionIds.map((id, i) => prisma.operacion.update({ where: { id }, data: { orden: i + 1 } })),
+    );
+  },
+
   eliminarOperacion(operacionId: string, versionId: string) {
     return prisma.$transaction(async (tx) => {
       await tx.operacion.delete({ where: { id: operacionId } });

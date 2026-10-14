@@ -27,6 +27,7 @@ export interface CambiosNodo {
   nombre?: string;
   activo?: boolean;
   orden?: number;
+  tiempoSeg?: number | null; // solo procesos y piezas; null = quitar el tiempo
 }
 
 /** Toda mutación del catálogo invalida el árbol (activos e inactivos). */

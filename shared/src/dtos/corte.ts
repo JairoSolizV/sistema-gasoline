@@ -29,6 +29,40 @@ export interface CorteOperacionDTO {
   diferencia: number; // objetivo − asignado (>0 faltan, <0 sobran)
   totalOperacion: number; // centavos, Σ totales de sus asignaciones
   asignaciones: AsignacionDTO[];
+  tiempoSeg: number | null; // segundos por prenda (catálogo, congelado al abrir); null = sin tiempo
+  // cambio de último momento respecto del modelo (solo en este corte)
+  agregadaEnCorte: boolean; // no viene del modelo: se agregó en el corte
+  modificadaEnCorte: boolean; // máquina/proceso/pieza/CT distintos al modelo
+}
+
+// ── Historial de cambios de las operaciones del corte (no tocan el modelo) ──
+
+export type TipoCambioCorte = 'reordenar' | 'editar' | 'agregar' | 'quitar';
+export type CampoOperacion = 'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct';
+
+export interface OperacionResumenDTO {
+  grupo: string;
+  n: string | null;
+  equipo: string;
+  proceso: string;
+  pieza: string | null;
+  ct: number; // centavos
+}
+
+export type DetalleCambioCorte =
+  | {
+      tipo: 'editar';
+      campos: { campo: CampoOperacion; antes: string | number | null; despues: string | number | null }[];
+    }
+  | { tipo: 'agregar' | 'quitar'; operacion: OperacionResumenDTO }
+  | { tipo: 'reordenar'; antes: string[]; despues: string[] };
+
+export interface CorteCambioDTO {
+  id: string;
+  fecha: string; // ISO
+  grupo: string;
+  etiqueta: string; // "proceso · pieza" al momento del cambio
+  detalle: DetalleCambioCorte;
 }
 
 export interface PersonaDTO {
@@ -76,7 +110,7 @@ export interface ServicioCorteDTO {
 
 export interface CorteResumenDTO {
   id: string;
-  codigo: string | null;
+  codigo: number; // numeración del corte (N° 23), única
   modeloNombre: string;
   numeroVersion: number;
   cantidadTotal: number;
@@ -97,7 +131,7 @@ export interface TotalPorOperarioDTO {
 
 export interface CorteDetalleDTO {
   id: string;
-  codigo: string | null;
+  codigo: number; // numeración del corte (N° 23), única
   modeloVersionId: string;
   modeloNombre: string;
   numeroVersion: number;
@@ -120,4 +154,16 @@ export interface CorteDetalleDTO {
   costoTotal: number; // costura + servicio de corte
   operaciones: CorteOperacionDTO[];
   totalesPorOperario: TotalPorOperarioDTO[];
+  cambios: CorteCambioDTO[]; // historial de cambios respecto del modelo, más reciente primero
+  estimado: EstimadoDuracionDTO;
+}
+
+/** Cuánto tarda el corte: todos cosen en paralelo, así que termina cuando
+ *  termina el operario más cargado (Σ piezas asignadas × segundos por prenda).
+ *  Solo estimado; no afecta pagos. */
+export interface EstimadoDuracionDTO {
+  duracionSeg: number | null; // null = todavía no hay nada asignado con tiempo
+  operarioMasCargado: PersonaDTO | null;
+  operacionesSinTiempo: string[]; // etiquetas: el catálogo no tenía tiempo al abrir
+  operacionesSinAsignar: number; // sin asignar o con descuadre: su trabajo no está repartido
 }

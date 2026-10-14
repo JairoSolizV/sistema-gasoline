@@ -3,6 +3,7 @@ import {
   crearOperarioSchema,
   editarOperarioSchema,
   listarOperariosQuerySchema,
+  sueldoInputSchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
 import { operariosController } from './controller.js';
@@ -16,3 +17,6 @@ operariosRouter.post('/', validar(crearOperarioSchema), operariosController.crea
 operariosRouter.get('/:id', operariosController.obtener);
 operariosRouter.patch('/:id', validar(editarOperarioSchema), operariosController.editar);
 operariosRouter.delete('/:id', operariosController.eliminar);
+// Ayudantes: sueldo semanal con historial (docs/PLAN_AYUDANTES.md)
+operariosRouter.post('/:id/sueldos', validar(sueldoInputSchema), operariosController.guardarSueldo);
+operariosRouter.delete('/:id/sueldos/:sueldoId', operariosController.eliminarSueldo);

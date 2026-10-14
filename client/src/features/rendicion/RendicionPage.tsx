@@ -172,7 +172,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
                   <span className="font-semibold">{c.modeloNombre}</span>
                   <span className="ml-1 text-[11px] font-semibold text-gray-400">
                     v{c.numeroVersion}
-                    {c.codigo ? ` · ${c.codigo}` : ''}
+                    {` · COD ${c.codigo}`}
                   </span>
                   {c.fechaCierre && (
                     <span className="ml-2 text-xs text-gray-500">
@@ -235,7 +235,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
                       {t.modeloNombre}
                       <span className="ml-1 text-[11px] font-semibold text-gray-400">
                         v{t.numeroVersion}
-                        {t.codigo ? ` · ${t.codigo}` : ''}
+                        {` · COD ${t.codigo}`}
                       </span>
                     </td>
                     <td className="mono px-3 py-2 text-right text-gray-500">{t.cantidad} prendas</td>

@@ -2,13 +2,18 @@
 // operarios de baja sin historial, y armado del DTO (nunca se devuelve el
 // modelo Prisma crudo — ARQUITECTURA §5.3).
 import type { Prisma } from '@prisma/client';
-import type {
-  CrearOperarioInput,
-  EditarOperarioInput,
-  OperarioDTO,
-  RolOperario,
+import {
+  dateADia,
+  diaADate,
+  type CrearOperarioInput,
+  type EditarOperarioInput,
+  type OperarioDTO,
+  type RolOperario,
+  type SueldoInput,
 } from '@taller/shared';
+import { hoyEnBolivia } from '../../lib/hoy.js';
 import { AppError } from '../../middleware/errors.js';
+import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
 import { operariosRepository, type OperarioConHistorial } from './repository.js';
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
@@ -43,7 +48,24 @@ function aDTO(o: OperarioConHistorial): OperarioDTO {
     fechaSalida: iso(o.fechaSalida),
     fechaBaja: iso(o.fechaBaja),
     tieneHistorial: partesHistorial(o._count).length > 0,
+    sueldos: o.sueldos.map((s) => ({
+      id: s.id,
+      montoSemanal: s.montoSemanal,
+      vigenteDesde: dateADia(s.vigenteDesde),
+    })),
+    sueldoVigente: sueldoVigenteEl(o.sueldos, hoyEnBolivia()),
   };
+}
+
+/** Sueldo semanal vigente en un día: el último con vigenteDesde ≤ ese día. */
+function sueldoVigenteEl(
+  sueldos: { montoSemanal: number; vigenteDesde: Date }[],
+  dia: string,
+): number | null {
+  const vigente = sueldos
+    .filter((s) => dateADia(s.vigenteDesde) <= dia)
+    .sort((a, b) => b.vigenteDesde.getTime() - a.vigenteDesde.getTime())[0];
+  return vigente?.montoSemanal ?? null;
 }
 
 async function exigirCiLibre(ci: string, idPropio?: string) {
@@ -78,8 +100,51 @@ export const operariosService = {
       fechaNacimiento: input.fechaNacimiento,
       fechaIngreso: input.fechaIngreso,
       fechaSalida: input.fechaSalida ?? null,
+      // ayudante: el sueldo rige desde su día de ingreso
+      ...(input.sueldoSemanal != null
+        ? {
+            sueldos: {
+              create: {
+                montoSemanal: input.sueldoSemanal,
+                vigenteDesde: diaADate(dateADia(input.fechaIngreso)),
+              },
+            },
+          }
+        : {}),
     });
     return aDTO(operario);
+  },
+
+  /** Sueldo semanal de un ayudante desde una fecha (el sueldo "se ajusta cada
+   *  mes"). No se puede tocar un sueldo que rija desde un mes ya liquidado. */
+  async guardarSueldo(operarioId: string, input: SueldoInput): Promise<OperarioDTO> {
+    const operario = await operariosRepository.obtener(operarioId);
+    if (!operario) throw new AppError('NO_ENCONTRADO', 'Operario no encontrado', 404);
+    if (!operario.roles.includes('ayudante')) {
+      throw new AppError('OPERARIO_SIN_ROL', `${operario.nombre} no tiene el rol "Ayudante"`, 409);
+    }
+    const desde = diaADate(input.vigenteDesde);
+    await exigirFechaSinLiquidar(desde, 'cambiar el sueldo');
+    await operariosRepository.guardarSueldo(operarioId, input.montoSemanal, desde);
+    return this.obtener(operarioId);
+  },
+
+  async eliminarSueldo(operarioId: string, sueldoId: string): Promise<OperarioDTO> {
+    const sueldo = await operariosRepository.obtenerSueldo(sueldoId);
+    if (!sueldo || sueldo.operarioId !== operarioId) {
+      throw new AppError('NO_ENCONTRADO', 'Sueldo no encontrado', 404);
+    }
+    const operario = (await operariosRepository.obtener(operarioId))!;
+    if (operario.roles.includes('ayudante') && operario.sueldos.length === 1) {
+      throw new AppError(
+        'SUELDO_UNICO',
+        'Un ayudante necesita al menos un sueldo: cambiale el monto en vez de quitarlo',
+        409,
+      );
+    }
+    await exigirFechaSinLiquidar(sueldo.vigenteDesde, 'quitar un sueldo');
+    await operariosRepository.eliminarSueldo(sueldoId);
+    return this.obtener(operarioId);
   },
 
   async editar(id: string, input: EditarOperarioInput): Promise<OperarioDTO> {

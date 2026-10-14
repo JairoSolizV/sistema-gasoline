@@ -21,7 +21,7 @@ export interface RendicionOperacionDTO {
 
 export interface RendicionCorteDTO {
   corteId: string;
-  codigo: string | null;
+  codigo: number; // numeración del corte (N° 23), única
   modeloNombre: string;
   numeroVersion: number;
   fechaCierre: string | null;
@@ -33,7 +33,7 @@ export interface RendicionCorteDTO {
  *  en el doblado se ve solo su mitad, no el nombre ni la parte del otro). */
 export interface RendicionTrabajoCorteDTO {
   corteId: string;
-  codigo: string | null;
+  codigo: number; // numeración del corte (N° 23), única
   modeloNombre: string;
   numeroVersion: number;
   proceso: ProcesoCorte;

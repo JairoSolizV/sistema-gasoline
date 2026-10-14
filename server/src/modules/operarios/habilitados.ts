@@ -6,11 +6,14 @@ import { ETIQUETA_ROL, type RolOperario } from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
 import { operariosRepository } from './repository.js';
 
+/** `rol` puede ser una lista: alcanza con tener cualquiera de ellos (ej. la
+ *  costura la hacen costureros o ayudantes, docs/PLAN_AYUDANTES.md §2.11). */
 export async function exigirOperariosHabilitados(
   ids: string[],
-  rol: RolOperario,
+  rol: RolOperario | readonly RolOperario[],
   para: string,
 ): Promise<void> {
+  const aceptados: readonly RolOperario[] = typeof rol === 'string' ? [rol] : rol;
   const unicos = [...new Set(ids)];
   if (unicos.length === 0) return;
   const operarios = await operariosRepository.listarPorIds(unicos);
@@ -25,11 +28,12 @@ export async function exigirOperariosHabilitados(
       409,
     );
   }
-  const sinRol = operarios.find((o) => !o.roles.includes(rol));
+  const sinRol = operarios.find((o) => !aceptados.some((r) => o.roles.includes(r)));
   if (sinRol) {
+    const nombres = aceptados.map((r) => `"${ETIQUETA_ROL[r]}"`).join(' o ');
     throw new AppError(
       'OPERARIO_SIN_ROL',
-      `${sinRol.nombre} no tiene el rol "${ETIQUETA_ROL[rol]}" y no puede ${para}. Agregáselo en Operarios.`,
+      `${sinRol.nombre} no tiene el rol ${nombres} y no puede ${para}. Agregáselo en Operarios.`,
       409,
     );
   }

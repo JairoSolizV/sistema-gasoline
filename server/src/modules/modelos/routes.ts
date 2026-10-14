@@ -6,6 +6,7 @@ import {
   editarOperacionSchema,
   moldeInputSchema,
   operacionInputSchema,
+  reordenarOperacionesSchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
 import { modelosController } from './controller.js';
@@ -32,6 +33,11 @@ modelosRouter.post(
   '/versiones/:id/operaciones',
   validar(operacionInputSchema),
   modelosController.agregarOperacion,
+);
+modelosRouter.put(
+  '/versiones/:id/operaciones/orden',
+  validar(reordenarOperacionesSchema),
+  modelosController.reordenarOperaciones,
 );
 modelosRouter.patch(
   '/operaciones/:opId',

@@ -313,3 +313,109 @@ describe('DELETE /api/v1/operarios/:id — solo de baja y sin historial', () => 
     expect(res.status).toBe(404);
   });
 });
+
+// ── Ayudantes: sueldo semanal con historial (docs/PLAN_AYUDANTES.md) ──
+describe('ayudantes: sueldo semanal', () => {
+  const ayudante = (nombre: string, extra: Record<string, unknown> = {}) =>
+    crearOperarioTest(nombre, { roles: ['ayudante'], sueldoSemanal: 40000, ...extra });
+
+  test('alta de ayudante: el sueldo es obligatorio y rige desde su ingreso', async () => {
+    const sin = await crearOperarioTest('TEST AYU SIN', { roles: ['ayudante'] });
+    expect(sin.status).toBe(400);
+    expect(sin.body.error.message).toContain('sueldoSemanal');
+
+    const res = await ayudante('TEST AYU ALTA'); // ingreso 2026-01-05 (datosOperario)
+    expect(res.status).toBe(201);
+    expect(res.body.data.roles).toEqual(['ayudante']);
+    expect(res.body.data.sueldos).toEqual([
+      { id: expect.any(String), montoSemanal: 40000, vigenteDesde: '2026-01-05' },
+    ]);
+    expect(res.body.data.sueldoVigente).toBe(40000);
+  });
+
+  test('el sueldo se ajusta: el vigente es el último que ya empezó a regir', async () => {
+    const alta = await ayudante('TEST AYU AJUSTE');
+    const id = alta.body.data.id;
+
+    const futuro = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 60000, vigenteDesde: '2099-01-01' });
+    expect(futuro.status).toBe(200);
+    expect(futuro.body.data.sueldoVigente).toBe(40000); // todavía no rige
+
+    const subida = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 45000, vigenteDesde: '2026-02-01' });
+    expect(subida.body.data.sueldoVigente).toBe(45000);
+    expect(subida.body.data.sueldos.map((s: { vigenteDesde: string }) => s.vigenteDesde)).toEqual([
+      '2099-01-01',
+      '2026-02-01',
+      '2026-01-05',
+    ]);
+
+    // misma fecha: reemplaza, no duplica
+    const corregido = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 50000, vigenteDesde: '2026-02-01' });
+    expect(corregido.body.data.sueldos).toHaveLength(3);
+    expect(corregido.body.data.sueldoVigente).toBe(50000);
+  });
+
+  test('validaciones: rol ayudante, fecha real, monto > 0', async () => {
+    const costurero = await crearOperarioTest('TEST AYU NO ES');
+    const sinRol = await request(app)
+      .post(`/api/v1/operarios/${costurero.body.data.id}/sueldos`)
+      .send({ montoSemanal: 40000, vigenteDesde: '2026-02-01' });
+    expect(sinRol.status).toBe(409);
+
+    const alta = await ayudante('TEST AYU VALID');
+    const id = alta.body.data.id;
+    const fechaFalsa = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 40000, vigenteDesde: '2026-02-30' });
+    expect(fechaFalsa.status).toBe(400);
+    const cero = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 0, vigenteDesde: '2026-02-01' });
+    expect(cero.status).toBe(400);
+  });
+
+  test('quitar un sueldo: nunca el único; desde un mes liquidado no', async () => {
+    const alta = await ayudante('TEST AYU QUITAR');
+    const id = alta.body.data.id;
+    const unico = alta.body.data.sueldos[0].id;
+    const solo = await request(app).delete(`/api/v1/operarios/${id}/sueldos/${unico}`);
+    expect(solo.status).toBe(409);
+    expect(solo.body.error.code).toBe('SUELDO_UNICO');
+
+    const otro = await request(app)
+      .post(`/api/v1/operarios/${id}/sueldos`)
+      .send({ montoSemanal: 45000, vigenteDesde: '2026-03-01' });
+    const nuevoId = otro.body.data.sueldos[0].id;
+    const ok = await request(app).delete(`/api/v1/operarios/${id}/sueldos/${nuevoId}`);
+    expect(ok.status).toBe(200);
+    expect(ok.body.data.sueldos).toHaveLength(1);
+
+    const periodo = await prisma.periodo.create({
+      data: { anio: 2020, mes: 1, estado: 'cerrado', fechaCierre: new Date('2020-02-01T12:00:00Z') },
+    });
+    try {
+      const viejo = await request(app)
+        .post(`/api/v1/operarios/${id}/sueldos`)
+        .send({ montoSemanal: 30000, vigenteDesde: '2020-01-10' });
+      expect(viejo.status).toBe(409);
+      expect(viejo.body.error.code).toBe('MES_LIQUIDADO');
+    } finally {
+      await prisma.periodo.delete({ where: { id: periodo.id } });
+    }
+  });
+
+  test('un ayudante de baja sin historial se elimina junto con su sueldo', async () => {
+    const alta = await ayudante('TEST AYU BORRAR');
+    const id = alta.body.data.id;
+    await request(app).patch(`/api/v1/operarios/${id}`).send({ activo: false });
+    const res = await request(app).delete(`/api/v1/operarios/${id}`);
+    expect(res.status).toBe(200);
+    expect(await prisma.sueldoAyudante.count({ where: { operarioId: id } })).toBe(0);
+  });
+});

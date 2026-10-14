@@ -33,3 +33,17 @@ export function validarMaximoTres(cantidadAsignaciones: number): boolean {
 export function puedeCerrarCorte(estados: ReadonlyArray<EstadoOperacion>): boolean {
   return estados.length > 0 && estados.every((e) => e === 'asignada');
 }
+
+/** Reordenar operaciones: el nuevo orden debe tener EXACTAMENTE las mismas
+ *  operaciones (ni faltantes, ni ajenas, ni repetidas), solo en otra posición. */
+export function esReordenValido(
+  actuales: ReadonlyArray<string>,
+  nuevoOrden: ReadonlyArray<string>,
+): boolean {
+  const set = new Set(nuevoOrden);
+  return (
+    nuevoOrden.length === actuales.length &&
+    set.size === nuevoOrden.length &&
+    actuales.every((id) => set.has(id))
+  );
+}

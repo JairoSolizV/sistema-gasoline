@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatBs } from '@taller/shared';
 import { useModelos } from '../../api/modelos';
-import { useAbrirCorte, useCrearCorte } from '../../api/cortes';
+import { useAbrirCorte, useCrearCorte, useSiguienteCodigo } from '../../api/cortes';
 import { ErrorApi } from '../../api/client';
 import { CamposTendido, tendidoVacio, validarTendido } from './CamposTendido';
 
@@ -25,6 +25,7 @@ export function NuevoCortePage() {
   const { data: modelos } = useModelos();
   const crear = useCrearCorte();
   const abrir = useAbrirCorte();
+  const { data: siguiente } = useSiguienteCodigo();
 
   const [modeloId, setModeloId] = useState('');
   const [versionId, setVersionId] = useState('');
@@ -57,7 +58,8 @@ export function NuevoCortePage() {
 
     const detalle = await crear.mutateAsync({
       modeloVersionId: version.id,
-      codigo: codigo.trim() === '' ? null : codigo.trim(),
+      // vacío → el server numera solo (mayor + 1)
+      codigo: codigo === '' ? undefined : parseInt(codigo, 10),
       tallas: usadas.map((f) => entero(f.talla)),
       cortePorTalla: usadas.map((f) => entero(f.corte)),
       plusPorTalla: usadas.map((f) => entero(f.plus)),
@@ -146,13 +148,17 @@ export function NuevoCortePage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium">
-                Código <span className="font-normal text-gray-400">(opcional)</span>
+                COD{' '}
+                <span className="font-normal text-gray-400">
+                  (vacío = automático{siguiente ? `: ${siguiente.codigo}` : ''})
+                </span>
               </label>
               <input
                 value={codigo}
-                onChange={(e) => setCodigo(e.target.value)}
-                placeholder="ej. C-0144"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
+                onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                placeholder={siguiente ? String(siguiente.codigo) : 'automático'}
+                className="mono w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
               />
             </div>
           </div>

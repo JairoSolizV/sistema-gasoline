@@ -4,6 +4,7 @@ import {
   ETIQUETA_PROCESO,
   formatBs,
   formatMetros,
+  ROLES_COSTURA,
   type CorteDetalleDTO,
   type CorteOperacionDTO,
 } from '@taller/shared';
@@ -12,16 +13,24 @@ import {
   useAsignarGrupo,
   useCerrarCorte,
   useCorte,
+  useEditarCodigo,
   useEditarTendido,
+  useReordenarOperacionesCorte,
 } from '../../api/cortes';
+import {
+  GrupoCorte,
+  HistorialCambios,
+  ModalOperacionCorte,
+  type ModalOperacion,
+} from './CambiosOperaciones';
 import { useOperarios } from '../../api/operarios';
 import { Modal } from '../../components/Modal';
 import { ErrorApi } from '../../api/client';
-import { badgeEstadoCorte, etiquetaGrupo } from './estados';
+import { badgeEstadoCorte } from './estados';
 import { hoyLocalISO } from '../../lib/fechas';
-import { OperacionFila } from './OperacionFila';
 import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendido';
 import { ServicioCorte } from './ServicioCorte';
+import { DuracionEstimada } from './DuracionEstimada';
 
 // Datos del tendido: informativos, no entran al cálculo de pagos. Mientras el
 // corte no esté cerrado se pueden completar (cortes creados antes de pedirlos)
@@ -102,8 +111,8 @@ function ModalTendido({ corte, onCerrar }: { corte: CorteDetalleDTO; onCerrar: (
         {corte.tela ? 'Editar' : 'Completar'} datos del tendido
       </h2>
       <p className="mt-1 text-sm text-gray-500">
-        {corte.modeloNombre} v{corte.numeroVersion}
-        {corte.codigo ? ` · ${corte.codigo}` : ''} · informativo, no afecta los pagos
+        COD {corte.codigo} · {corte.modeloNombre} v{corte.numeroVersion} · informativo, no
+        afecta los pagos
       </p>
       <div className="mt-4">
         <CamposTendido valor={valor} onChange={setValor} />
@@ -133,11 +142,68 @@ function ModalTendido({ corte, onCerrar }: { corte: CorteDetalleDTO; onCerrar: (
   );
 }
 
+// Numeración del corte: se puede corregir en cualquier estado (es una etiqueta,
+// no toca pagos). El server rechaza un número que ya usa otro corte.
+function ModalCodigo({ corte, onCerrar }: { corte: CorteDetalleDTO; onCerrar: () => void }) {
+  const editar = useEditarCodigo();
+  const [valor, setValor] = useState(String(corte.codigo));
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  const guardar = async () => {
+    setErrorLocal(null);
+    const codigo = parseInt(valor, 10);
+    if (!(codigo >= 1)) return setErrorLocal('Ingresá un número mayor a 0');
+    await editar.mutateAsync({ corteId: corte.id, input: { codigo } });
+    onCerrar();
+  };
+
+  return (
+    <Modal onCerrar={onCerrar}>
+      <h2 className="text-lg font-semibold">Código del corte</h2>
+      <p className="mt-1 text-sm text-gray-500">
+        {corte.modeloNombre} v{corte.numeroVersion} · no se puede repetir con otro corte
+      </p>
+      <label className="mt-4 mb-1 block text-sm font-medium">COD</label>
+      <input
+        value={valor}
+        onChange={(e) => setValor(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => e.key === 'Enter' && guardar()}
+        inputMode="numeric"
+        autoFocus
+        className="mono w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-acento"
+      />
+      {(errorLocal || editar.error) && (
+        <p className="mt-4 rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+          {errorLocal ??
+            (editar.error instanceof ErrorApi ? editar.error.message : 'Error al guardar')}
+        </p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCerrar}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={guardar}
+          disabled={editar.isPending}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Guardar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 export function CorteDetallePage() {
   const { corteId } = useParams();
   const { data: corte, isLoading, error } = useCorte(corteId);
-  // asignación de costura: solo costureros activos (restricción estricta de roles)
-  const { data: operarios } = useOperarios('activos', 'costurero');
+  // asignación de costura: costureros y ayudantes activos (restricción estricta
+  // de roles; los ayudantes también cosen — PLAN_AYUDANTES §2.11)
+  const { data: activos } = useOperarios('activos');
+  const operarios = activos?.filter((o) => ROLES_COSTURA.some((r) => o.roles.includes(r)));
   const abrir = useAbrirCorte();
   const asignarGrupo = useAsignarGrupo();
   const cerrar = useCerrarCorte();
@@ -145,6 +211,9 @@ export function CorteDetallePage() {
   const [plegados, setPlegados] = useState<Record<string, boolean>>({});
   const [modalCerrar, setModalCerrar] = useState(false);
   const [modalTendido, setModalTendido] = useState(false);
+  const [modalCodigo, setModalCodigo] = useState(false);
+  const [modalOp, setModalOp] = useState<ModalOperacion | null>(null);
+  const reordenar = useReordenarOperacionesCorte();
   const [fechaCierre, setFechaCierre] = useState(hoyLocalISO);
 
   const grupos = useMemo(() => {
@@ -183,7 +252,7 @@ export function CorteDetallePage() {
         <Link to="/cortes" className="hover:underline">
           Cortes
         </Link>{' '}
-        / {corte.modeloNombre}
+        / COD {corte.codigo} · {corte.modeloNombre}
       </div>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
@@ -201,7 +270,14 @@ export function CorteDetallePage() {
             </span>
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            {corte.codigo ? `${corte.codigo} · ` : ''}
+            <span className="mono font-semibold text-gray-700">COD {corte.codigo}</span>{' '}
+            <button
+              onClick={() => setModalCodigo(true)}
+              className="text-xs font-medium text-acento hover:underline"
+            >
+              editar
+            </button>
+            {' · '}
             {corte.cantidadTotal} prendas
             {corte.fechaCierre &&
               ` · cerrado el ${new Date(corte.fechaCierre).toLocaleDateString('es-BO')}`}
@@ -310,9 +386,11 @@ export function CorteDetallePage() {
           corte={corte}
           onEditar={corte.estado === 'cerrado' ? null : () => setModalTendido(true)}
         />
+        {corte.estado !== 'borrador' && <DuracionEstimada corte={corte} />}
         {modalTendido && (
           <ModalTendido corte={corte} onCerrar={() => setModalTendido(false)} />
         )}
+        {modalCodigo && <ModalCodigo corte={corte} onCerrar={() => setModalCodigo(false)} />}
       </div>
 
       <ServicioCorte corte={corte} />
@@ -324,82 +402,63 @@ export function CorteDetallePage() {
         </div>
       ) : (
         <div className="mt-6 space-y-4">
-          {grupos.map(([grupo, ops]) => {
-            const g = etiquetaGrupo(ops);
-            const plegado = plegados[grupo] ?? false;
-            return (
-              <div key={grupo} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-                <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-                  <button
-                    onClick={() => setPlegados((p) => ({ ...p, [grupo]: !plegado }))}
-                    className="flex items-center gap-2 text-sm font-semibold"
-                  >
-                    <span
-                      className="inline-block text-gray-400 transition-transform"
-                      style={{ transform: plegado ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                    >
-                      ▸
-                    </span>
-                    {grupo}
-                  </button>
-                  <span
-                    className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                    style={{ color: g.color, background: g.bg, borderColor: g.border }}
-                  >
-                    {g.texto}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {g.ok}/{ops.length}
-                  </span>
-                  <span className="mono ml-auto text-xs text-gray-500">
-                    Σ CT Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
-                  </span>
-                  {editable && (
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const operarioId = e.target.value;
-                        if (!operarioId) return;
-                        const nombre = operarios?.find((o) => o.id === operarioId)?.nombre;
-                        if (
-                          window.confirm(
-                            `Asignar TODO el grupo ${grupo} a ${nombre} (${corte.cantidadTotal} piezas por operación)? Se reemplazan las asignaciones actuales del grupo.`,
-                          )
-                        ) {
-                          asignarGrupo.mutate({
-                            corteId: corte.id,
-                            input: { grupo, operarioId, esMaestroExterno: false },
-                          });
-                        }
-                        e.target.value = '';
-                      }}
-                      className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs outline-none focus:border-acento"
-                    >
-                      <option value="">Asignar grupo completo a…</option>
-                      {operarios?.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-                {!plegado && (
-                  <div>
-                    {ops.map((op) => (
-                      <OperacionFila
-                        key={op.id}
-                        corteId={corte.id}
-                        op={op}
-                        operarios={operarios ?? []}
-                        editable={editable}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {editable && (
+            <p className="text-xs text-gray-500">
+              Arrastrá <span className="text-gray-400">⠿</span> para reordenar dentro de un grupo.
+              Editar, agregar o quitar operaciones aquí cambia <strong>solo este corte</strong>: el
+              modelo no se toca y cada cambio queda en el historial.
+            </p>
+          )}
+          {grupos.map(([grupo, ops]) => (
+            <GrupoCorte
+              key={grupo}
+              corte={corte}
+              grupo={grupo}
+              ops={ops}
+              operarios={operarios ?? []}
+              editable={editable}
+              plegado={plegados[grupo] ?? false}
+              onPlegar={() => setPlegados((p) => ({ ...p, [grupo]: !(p[grupo] ?? false) }))}
+              onAsignarGrupo={(operarioId) =>
+                asignarGrupo.mutate({
+                  corteId: corte.id,
+                  input: { grupo, operarioId, esMaestroExterno: false },
+                })
+              }
+              // arrastrar dentro del grupo: se manda el orden completo del corte
+              onReordenar={(idsGrupo) =>
+                reordenar.mutate({
+                  corteId: corte.id,
+                  operacionIds: grupos.flatMap(([g, os]) =>
+                    g === grupo ? idsGrupo : os.map((o) => o.id),
+                  ),
+                })
+              }
+              onEditar={(op) => setModalOp({ tipo: 'editar', operacion: op })}
+              onQuitar={(op) => setModalOp({ tipo: 'quitar', operacion: op })}
+              onAgregar={() => setModalOp({ tipo: 'agregar', grupo })}
+            />
+          ))}
+          {editable && (
+            <button
+              onClick={() => setModalOp({ tipo: 'agregar' })}
+              className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
+            >
+              + Agregar operación solo a este corte (nuevo grupo)
+            </button>
+          )}
+          {reordenar.error != null && (
+            <p className="rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+              {reordenar.error instanceof ErrorApi
+                ? reordenar.error.message
+                : 'No se pudo guardar el nuevo orden'}
+            </p>
+          )}
+          {modalOp && (
+            <ModalOperacionCorte corte={corte} modal={modalOp} onCerrar={() => setModalOp(null)} />
+          )}
+
+          <HistorialCambios cambios={corte.cambios} />
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">

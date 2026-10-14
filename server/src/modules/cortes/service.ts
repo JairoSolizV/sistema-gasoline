@@ -9,17 +9,24 @@ import type {
   CorteDetalleDTO,
   CorteOperacionDTO,
   CorteResumenDTO,
+  EstimadoDuracionDTO,
   CrearCorteInput,
+  EditarCodigoInput,
+  EditarOperacionInput,
   EditarServicioInput,
   EditarTendidoInput,
+  OperacionInput,
   ProcesoCorte,
   ReemplazarAsignacionesInput,
   RegistrarProcesoInput,
+  ReordenarOperacionesInput,
   TotalPorOperarioDTO,
 } from '@taller/shared';
 import { ETIQUETA_PROCESO } from '@taller/shared';
+import { Prisma } from '@prisma/client';
 import { cantidadTotal, sumaCt, tarifaEfectiva, totalAsignacion } from '../../domain/calculo.js';
 import {
+  esReordenValido,
   puedeCerrarCorte,
   validarMaximoTres,
   validarSumaExacta,
@@ -27,8 +34,46 @@ import {
 import { AppError } from '../../middleware/errors.js';
 import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
 import { exigirOperariosHabilitados } from '../operarios/habilitados.js';
-import { cortesRepository, type CorteConDetalle } from './repository.js';
+import { tiemposDeOperaciones } from '../catalogo/tiempos.js';
+import { estimarDuracion } from '../../domain/estimado.js';
+import { ROLES_COSTURA } from '@taller/shared';
+import {
+  cortesRepository,
+  type CorteConDetalle,
+  type DatosOperacionCorte,
+} from './repository.js';
 import { aServicioDTO, faltantesServicio, prepararTrabajos, tarifasDeConfig } from './servicio.js';
+import {
+  aCambiosDTO,
+  camposCambiados,
+  cambioAgregarOQuitar,
+  cambioEditar,
+  cambiosReorden,
+  etiquetaOperacion,
+  marcasDeOperacion,
+} from './cambios.js';
+
+/** Duración estimada (solo informativa): el operario más cargado manda. */
+function aEstimadoDTO(operaciones: CorteOperacionDTO[]): EstimadoDuracionDTO {
+  const e = estimarDuracion(
+    operaciones.map((o) => ({
+      etiqueta: etiquetaOperacion(o),
+      tiempoSeg: o.tiempoSeg,
+      estado: o.estado,
+      asignaciones: o.asignaciones,
+    })),
+  );
+  const nombre = operaciones
+    .flatMap((o) => o.asignaciones)
+    .find((a) => a.operarioId === e.operarioMasCargadoId)?.operarioNombre;
+  return {
+    duracionSeg: e.duracionSeg,
+    operarioMasCargado:
+      e.operarioMasCargadoId && nombre ? { id: e.operarioMasCargadoId, nombre } : null,
+    operacionesSinTiempo: e.operacionesSinTiempo,
+    operacionesSinAsignar: e.operacionesSinAsignar,
+  };
+}
 
 function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
   const operaciones: CorteOperacionDTO[] = corte.operaciones.map((op) => {
@@ -60,11 +105,13 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
       pieza: op.pieza,
       ct: op.ct,
       cantidadObjetivo: op.cantidadObjetivo,
+      tiempoSeg: op.tiempoSeg,
       estado: op.estado,
       asignado: resultado.asignado,
       diferencia: resultado.diferencia,
       totalOperacion: asignaciones.reduce((acc, a) => acc + a.total, 0),
       asignaciones,
+      ...marcasDeOperacion(corte, op),
     };
   });
 
@@ -114,6 +161,8 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     costoTotal: costoCostura + costoServicioCorte,
     operaciones,
     totalesPorOperario: [...porOperario.values()].sort((a, b) => b.total - a.total),
+    cambios: aCambiosDTO(corte),
+    estimado: aEstimadoDTO(operaciones),
   };
 }
 
@@ -154,6 +203,31 @@ function exigirInterno(corte: CorteConDetalle) {
   }
 }
 
+// ── Código (numeración) del corte: único, automático o elegido a mano ──
+
+function errorCodigoRepetido(codigo: number, modeloNombre?: string) {
+  const de = modeloNombre ? ` (${modeloNombre})` : '';
+  return new AppError('CODIGO_REPETIDO', `Ya existe el corte COD ${codigo}${de}: elegí otro código`, 409);
+}
+
+/** Rechaza un código que ya usa OTRO corte. El índice único de la BD es la
+ *  garantía final; esto solo da un mensaje claro antes de intentar guardar. */
+async function exigirCodigoLibre(codigo: number, corteId?: string) {
+  const otro = await cortesRepository.buscarPorCodigo(codigo);
+  if (otro && otro.id !== corteId) throw errorCodigoRepetido(codigo, otro.version.modelo.nombre);
+}
+
+/** Dos guardados simultáneos con el mismo código: el índice único rechaza el
+ *  segundo (P2002) y lo devolvemos como 409 en vez de error interno. */
+function traducirCodigoRepetido(codigo: number) {
+  return (e: unknown): never => {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      throw errorCodigoRepetido(codigo);
+    }
+    throw e;
+  };
+}
+
 async function diferencialDeConfig(): Promise<number> {
   const config = await cortesRepository.obtenerConfiguracion();
   return config?.diferencialMaestroExterno ?? 10;
@@ -191,21 +265,46 @@ export const cortesService = {
     if (cantidad < 1) {
       throw new AppError('VALIDACION', 'El corte debe tener al menos una prenda', 400);
     }
-    const corte = await cortesRepository.crearBorrador({
-      modeloVersionId: input.modeloVersionId,
-      codigo: input.codigo ?? null,
-      tallas: input.tallas,
-      cortePorTalla: input.cortePorTalla,
-      plusPorTalla: input.plusPorTalla,
-      cantidadTotal: cantidad,
-      tela: input.tela,
-      anchoCm: input.anchoCm,
-      trazadoCm: input.trazadoCm,
-      esInterno: input.esInterno,
-      // snapshot: cambiar Configuración después no altera este corte
-      tarifas: input.esInterno ? await tarifasDeConfig() : null,
-    });
+    // sin código → el siguiente de la numeración (mayor + 1)
+    if (input.codigo != null) await exigirCodigoLibre(input.codigo);
+    const codigo = input.codigo ?? (await cortesRepository.maximoCodigo()) + 1;
+    // snapshot: cambiar Configuración después no altera este corte
+    const tarifas = input.esInterno ? await tarifasDeConfig() : null;
+    const corte = await cortesRepository
+      .crearBorrador({
+        modeloVersionId: input.modeloVersionId,
+        codigo,
+        tallas: input.tallas,
+        cortePorTalla: input.cortePorTalla,
+        plusPorTalla: input.plusPorTalla,
+        cantidadTotal: cantidad,
+        tela: input.tela,
+        anchoCm: input.anchoCm,
+        trazadoCm: input.trazadoCm,
+        esInterno: input.esInterno,
+        tarifas,
+      })
+      .catch(traducirCodigoRepetido(codigo));
     return detalle(corte.id);
+  },
+
+  /** Código que se asignaría automáticamente al próximo corte. */
+  async siguienteCodigo(): Promise<{ codigo: number }> {
+    return { codigo: (await cortesRepository.maximoCodigo()) + 1 };
+  },
+
+  /** Corregir la numeración. Es solo una etiqueta (no toca pagos), por eso se
+   *  permite en cualquier estado, también con el corte cerrado. */
+  async editarCodigo(corteId: string, input: EditarCodigoInput): Promise<CorteDetalleDTO> {
+    const corte = await cortesRepository.obtenerDetalle(corteId);
+    if (!corte) throw new AppError('NO_ENCONTRADO', 'Corte no encontrado', 404);
+    if (corte.codigo !== input.codigo) {
+      await exigirCodigoLibre(input.codigo, corteId);
+      await cortesRepository
+        .actualizarCodigo(corteId, input.codigo)
+        .catch(traducirCodigoRepetido(input.codigo));
+    }
+    return detalle(corteId);
   },
 
   // Completar/corregir el tendido (informativo: no toca pagos). Cerrado = inmutable.
@@ -279,10 +378,13 @@ export const cortesService = {
       throw new AppError('SIN_OPERACIONES', 'La versión no tiene operaciones que asignar', 409);
     }
 
-    // snapshot: ct congelado + cantidad objetivo = cantidad del corte (PLUS incluido)
+    // snapshot: ct y tiempo del catálogo congelados + cantidad objetivo = cantidad
+    // del corte (PLUS incluido)
+    const tiempos = await tiemposDeOperaciones(version.operaciones);
     await cortesRepository.abrir(
       corteId,
-      version.operaciones.map((o) => ({
+      version.operaciones.map((o, i) => ({
+        tiempoSeg: tiempos[i],
         operacionOrigenId: o.id,
         orden: o.orden,
         grupo: o.grupo,
@@ -314,7 +416,7 @@ export const cortesService = {
     if (new Set(ids).size !== ids.length) {
       throw new AppError('VALIDACION', 'No se puede repetir un operario en la misma operación', 400);
     }
-    await exigirOperariosHabilitados(ids, 'costurero', 'recibir asignaciones de costura');
+    await exigirOperariosHabilitados(ids, ROLES_COSTURA, 'recibir asignaciones de costura');
 
     const diferencialConfig = await diferencialDeConfig();
     const filas = input.asignaciones.map((a) => {
@@ -346,7 +448,7 @@ export const cortesService = {
     }
     await exigirOperariosHabilitados(
       [input.operarioId],
-      'costurero',
+      ROLES_COSTURA,
       'recibir asignaciones de costura',
     );
 
@@ -396,6 +498,117 @@ export const cortesService = {
     const fechaCierre = input.fechaCierre ?? new Date();
     await exigirFechaSinLiquidar(fechaCierre, 'cerrar el corte');
     await cortesRepository.cerrar(corteId, fechaCierre);
+    return detalle(corteId);
+  },
+
+  // ── Cambios de último momento a las operaciones (solo este corte, nunca el
+  //    modelo). Solo con el corte abierto; cada uno queda en el historial. ──
+
+  /** Nuevo orden (arrastrar). No cambia ningún pago. */
+  async reordenarOperaciones(
+    corteId: string,
+    input: ReordenarOperacionesInput,
+  ): Promise<CorteDetalleDTO> {
+    const corte = await corteAbiertoOError(corteId);
+    const actuales = corte.operaciones; // ya vienen por orden
+    if (!esReordenValido(actuales.map((o) => o.id), input.operacionIds)) {
+      throw new AppError(
+        'ORDEN_INVALIDO',
+        'El nuevo orden no coincide con las operaciones del corte; recargá la página',
+        409,
+      );
+    }
+    const porId = new Map(actuales.map((o) => [o.id, o]));
+    const nuevas = input.operacionIds.map((id) => porId.get(id)!);
+    if (nuevas.every((o, i) => o.id === actuales[i].id)) return aDetalleDTO(corte); // sin cambios
+    await cortesRepository.reordenarOperaciones(
+      corteId,
+      input.operacionIds,
+      cambiosReorden(actuales, nuevas),
+    );
+    return detalle(corteId);
+  },
+
+  /** Cambiar máquina, proceso, pieza, N, grupo o CT de una operación del corte.
+   *  Si cambia el CT se recalculan tarifa y total de sus asignaciones (el
+   *  diferencial de maestro se conserva); la suma de piezas no cambia. */
+  async editarOperacion(
+    corteId: string,
+    corteOperacionId: string,
+    input: EditarOperacionInput,
+  ): Promise<CorteDetalleDTO> {
+    const corte = await corteAbiertoOError(corteId);
+    const op = corte.operaciones.find((o) => o.id === corteOperacionId);
+    if (!op) throw new AppError('NO_ENCONTRADO', 'Operación del corte no encontrada', 404);
+    const campos = camposCambiados(op, input);
+    if (campos.length === 0) return aDetalleDTO(corte);
+
+    const ct = input.ct ?? op.ct;
+    const asignaciones =
+      ct === op.ct
+        ? []
+        : op.asignaciones.map((a) => {
+            const tarifa = tarifaEfectiva(ct, a.diferencial);
+            return { id: a.id, tarifaEfectiva: tarifa, total: totalAsignacion(a.cantidad, tarifa) };
+          });
+    const data = Object.fromEntries(campos.map((c) => [c.campo, c.despues])) as Partial<
+      DatosOperacionCorte
+    > & { tiempoSeg?: number | null };
+    // otra máquina/proceso/pieza = otra operación: se toma su tiempo del catálogo
+    if (campos.some((c) => c.campo === 'equipo' || c.campo === 'proceso' || c.campo === 'pieza')) {
+      [data.tiempoSeg] = await tiemposDeOperaciones([{ ...op, ...data }]);
+    }
+    await cortesRepository.editarOperacion(
+      corteId,
+      corteOperacionId,
+      data,
+      asignaciones,
+      cambioEditar(op, campos),
+    );
+    return detalle(corteId);
+  },
+
+  /** Operación extra solo para este corte: empieza sin asignar, así que hay que
+   *  asignarla (suma exacta) antes de poder cerrar. */
+  async agregarOperacion(corteId: string, input: OperacionInput): Promise<CorteDetalleDTO> {
+    const corte = await corteAbiertoOError(corteId);
+    const datos = {
+      grupo: input.grupo,
+      n: input.n ?? null,
+      equipo: input.equipo,
+      proceso: input.proceso,
+      pieza: input.pieza ?? null,
+      ct: input.ct,
+    };
+    const [tiempoSeg] = await tiemposDeOperaciones([datos]);
+    await cortesRepository.agregarOperacion(
+      corteId,
+      { ...datos, cantidadObjetivo: corte.cantidadTotal, tiempoSeg },
+      cambioAgregarOQuitar('agregar', datos),
+    );
+    return detalle(corteId);
+  },
+
+  /** Quitar una operación que no se hace en este corte. Si tiene operarios
+   *  asignados hay que quitarlos antes (así nunca se borra un pago sin querer). */
+  async quitarOperacion(corteId: string, corteOperacionId: string): Promise<CorteDetalleDTO> {
+    const corte = await corteAbiertoOError(corteId);
+    const op = corte.operaciones.find((o) => o.id === corteOperacionId);
+    if (!op) throw new AppError('NO_ENCONTRADO', 'Operación del corte no encontrada', 404);
+    if (op.asignaciones.length > 0) {
+      throw new AppError(
+        'OPERACION_CON_ASIGNACIONES',
+        'Esta operación tiene operarios asignados: quitalos antes de eliminarla del corte',
+        409,
+      );
+    }
+    if (corte.operaciones.length === 1) {
+      throw new AppError('SIN_OPERACIONES', 'El corte debe conservar al menos una operación', 409);
+    }
+    await cortesRepository.quitarOperacion(corteId, corteOperacionId, {
+      ...cambioAgregarOQuitar('quitar', op),
+      corteOperacionId: null,
+    });
     return detalle(corteId);
   },
 };

@@ -160,6 +160,7 @@ describe('crear y abrir corte (snapshot)', () => {
     const cerrado = await prisma.corte.create({
       data: {
         modeloVersionId: versionTestId,
+        codigo: 900_001,
         tallas: [28],
         cortePorTalla: [10],
         plusPorTalla: [],
@@ -182,7 +183,95 @@ describe('crear y abrir corte (snapshot)', () => {
     const otra = await request(app).post(`/api/v1/cortes/${detalle.id}/abrir`);
     expect(otra.status).toBe(409);
   });
+});
 
+describe('código (numeración) del corte', () => {
+  const nuevo = async (codigo?: number | null) =>
+    request(app)
+      .post('/api/v1/cortes')
+      .send({
+        ...(await datosCorte()),
+        modeloVersionId: versionTestId,
+        tallas: [28],
+        cortePorTalla: [10],
+        ...(codigo !== undefined ? { codigo } : {}),
+      });
+  // otros tests ya crearon cortes: los números se toman relativos al siguiente libre
+  const siguiente = async (): Promise<number> =>
+    (await request(app).get('/api/v1/cortes/siguiente-codigo')).body.data.codigo;
+
+  test('sin código se numera automático: mayor + 1, y lo anticipa siguiente-codigo', async () => {
+    const a = await nuevo();
+    expect(a.status).toBe(201);
+    expect(await siguiente()).toBe(a.body.data.codigo + 1);
+    const b = await nuevo(null); // null / vacío = automático
+    expect(b.status).toBe(201);
+    expect(b.body.data.codigo).toBe(a.body.data.codigo + 1);
+  });
+
+  test('código elegido a mano (con huecos); la automática sigue después del mayor', async () => {
+    const elegido = (await siguiente()) + 100;
+    const manual = await nuevo(elegido);
+    expect(manual.status).toBe(201);
+    expect(manual.body.data.codigo).toBe(elegido);
+    const auto = await nuevo();
+    expect(auto.body.data.codigo).toBe(elegido + 1);
+  });
+
+  test('no se repite: al crear ni al editar (409); inválidos 400', async () => {
+    const base = await siguiente();
+    const a = await nuevo(base);
+    const b = await nuevo(base + 1);
+    const repetido = await nuevo(base);
+    expect(repetido.status).toBe(409);
+    expect(repetido.body.error.code).toBe('CODIGO_REPETIDO');
+
+    const editarB = (codigo: unknown) =>
+      request(app).patch(`/api/v1/cortes/${b.body.data.id}/codigo`).send({ codigo });
+    expect((await editarB(base)).status).toBe(409);
+    for (const malo of [0, -3, 1.5, 'abc', null]) {
+      expect((await editarB(malo)).status).toBe(400);
+    }
+    expect((await nuevo(0)).status).toBe(400);
+
+    const ok = await editarB(base + 50);
+    expect(ok.status).toBe(200);
+    expect(ok.body.data.codigo).toBe(base + 50);
+    // guardar el mismo código que ya tiene no choca consigo mismo
+    expect((await editarB(base + 50)).status).toBe(200);
+    // el número anterior de b quedó libre
+    expect((await nuevo(base + 1)).status).toBe(201);
+    expect(a.body.data.codigo).toBe(base);
+  });
+
+  test('se puede corregir con el corte cerrado (no toca pagos); 404 si no existe', async () => {
+    const base = await siguiente();
+    const cerrado = await prisma.corte.create({
+      data: {
+        modeloVersionId: versionTestId,
+        codigo: base,
+        tallas: [28],
+        cortePorTalla: [10],
+        plusPorTalla: [],
+        cantidadTotal: 10,
+        estado: 'cerrado',
+        esInterno: false,
+        fechaCierre: new Date('2026-09-15T12:00:00Z'),
+      },
+    });
+    const res = await request(app)
+      .patch(`/api/v1/cortes/${cerrado.id}/codigo`)
+      .send({ codigo: base + 10 });
+    expect(res.status).toBe(200);
+    expect(res.body.data.codigo).toBe(base + 10);
+    const nada = await request(app)
+      .patch('/api/v1/cortes/00000000-0000-0000-0000-000000000000/codigo')
+      .send({ codigo: base + 20 });
+    expect(nada.status).toBe(404);
+  });
+});
+
+describe('snapshot inmutable', () => {
   test('CA-1.4: editar la tarifa de la versión NO cambia el corte ya abierto', async () => {
     const detalle = await crearCorteAbierto();
     const opPinza = detalle.operaciones.find((o: { proceso: string }) => o.proceso === 'pinza');
@@ -236,6 +325,18 @@ describe('roles: restricción estricta (PLAN_SERVICIO_CORTE §3)', () => {
       .send({ grupo: op.grupo, operarioId: id });
     expect(grupo.status).toBe(409);
     expect(grupo.body.error.code).toBe('OPERARIO_SIN_ROL');
+  });
+
+  test('un ayudante también recibe operaciones de costura (PLAN_AYUDANTES §2.11)', async () => {
+    const alta = await request(app)
+      .post('/api/v1/operarios')
+      .send({ nombre: 'TEST AYUDANTE COSE', ...datosOperario({ roles: ['ayudante'], sueldoSemanal: 40000 }) });
+    const detalle = await crearCorteAbierto();
+    const op = detalle.operaciones[0];
+    const res = await request(app)
+      .put(`/api/v1/cortes/${detalle.id}/operaciones/${op.id}/asignaciones`)
+      .send({ asignaciones: [{ operarioId: alta.body.data.id, cantidad: 372 }] });
+    expect(res.status).toBe(200);
   });
 });
 
@@ -467,5 +568,168 @@ describe('cierre del corte y CA-8.1 (cuadre de centavos)', () => {
     const asignacion = releido.body.data.operaciones[0].asignaciones[0];
     expect(asignacion.operarioId).toBe(operarioId);
     expect(asignacion.total).toBe(5580);
+  });
+});
+
+// Cambios de último momento: solo el snapshot del corte, nunca el modelo, y
+// cada uno queda en el historial (CorteCambio).
+describe('cambios de último momento a las operaciones del corte', () => {
+  type Op = { id: string; proceso: string; ct: number; estado: string };
+  const opDe = (detalle: { operaciones: Op[] }, proceso: string) =>
+    detalle.operaciones.find((o) => o.proceso === proceso)!;
+  const versionOps = async () =>
+    (await request(app).get(`/api/v1/versiones/${versionTestId}`)).body.data.operaciones as Op[];
+
+  test('reordenar: cambia el orden del corte, no el del modelo, y queda en el historial', async () => {
+    const detalle = await crearCorteAbierto();
+    const [pinza, urlado, ensamble] = detalle.operaciones.map((o: Op) => o.id);
+    const url = `/api/v1/cortes/${detalle.id}/operaciones/orden`;
+
+    const res = await request(app).put(url).send({ operacionIds: [urlado, pinza, ensamble] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.operaciones.map((o: Op) => o.proceso)).toEqual(['urlado', 'pinza', 'ensamble']);
+    expect(res.body.data.cambios).toHaveLength(1);
+    const cambio = res.body.data.cambios[0];
+    expect(cambio.grupo).toBe('TRASEROS');
+    expect(cambio.detalle).toEqual({
+      tipo: 'reordenar',
+      antes: ['pinza · trasero', 'urlado · trasero'],
+      despues: ['urlado · trasero', 'pinza · trasero'],
+    });
+    // el modelo conserva su orden
+    expect((await versionOps()).map((o) => o.proceso)).toEqual(['pinza', 'urlado', 'ensamble']);
+
+    // mismo orden = sin cambios ni historial; orden ajeno = 409
+    const igual = await request(app).put(url).send({ operacionIds: [urlado, pinza, ensamble] });
+    expect(igual.body.data.cambios).toHaveLength(1);
+    expect((await request(app).put(url).send({ operacionIds: [urlado, pinza] })).status).toBe(409);
+  });
+
+  test('editar el CT recalcula los pagos de sus asignaciones (con maestro) y no toca el modelo', async () => {
+    const detalle = await crearCorteAbierto();
+    const pinza = opDe(detalle, 'pinza');
+    await request(app)
+      .put(`/api/v1/cortes/${detalle.id}/operaciones/${pinza.id}/asignaciones`)
+      .send({
+        asignaciones: [
+          { operarioId: rubenId, cantidad: 300 },
+          { operarioId: clarisId, cantidad: 72, esMaestroExterno: true, diferencial: 10 },
+        ],
+      });
+
+    const res = await request(app)
+      .patch(`/api/v1/cortes/${detalle.id}/operaciones/${pinza.id}`)
+      .send({ ct: 20, equipo: 'plana' });
+    expect(res.status).toBe(200);
+    const op = opDe(res.body.data, 'pinza') as Op & {
+      equipo: string;
+      modificadaEnCorte: boolean;
+      asignaciones: { tarifaEfectiva: number; total: number }[];
+    };
+    expect(op.ct).toBe(20);
+    expect(op.equipo).toBe('plana');
+    expect(op.estado).toBe('asignada'); // la suma de piezas no cambia
+    expect(op.asignaciones.map((a) => [a.tarifaEfectiva, a.total])).toEqual([
+      [20, 6000], // 300 × 0.20
+      [30, 2160], // 72 × (0.20 + 0.10 maestro)
+    ]);
+    expect(op.modificadaEnCorte).toBe(true);
+    expect(res.body.data.costoManoObraPrenda).toBe(90); // 20 + 20 + 50
+    expect(res.body.data.cambios[0].detalle).toEqual({
+      tipo: 'editar',
+      campos: [
+        { campo: 'equipo', antes: 'recta', despues: 'plana' },
+        { campo: 'ct', antes: 15, despues: 20 },
+      ],
+    });
+    // el modelo sigue igual
+    const pinzaModelo = (await versionOps()).find((o) => o.proceso === 'pinza') as Op & {
+      equipo: string;
+    };
+    expect([pinzaModelo.ct, pinzaModelo.equipo]).toEqual([15, 'recta']);
+  });
+
+  test('volver al valor original deja de marcarla como modificada (el historial queda)', async () => {
+    const detalle = await crearCorteAbierto();
+    const urlado = opDe(detalle, 'urlado');
+    const url = `/api/v1/cortes/${detalle.id}/operaciones/${urlado.id}`;
+    await request(app).patch(url).send({ equipo: 'recta' });
+    const vuelta = await request(app).patch(url).send({ equipo: 'codo' });
+    expect(opDe(vuelta.body.data, 'urlado')).toMatchObject({ modificadaEnCorte: false });
+    expect(vuelta.body.data.cambios).toHaveLength(2);
+    // sin diferencias reales no se registra nada
+    const nada = await request(app).patch(url).send({ equipo: 'codo' });
+    expect(nada.body.data.cambios).toHaveLength(2);
+  });
+
+  test('agregar: operación extra sin asignar, bloquea el cierre hasta asignarla; el modelo no cambia', async () => {
+    const detalle = await crearCorteAbierto();
+    for (const op of detalle.operaciones) {
+      await request(app)
+        .put(`/api/v1/cortes/${detalle.id}/operaciones/${op.id}/asignaciones`)
+        .send({ asignaciones: [{ operarioId: rubenId, cantidad: 372 }] });
+    }
+    const res = await request(app)
+      .post(`/api/v1/cortes/${detalle.id}/operaciones`)
+      .send({ grupo: 'TRASEROS', n: '3', equipo: 'recta', proceso: 'remate', pieza: 'trasero', ct: 5 });
+    expect(res.status).toBe(201);
+    expect(opDe(res.body.data, 'remate')).toMatchObject({
+      estado: 'sin_asignar',
+      agregadaEnCorte: true,
+      cantidadObjetivo: 372,
+    });
+    expect(res.body.data.cambios[0].detalle.tipo).toBe('agregar');
+    expect(await versionOps()).toHaveLength(3);
+
+    const cierre = await request(app).post(`/api/v1/cortes/${detalle.id}/cerrar`).send({});
+    expect(cierre.status).toBe(409);
+    expect(cierre.body.error.code).toBe('CORTE_INCOMPLETO');
+  });
+
+  test('quitar: con operarios asignados 409; sin asignar se quita y queda en el historial', async () => {
+    const detalle = await crearCorteAbierto();
+    const pinza = opDe(detalle, 'pinza');
+    const urlado = opDe(detalle, 'urlado');
+    await request(app)
+      .put(`/api/v1/cortes/${detalle.id}/operaciones/${pinza.id}/asignaciones`)
+      .send({ asignaciones: [{ operarioId: rubenId, cantidad: 372 }] });
+
+    const conAsignacion = await request(app).delete(
+      `/api/v1/cortes/${detalle.id}/operaciones/${pinza.id}`,
+    );
+    expect(conAsignacion.status).toBe(409);
+    expect(conAsignacion.body.error.code).toBe('OPERACION_CON_ASIGNACIONES');
+
+    const res = await request(app).delete(`/api/v1/cortes/${detalle.id}/operaciones/${urlado.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.operaciones.map((o: Op) => o.proceso)).toEqual(['pinza', 'ensamble']);
+    expect(res.body.data.cambios[0]).toMatchObject({
+      grupo: 'TRASEROS',
+      etiqueta: 'urlado · trasero',
+      detalle: { tipo: 'quitar', operacion: { proceso: 'urlado', ct: 20 } },
+    });
+    expect(res.body.data.costoManoObraPrenda).toBe(65); // 15 + 50
+    expect(await versionOps()).toHaveLength(3);
+  });
+
+  test('solo con el corte abierto: cerrado o borrador → 409', async () => {
+    const detalle = await crearCorteAbierto();
+    const op = detalle.operaciones[0];
+    const ids = detalle.operaciones.map((o: Op) => o.id);
+    const nueva = { grupo: 'X', equipo: 'recta', proceso: 'p', ct: 1 };
+    await prisma.corte.update({ where: { id: detalle.id }, data: { estado: 'cerrado' } });
+    const base = `/api/v1/cortes/${detalle.id}/operaciones`;
+    expect((await request(app).patch(`${base}/${op.id}`).send({ ct: 99 })).status).toBe(409);
+    expect((await request(app).delete(`${base}/${op.id}`)).status).toBe(409);
+    expect((await request(app).put(`${base}/orden`).send({ operacionIds: ids })).status).toBe(409);
+    expect((await request(app).post(base).send(nueva)).status).toBe(409);
+
+    const borrador = await request(app)
+      .post('/api/v1/cortes')
+      .send({ ...(await datosCorte()), modeloVersionId: versionTestId, tallas: [28], cortePorTalla: [10] });
+    const enBorrador = await request(app)
+      .post(`/api/v1/cortes/${borrador.body.data.id}/operaciones`)
+      .send(nueva);
+    expect(enBorrador.status).toBe(409);
   });
 });

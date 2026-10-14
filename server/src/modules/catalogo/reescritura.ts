@@ -96,7 +96,10 @@ export const renombreRepository = {
     });
   },
 
-  proceso(id: string, data: { nombre?: string; activo?: boolean; orden?: number }) {
+  proceso(
+    id: string,
+    data: { nombre?: string; activo?: boolean; orden?: number; tiempoSeg?: number | null },
+  ) {
     return prisma.$transaction(async (tx) => {
       const actual = await tx.proceso.findUnique({ where: { id }, include: { maquina: true } });
       if (!actual) throw new AppError('NO_ENCONTRADO', 'Proceso no encontrado', 404);
@@ -113,7 +116,10 @@ export const renombreRepository = {
     });
   },
 
-  pieza(id: string, data: { nombre?: string; activo?: boolean; orden?: number }) {
+  pieza(
+    id: string,
+    data: { nombre?: string; activo?: boolean; orden?: number; tiempoSeg?: number | null },
+  ) {
     return prisma.$transaction(async (tx) => {
       const actual = await tx.pieza.findUnique({
         where: { id },

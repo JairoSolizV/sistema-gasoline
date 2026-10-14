@@ -12,8 +12,14 @@ export interface CatalogoNodoDTO {
   usos: number;
 }
 
-export interface CatalogoProcesoDTO extends CatalogoNodoDTO {
-  piezas: CatalogoNodoDTO[];
+/** Proceso o pieza: llevan el tiempo estimado (segundos por prenda). En una
+ *  operación manda el de la pieza; si no tiene, el del proceso. */
+export interface CatalogoNodoConTiempoDTO extends CatalogoNodoDTO {
+  tiempoSeg: number | null;
+}
+
+export interface CatalogoProcesoDTO extends CatalogoNodoConTiempoDTO {
+  piezas: CatalogoNodoConTiempoDTO[];
 }
 
 export interface CatalogoMaquinaDTO extends CatalogoNodoDTO {

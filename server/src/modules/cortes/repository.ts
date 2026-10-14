@@ -1,6 +1,13 @@
 // Único acceso a Prisma del módulo. El snapshot al abrir y el reemplazo de
 // asignaciones son transaccionales (ARQUITECTURA §3.2): nunca quedan a medias.
-import type { EstadoCorteOp, ModalidadDoblado, Prisma, ProcesoCorte } from '@prisma/client';
+import type {
+  EstadoCorteOp,
+  ModalidadDoblado,
+  Prisma,
+  ProcesoCorte,
+  TipoCambioCorte,
+} from '@prisma/client';
+import type { DetalleCambioCorte } from '@taller/shared';
 import { prisma } from '../../lib/prisma.js';
 
 /** Tarifas predeterminadas copiadas al corte (mismos nombres que las columnas). */
@@ -39,7 +46,29 @@ const incluirDetalle = {
     orderBy: { orden: 'asc' as const },
     include: { asignaciones: { include: { operario: true } } },
   },
+  // historial de cambios de último momento (más reciente primero)
+  cambios: { orderBy: { fecha: 'desc' as const } },
 };
+
+/** Una fila del historial de cambios del corte, armada por el service. */
+export interface CambioData {
+  tipo: TipoCambioCorte;
+  corteOperacionId: string | null;
+  grupo: string;
+  etiqueta: string;
+  detalle: DetalleCambioCorte;
+}
+
+function aFilaCambio(corteId: string, c: CambioData): Prisma.CorteCambioUncheckedCreateInput {
+  // el detalle es JSON plano armado en cambios.ts
+  return { ...c, corteId, detalle: c.detalle as unknown as Prisma.InputJsonValue };
+}
+
+/** Datos editables de una operación del corte (snapshot propio del corte). */
+export type DatosOperacionCorte = Pick<
+  Prisma.CorteOperacionUncheckedCreateInput,
+  'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct'
+>;
 
 export type CorteConDetalle = Prisma.CorteGetPayload<{ include: typeof incluirDetalle }>;
 
@@ -69,9 +98,27 @@ export const cortesRepository = {
     });
   },
 
+  /** Mayor código usado (0 si no hay cortes): el siguiente automático es éste + 1. */
+  async maximoCodigo(): Promise<number> {
+    const r = await prisma.corte.aggregate({ _max: { codigo: true } });
+    return r._max.codigo ?? 0;
+  },
+
+  /** Corte que ya usa ese código (para rechazar repetidos con un mensaje claro). */
+  buscarPorCodigo(codigo: number) {
+    return prisma.corte.findUnique({
+      where: { codigo },
+      select: { id: true, codigo: true, version: { select: { modelo: { select: { nombre: true } } } } },
+    });
+  },
+
+  actualizarCodigo(corteId: string, codigo: number) {
+    return prisma.corte.update({ where: { id: corteId }, data: { codigo } });
+  },
+
   crearBorrador(data: {
     modeloVersionId: string;
-    codigo: string | null;
+    codigo: number;
     tallas: number[];
     cortePorTalla: number[];
     plusPorTalla: number[];
@@ -148,6 +195,67 @@ export const cortesRepository = {
 
   obtenerCorteOperacion(id: string) {
     return prisma.corteOperacion.findUnique({ where: { id } });
+  },
+
+  // ── Cambios de último momento a las operaciones del corte (nunca al modelo) ──
+
+  /** Fija orden = posición (1..n) y registra el historial, atómico. */
+  reordenarOperaciones(corteId: string, operacionIds: string[], cambios: CambioData[]) {
+    return prisma.$transaction(async (tx) => {
+      for (const [i, id] of operacionIds.entries()) {
+        await tx.corteOperacion.update({ where: { id }, data: { orden: i + 1 } });
+      }
+      await tx.corteCambio.createMany({ data: cambios.map((c) => aFilaCambio(corteId, c)) });
+    });
+  },
+
+  /** Edita el snapshot de una operación del corte. Si cambió el CT, las
+   *  asignaciones llegan ya recalculadas (tarifa y total) y se guardan juntas. */
+  editarOperacion(
+    corteId: string,
+    corteOperacionId: string,
+    data: Partial<DatosOperacionCorte> & { tiempoSeg?: number | null },
+    asignaciones: { id: string; tarifaEfectiva: number; total: number }[],
+    cambio: CambioData,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.corteOperacion.update({ where: { id: corteOperacionId }, data });
+      for (const a of asignaciones) {
+        await tx.asignacion.update({
+          where: { id: a.id },
+          data: { tarifaEfectiva: a.tarifaEfectiva, total: a.total },
+        });
+      }
+      await tx.corteCambio.create({ data: aFilaCambio(corteId, cambio) });
+    });
+  },
+
+  /** Operación extra solo para este corte: al final, sin asignar, sin origen. */
+  agregarOperacion(
+    corteId: string,
+    data: DatosOperacionCorte & { cantidadObjetivo: number; tiempoSeg: number | null },
+    cambio: Omit<CambioData, 'corteOperacionId'>,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const ultimo = await tx.corteOperacion.aggregate({
+        where: { corteId },
+        _max: { orden: true },
+      });
+      const op = await tx.corteOperacion.create({
+        data: { ...data, corteId, orden: (ultimo._max.orden ?? 0) + 1, estado: 'sin_asignar' },
+      });
+      await tx.corteCambio.create({
+        data: aFilaCambio(corteId, { ...cambio, corteOperacionId: op.id }),
+      });
+    });
+  },
+
+  /** Quita una operación SIN asignaciones (el service lo exige) y lo registra. */
+  quitarOperacion(corteId: string, corteOperacionId: string, cambio: CambioData) {
+    return prisma.$transaction(async (tx) => {
+      await tx.corteCambio.create({ data: aFilaCambio(corteId, cambio) });
+      await tx.corteOperacion.delete({ where: { id: corteOperacionId } });
+    });
   },
 
   listarOperacionesDeGrupo(corteId: string, grupo: string) {

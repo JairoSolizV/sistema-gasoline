@@ -44,9 +44,23 @@ const edicion = <T extends z.ZodTypeAny>(nombre: T) =>
     .partial()
     .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
 
+// Tiempo estimado en segundos por prenda (proceso y pieza). null = sin tiempo.
+const tiempoSeg = z
+  .number({ error: 'El tiempo debe ser un número de segundos' })
+  .int('El tiempo va en segundos enteros')
+  .min(1, 'El tiempo debe ser mayor a 0')
+  .max(36_000, 'El tiempo es demasiado grande')
+  .nullable();
+
+const edicionConTiempo = (nombre: z.ZodTypeAny) =>
+  z
+    .object({ nombre, activo: z.boolean(), orden: z.number().int().min(0), tiempoSeg })
+    .partial()
+    .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
+
 export const editarMaquinaSchema = edicion(nombreCatalogo(40));
-export const editarProcesoSchema = edicion(nombreCatalogo(60));
-export const editarPiezaSchema = edicion(nombreCatalogo(60));
+export const editarProcesoSchema = edicionConTiempo(nombreCatalogo(60));
+export const editarPiezaSchema = edicionConTiempo(nombreCatalogo(60));
 export const editarGrupoSchema = edicion(nombreGrupo);
 
 // Fusionar A en B: A desaparece y sus operaciones pasan a decir B.
@@ -64,4 +78,6 @@ export const listarCatalogoQuerySchema = z.object({
 
 export type FusionarInput = z.infer<typeof fusionarSchema>;
 export type CrearNodoCatalogoInput = z.infer<typeof crearMaquinaSchema>;
-export type EditarNodoCatalogoInput = z.infer<typeof editarMaquinaSchema>;
+export type EditarNodoCatalogoInput = z.infer<typeof editarMaquinaSchema> & {
+  tiempoSeg?: number | null; // solo procesos y piezas
+};

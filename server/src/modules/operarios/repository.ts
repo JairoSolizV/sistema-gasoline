@@ -14,6 +14,8 @@ const conHistorial = {
       pagosMolde: true,
     },
   },
+  // ayudantes: historial de sueldo semanal, el más reciente primero
+  sueldos: { orderBy: { vigenteDesde: 'desc' } },
 } satisfies Prisma.OperarioInclude;
 
 export type OperarioConHistorial = Prisma.OperarioGetPayload<{ include: typeof conHistorial }>;
@@ -52,5 +54,22 @@ export const operariosRepository = {
 
   eliminar(id: string) {
     return prisma.operario.delete({ where: { id } });
+  },
+
+  /** Registra el sueldo desde una fecha; si ya había uno con esa fecha lo reemplaza. */
+  guardarSueldo(operarioId: string, montoSemanal: number, vigenteDesde: Date) {
+    return prisma.sueldoAyudante.upsert({
+      where: { operarioId_vigenteDesde: { operarioId, vigenteDesde } },
+      create: { operarioId, montoSemanal, vigenteDesde },
+      update: { montoSemanal },
+    });
+  },
+
+  obtenerSueldo(id: string) {
+    return prisma.sueldoAyudante.findUnique({ where: { id } });
+  },
+
+  eliminarSueldo(id: string) {
+    return prisma.sueldoAyudante.delete({ where: { id } });
   },
 };

@@ -6,6 +6,7 @@ import type {
   EditarOperacionInput,
   MoldeInput,
   OperacionInput,
+  ReordenarOperacionesInput,
 } from '@taller/shared';
 import { modelosService } from './service.js';
 
@@ -66,6 +67,14 @@ export const modelosController = {
 
   async eliminarOperacion(req: Request, res: Response) {
     const dto = await modelosService.eliminarOperacion(String(req.params.opId));
+    res.json({ data: dto });
+  },
+
+  async reordenarOperaciones(req: Request, res: Response) {
+    const dto = await modelosService.reordenarOperaciones(
+      String(req.params.id),
+      req.body as ReordenarOperacionesInput,
+    );
     res.json({ data: dto });
   },
 };

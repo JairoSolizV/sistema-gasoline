@@ -7,7 +7,12 @@ export type RolOperario =
   | 'moldista'
   | 'buscador'
   | 'trazador'
-  | 'clasificador';
+  | 'clasificador'
+  | 'ayudante';
+
+/** Quiénes pueden recibir operaciones de costura (y de empaque): costureros y
+ *  ayudantes (docs/PLAN_AYUDANTES.md §2.11). */
+export const ROLES_COSTURA: readonly RolOperario[] = ['costurero', 'ayudante'];
 
 /** Nombre del oficio para mostrar. */
 export const ETIQUETA_ROL: Record<RolOperario, string> = {
@@ -18,6 +23,7 @@ export const ETIQUETA_ROL: Record<RolOperario, string> = {
   buscador: 'Buscador de diseño',
   trazador: 'Trazador',
   clasificador: 'Clasificador / codificador',
+  ayudante: 'Ayudante',
 };
 
 export interface OperarioDTO {
@@ -36,4 +42,13 @@ export interface OperarioDTO {
   fechaBaja: string | null;
   // true si tiene asignaciones, anticipos, liquidaciones o cortes: no se puede eliminar
   tieneHistorial: boolean;
+  // ayudante: historial de sueldo semanal (más reciente primero) y el vigente hoy
+  sueldos: SueldoDTO[];
+  sueldoVigente: number | null; // centavos por semana
+}
+
+export interface SueldoDTO {
+  id: string;
+  montoSemanal: number; // centavos por semana completa
+  vigenteDesde: string; // 'aaaa-mm-dd'
 }

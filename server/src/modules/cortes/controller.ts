@@ -3,11 +3,15 @@ import type {
   AsignarGrupoInput,
   CerrarCorteInput,
   CrearCorteInput,
+  EditarCodigoInput,
+  EditarOperacionInput,
   EditarServicioInput,
   EditarTendidoInput,
+  OperacionInput,
   ProcesoCorte,
   ReemplazarAsignacionesInput,
   RegistrarProcesoInput,
+  ReordenarOperacionesInput,
 } from '@taller/shared';
 import { cortesService } from './service.js';
 
@@ -27,6 +31,18 @@ export const cortesController = {
   async crear(req: Request, res: Response) {
     const dto = await cortesService.crear(req.body as CrearCorteInput);
     res.status(201).json({ data: dto });
+  },
+
+  async siguienteCodigo(_req: Request, res: Response) {
+    res.json({ data: await cortesService.siguienteCodigo() });
+  },
+
+  async editarCodigo(req: Request, res: Response) {
+    const dto = await cortesService.editarCodigo(
+      String(req.params.id),
+      req.body as EditarCodigoInput,
+    );
+    res.json({ data: dto });
   },
 
   async abrir(req: Request, res: Response) {
@@ -74,6 +90,33 @@ export const cortesController = {
       String(req.params.id),
       req.body as AsignarGrupoInput,
     );
+    res.json({ data: dto });
+  },
+
+  async reordenarOperaciones(req: Request, res: Response) {
+    const dto = await cortesService.reordenarOperaciones(
+      String(req.params.id),
+      req.body as ReordenarOperacionesInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async agregarOperacion(req: Request, res: Response) {
+    const dto = await cortesService.agregarOperacion(String(req.params.id), req.body as OperacionInput);
+    res.status(201).json({ data: dto });
+  },
+
+  async editarOperacion(req: Request, res: Response) {
+    const dto = await cortesService.editarOperacion(
+      String(req.params.id),
+      String(req.params.opId),
+      req.body as EditarOperacionInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async quitarOperacion(req: Request, res: Response) {
+    const dto = await cortesService.quitarOperacion(String(req.params.id), String(req.params.opId));
     res.json({ data: dto });
   },
 

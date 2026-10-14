@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { esDiaValido } from '../dias.js';
 
 export const tipoOperarioSchema = z.enum(['regular', 'maestro_externo']);
 
@@ -12,6 +13,7 @@ export const ROLES_OPERARIO = [
   'buscador',
   'trazador',
   'clasificador',
+  'ayudante',
 ] as const;
 export const rolOperarioSchema = z.enum(ROLES_OPERARIO);
 
@@ -19,6 +21,13 @@ const rolesSchema = z
   .array(rolOperarioSchema)
   .min(1, 'Elegí al menos un rol')
   .transform((rs) => ROLES_OPERARIO.filter((r) => rs.includes(r))); // sin repetidos, orden fijo
+
+// Sueldo semanal de un ayudante (centavos por semana completa, lunes a sábado).
+const montoSemanalSchema = z
+  .number()
+  .int('El sueldo va en centavos enteros')
+  .min(1, 'El sueldo semanal debe ser mayor a 0')
+  .max(10_000_000);
 
 // Tarifa personal por prenda (centavos); null = usar el respaldo de Configuración.
 const tarifaPersonalSchema = z
@@ -72,11 +81,26 @@ export const crearOperarioSchema = z
     fechaIngreso: z.coerce.date({ error: 'La fecha de ingreso es obligatoria' }),
     // salida prevista/pactada: opcional e informativa (no da de baja)
     fechaSalida: z.coerce.date().nullable().optional(),
+    // ayudante: sueldo semanal (centavos), vigente desde la fecha de ingreso
+    sueldoSemanal: montoSemanalSchema.optional(),
   })
   .refine((o) => !o.fechaSalida || o.fechaSalida >= o.fechaIngreso, {
     path: ['fechaSalida'],
     message: 'La fecha de salida no puede ser anterior a la de ingreso',
+  })
+  .refine((o) => !o.roles.includes('ayudante') || o.sueldoSemanal != null, {
+    path: ['sueldoSemanal'],
+    message: 'El sueldo semanal es obligatorio para un ayudante',
   });
+
+// Sueldo semanal de un ayudante a partir de una fecha (historial: "se ajusta
+// cada mes"). Registrar otro con la misma fecha lo reemplaza.
+export const sueldoInputSchema = z.object({
+  montoSemanal: montoSemanalSchema,
+  vigenteDesde: z
+    .string()
+    .refine(esDiaValido, 'Fecha inválida (aaaa-mm-dd)'),
+});
 
 // PATCH: edición parcial. `activo` es la baja/reactivación lógica (el server
 // fija o limpia fechaBaja). Los datos personales admiten null para operarios
@@ -108,4 +132,5 @@ export const listarOperariosQuerySchema = z.object({
 });
 
 export type CrearOperarioInput = z.infer<typeof crearOperarioSchema>;
+export type SueldoInput = z.infer<typeof sueldoInputSchema>;
 export type EditarOperarioInput = z.infer<typeof editarOperarioSchema>;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type HTMLAttributes } from 'react';
 import {
   aCentavos,
   formatBs,
@@ -37,11 +37,18 @@ export function OperacionFila({
   op,
   operarios,
   editable,
+  manija,
+  onEditar,
+  onQuitar,
 }: {
   corteId: string;
   op: CorteOperacionDTO;
   operarios: OperarioDTO[];
   editable: boolean;
+  // cambios de último momento (solo con el corte abierto)
+  manija?: HTMLAttributes<HTMLSpanElement>;
+  onEditar?: () => void;
+  onQuitar?: () => void;
 }) {
   const guardar = useReemplazarAsignaciones();
   const [filas, setFilas] = useState<FilaEditor[]>(() => desdeDTO(op));
@@ -90,11 +97,36 @@ export function OperacionFila({
   return (
     <div className="border-b border-gray-100 px-5 py-3 last:border-0" style={{ background: vivo.estado === 'parcial' ? '#fffafa' : undefined }}>
       <div className="flex items-center gap-3">
+        {manija && (
+          <span
+            {...manija}
+            className="-ml-2 flex-none cursor-grab text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
+          >
+            ⠿
+          </span>
+        )}
         <span className="mono w-8 flex-none text-xs text-gray-400">{op.n ?? '—'}</span>
         <span className="w-24 flex-none text-xs text-gray-500">{op.equipo}</span>
-        <span className="flex-1 text-sm font-medium">
+        <span className="min-w-0 flex-1 text-sm font-medium">
           {op.proceso}
           {op.pieza && <span className="font-normal text-gray-500"> · {op.pieza}</span>}
+          {op.agregadaEnCorte ? (
+            <span
+              title="Operación agregada solo en este corte (no está en el modelo)"
+              className="ml-2 inline-block rounded-full border border-[#b9dcc6] bg-[#eef8f1] px-1.5 py-px text-[10px] font-semibold text-[#2f8a55]"
+            >
+              agregada
+            </span>
+          ) : (
+            op.modificadaEnCorte && (
+              <span
+                title="Distinta al modelo: se modificó solo en este corte (ver historial abajo)"
+                className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700"
+              >
+                modificada
+              </span>
+            )
+          )}
         </span>
         <span className="mono w-20 flex-none text-right text-sm">Bs {formatBs(op.ct)}</span>
         <span
@@ -106,6 +138,29 @@ export function OperacionFila({
         <span className="mono w-24 flex-none text-right text-sm font-semibold">
           Bs {formatBs(op.totalOperacion)}
         </span>
+        {(onEditar || onQuitar) && (
+          <span className="flex w-24 flex-none justify-end gap-2 text-[12px] font-medium">
+            {onEditar && (
+              <button onClick={onEditar} className="text-acento hover:underline">
+                Editar
+              </button>
+            )}
+            {onQuitar && (
+              <button
+                onClick={onQuitar}
+                disabled={op.asignaciones.length > 0}
+                title={
+                  op.asignaciones.length > 0
+                    ? 'Tiene operarios asignados: quitalos primero'
+                    : 'Quitar esta operación solo de este corte'
+                }
+                className="text-error hover:underline disabled:cursor-not-allowed disabled:text-gray-300 disabled:no-underline"
+              >
+                Quitar
+              </button>
+            )}
+          </span>
+        )}
       </div>
 
       <div className="mt-2 space-y-1.5 pl-11">

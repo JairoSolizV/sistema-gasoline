@@ -64,6 +64,64 @@ function CampoAlta({
   );
 }
 
+/** Tiempo estimado (segundos por prenda) de un proceso o pieza. Se edita en el
+ *  lugar: click, escribir y Enter. Vacío = sin tiempo. */
+function CampoTiempo({
+  tiempoSeg,
+  onGuardar,
+}: {
+  tiempoSeg: number | null;
+  onGuardar: (tiempoSeg: number | null) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor] = useState('');
+
+  const guardar = () => {
+    setEditando(false);
+    const nuevo = valor === '' ? null : parseInt(valor, 10);
+    if (nuevo === 0) return; // 0 no es un tiempo válido: se ignora
+    if (nuevo !== tiempoSeg) onGuardar(nuevo);
+  };
+
+  if (editando) {
+    return (
+      <span className="flex flex-none items-center gap-0.5">
+        <input
+          value={valor}
+          onChange={(e) => setValor(e.target.value.replace(/\D/g, '').slice(0, 5))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') guardar();
+            if (e.key === 'Escape') setEditando(false);
+          }}
+          onBlur={guardar}
+          autoFocus
+          inputMode="numeric"
+          placeholder="seg"
+          className="mono w-14 rounded-md border border-acento px-1.5 py-0.5 text-right text-xs outline-none"
+        />
+        <span className="text-[11px] text-gray-400">s</span>
+      </span>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setValor(tiempoSeg == null ? '' : String(tiempoSeg));
+        setEditando(true);
+      }}
+      title="Tiempo estimado: segundos por prenda (click para editar)"
+      className={`mono flex-none rounded-md border px-1.5 py-0.5 text-[11px] ${
+        tiempoSeg == null
+          ? 'border-dashed border-gray-300 text-gray-400 hover:border-acento hover:text-acento'
+          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-acento'
+      }`}
+    >
+      {tiempoSeg == null ? '+ seg' : `${tiempoSeg} s`}
+    </button>
+  );
+}
+
 /** Elegir con qué otra entrada de la MISMA rama se une esta. Lo tipeado en el
  *  catálogo se reescribe en las operaciones de los modelos; los cortes ya
  *  creados conservan su snapshot. */
@@ -262,10 +320,13 @@ function Columna({
   onFusionar,
   bloqueadaPor,
   placeholder,
+  conTiempo = false,
 }: {
   titulo: string;
   ayuda: string;
-  items: CatalogoNodoDTO[];
+  items: (CatalogoNodoDTO & { tiempoSeg?: number | null })[];
+  /** Procesos y piezas llevan el tiempo estimado (segundos por prenda). */
+  conTiempo?: boolean;
   seleccionadoId?: string | null;
   onSeleccionar?: (id: string) => void;
   onCrear: (nombre: string) => void;
@@ -281,7 +342,7 @@ function Columna({
   const [borrador, setBorrador] = useState('');
 
   return (
-    <div className="flex min-h-[26rem] flex-1 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className="flex min-h-[26rem] min-w-0 flex-1 flex-col rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 bg-gray-50 px-4 py-2.5">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">{titulo}</span>
@@ -346,13 +407,20 @@ function Columna({
                     <button
                       type="button"
                       onClick={() => onSeleccionar?.(item.id)}
-                      className={`flex-1 truncate text-left text-sm ${
+                      className={`min-w-0 flex-1 truncate text-left text-sm ${
                         item.activo ? '' : 'text-gray-400 line-through'
                       } ${onSeleccionar ? '' : 'cursor-default'}`}
                       title={item.nombre}
                     >
                       {item.nombre}
                     </button>
+
+                    {conTiempo && (
+                      <CampoTiempo
+                        tiempoSeg={item.tiempoSeg ?? null}
+                        onGuardar={(tiempoSeg) => onEditar(item.id, { tiempoSeg })}
+                      />
+                    )}
 
                     <span
                       className="rounded-full bg-gray-100 px-1.5 text-[10px] text-gray-500"
@@ -361,7 +429,7 @@ function Columna({
                       {item.usos}
                     </span>
 
-                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="hidden gap-1 group-hover:flex">
                       <button
                         type="button"
                         title="Renombrar"
@@ -518,6 +586,7 @@ export function CatalogoPage() {
                 }
                 bloqueadaPor={maquina ? undefined : 'Elegí una máquina'}
                 placeholder="nuevo proceso"
+                conTiempo
                 {...acciones(rutasCatalogo.proceso)}
               />
 
@@ -530,6 +599,7 @@ export function CatalogoPage() {
                 }
                 bloqueadaPor={proceso ? undefined : 'Elegí un proceso'}
                 placeholder="nueva pieza"
+                conTiempo
                 {...acciones(rutasCatalogo.pieza)}
               />
             </div>
@@ -541,6 +611,12 @@ export function CatalogoPage() {
             los modelos existentes. <strong>Renombrar</strong> y <strong>unir</strong>, en cambio, sí
             reescriben los modelos: las operaciones que decían el nombre viejo pasan a decir el nuevo,
             así que el contador de uso se mantiene.
+          </p>
+          <p className="text-xs text-gray-500">
+            <strong>Tiempo (segundos por prenda):</strong> lo que tarda esa operación en un pantalón.
+            Se carga en el proceso y, si una pieza tarda distinto, también en la pieza (manda el de
+            la pieza). Sirve para estimar cuánto tarda cada corte; no cambia ningún pago. Cada corte
+            guarda los tiempos del día en que se abre: cambiarlos acá no altera cortes ya abiertos.
           </p>
         </div>
       )}

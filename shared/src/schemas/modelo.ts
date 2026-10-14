@@ -62,7 +62,18 @@ export const editarOperacionSchema = operacionInputSchema
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
 
+/** Nuevo orden de TODAS las operaciones (ids en el orden deseado). Lo usan el
+ *  modelo (versión) y el corte: el server exige que sea exactamente el mismo
+ *  conjunto de operaciones, solo reordenado. */
+export const reordenarOperacionesSchema = z.object({
+  operacionIds: z
+    .array(z.string().min(1))
+    .min(1)
+    .refine((ids) => new Set(ids).size === ids.length, 'Hay operaciones repetidas en el orden'),
+});
+
 export type OperacionInput = z.infer<typeof operacionInputSchema>;
+export type ReordenarOperacionesInput = z.infer<typeof reordenarOperacionesSchema>;
 export type CrearModeloInput = z.infer<typeof crearModeloSchema>;
 export type CrearVersionInput = z.infer<typeof crearVersionSchema>;
 export type MoldeInput = z.infer<typeof moldeInputSchema>;

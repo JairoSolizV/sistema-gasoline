@@ -37,8 +37,10 @@ export function OperacionFormModal({
   onGuardar,
   onCerrar,
   errorGuardar,
+  aviso,
 }: {
   titulo: string;
+  aviso?: React.ReactNode; // nota bajo el título (ej. "solo este corte")
   operacion: OperacionDTO | null; // null = alta
   grupoSugerido?: string;
   onGuardar: (input: OperacionInput) => Promise<unknown>;
@@ -86,6 +88,7 @@ export function OperacionFormModal({
   return (
     <Modal onCerrar={onCerrar} ancho="max-w-lg">
       <h2 className="text-lg font-semibold">{titulo}</h2>
+      {aviso && <p className="mt-1 text-sm text-gray-500">{aviso}</p>}
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
