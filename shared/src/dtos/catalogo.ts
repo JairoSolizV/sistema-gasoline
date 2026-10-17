@@ -28,9 +28,30 @@ export interface CatalogoMaquinaDTO extends CatalogoNodoDTO {
 
 /** Respuesta única que alimenta tanto el formulario de modelos como la pantalla
  *  de administración: son pocos KB, se cachean y la cascada se resuelve en el cliente. */
+export interface CatalogoGrupoDTO extends CatalogoNodoDTO {
+  /** Operaciones del bloque reutilizable del grupo (0 = sin bloque). */
+  operacionesBloque: number;
+}
+
 export interface CatalogoArbolDTO {
   maquinas: CatalogoMaquinaDTO[];
-  grupos: CatalogoNodoDTO[];
+  grupos: CatalogoGrupoDTO[];
+}
+
+/** Una operación del bloque estándar de un grupo (como una fila de plantilla). */
+export interface BloqueOperacionDTO {
+  id: string;
+  orden: number;
+  n: string | null;
+  equipo: string;
+  proceso: string;
+  pieza: string | null;
+  ctReferencia: number | null; // centavos; sugerencia, el CT real va en el modelo
+}
+
+export interface BloqueGrupoDTO {
+  grupo: { id: string; nombre: string };
+  operaciones: BloqueOperacionDTO[]; // por orden
 }
 
 /** Resultado de unir dos entradas del catálogo. */

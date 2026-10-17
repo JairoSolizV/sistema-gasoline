@@ -9,6 +9,7 @@ import {
   editarPiezaSchema,
   editarProcesoSchema,
   fusionarSchema,
+  guardarBloqueGrupoSchema,
   listarCatalogoQuerySchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
@@ -51,3 +52,10 @@ catalogoRouter.post('/grupos', validar(crearGrupoSchema), catalogoController.cre
 catalogoRouter.patch('/grupos/:id', validar(editarGrupoSchema), catalogoController.editarGrupo);
 catalogoRouter.delete('/grupos/:id', catalogoController.borrarGrupo);
 catalogoRouter.post('/grupos/:id/fusionar', validar(fusionarSchema), catalogoController.fusionarGrupo);
+// bloque reutilizable del grupo: sus operaciones estándar (lista completa)
+catalogoRouter.get('/grupos/:id/operaciones', catalogoController.bloqueGrupo);
+catalogoRouter.put(
+  '/grupos/:id/operaciones',
+  validar(guardarBloqueGrupoSchema),
+  catalogoController.guardarBloqueGrupo,
+);

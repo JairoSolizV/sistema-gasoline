@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { aCentavos, formatBs } from '@taller/shared';
 import { useCrearModelo } from '../../api/modelos';
+import { obtenerBloqueGrupo, useCatalogo } from '../../api/catalogo';
 import { usePlantilla, usePlantillas } from '../../api/plantillas';
 import { useOperarios } from '../../api/operarios';
 import { useConfiguracion } from '../../api/configuracion';
@@ -168,11 +169,43 @@ export function NuevoModeloPage() {
     setValue,
     watch,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<NuevoModeloValores>({
     defaultValues: { nombre: '', operaciones: [{ ...OP_VACIA }] },
   });
-  const { fields, append, remove } = useFieldArray({ control, name: 'operaciones' });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'operaciones' });
+
+  // Bloques de grupo del catálogo (ej. ACABADO): se agregan todas sus
+  // operaciones de una vez, con su CT de referencia ya escrito.
+  const { data: catalogo } = useCatalogo(true);
+  const gruposConBloque = (catalogo?.grupos ?? []).filter((g) => g.operacionesBloque > 0);
+  const [errorBloque, setErrorBloque] = useState<string | null>(null);
+
+  const agregarBloque = async (grupoId: string) => {
+    setErrorBloque(null);
+    try {
+      const bloque = await obtenerBloqueGrupo(grupoId);
+      const filas: FilaNuevoModelo[] = bloque.operaciones.map((o) => ({
+        grupo: bloque.grupo.nombre,
+        n: o.n ?? '',
+        equipo: o.equipo,
+        proceso: o.proceso,
+        pieza: o.pieza ?? '',
+        ctBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+        ctRefBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+      }));
+      // si solo está la fila vacía del inicio, el bloque la reemplaza
+      const actuales = getValues('operaciones');
+      const soloVacia =
+        actuales.length === 1 &&
+        Object.values(actuales[0]).every((v) => (v ?? '').toString().trim() === '');
+      if (soloVacia) replace(filas);
+      else append(filas);
+    } catch (e) {
+      setErrorBloque(e instanceof ErrorApi ? e.message : 'No se pudo cargar el bloque del grupo');
+    }
+  };
 
   // Al elegir una plantilla se vuelcan sus operaciones con el CT de referencia
   // ya escrito (vacío donde la plantilla no tiene referencia).
@@ -331,16 +364,36 @@ export function NuevoModeloPage() {
             </tbody>
           </table>
           <div className="border-t border-gray-100 px-4 py-2">
-            <button
-              type="button"
-              onClick={() => {
-                const anterior = operacionesActuales[operacionesActuales.length - 1];
-                append({ ...OP_VACIA, grupo: anterior?.grupo ?? '' });
-              }}
-              className="text-[13px] font-medium text-acento hover:underline"
-            >
-              + Agregar operación
-            </button>
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const anterior = operacionesActuales[operacionesActuales.length - 1];
+                  append({ ...OP_VACIA, grupo: anterior?.grupo ?? '' });
+                }}
+                className="text-[13px] font-medium text-acento hover:underline"
+              >
+                + Agregar operación
+              </button>
+              {gruposConBloque.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) void agregarBloque(e.target.value);
+                  }}
+                  title="Agrega todas las operaciones estándar del grupo (Catálogo → Grupos)"
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs outline-none focus:border-acento"
+                >
+                  <option value="">+ Agregar grupo del catálogo…</option>
+                  {gruposConBloque.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.nombre} ({g.operacionesBloque} operaciones)
+                    </option>
+                  ))}
+                </select>
+              )}
+              {errorBloque && <span className="text-xs text-error">{errorBloque}</span>}
+            </div>
           </div>
         </div>
 

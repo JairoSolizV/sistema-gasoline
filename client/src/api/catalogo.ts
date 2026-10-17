@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CatalogoArbolDTO, CatalogoNodoDTO, FusionDTO } from '@taller/shared';
+import type {
+  BloqueGrupoDTO,
+  CatalogoArbolDTO,
+  CatalogoNodoDTO,
+  FusionDTO,
+  GuardarBloqueGrupoInput,
+} from '@taller/shared';
 import { api } from './client';
 
 // Un solo GET trae todo el árbol (pocos KB): el formulario de modelos lo cachea
@@ -62,5 +68,32 @@ export function useFusionarNodo() {
 export function useBorrarNodo() {
   return useMutacionCatalogo(({ ruta }: { ruta: string }) =>
     api<{ eliminado: boolean }>(ruta, { method: 'DELETE' }),
+  );
+}
+
+// ── Bloque reutilizable de un grupo (sus operaciones estándar) ──
+
+export function useBloqueGrupo(grupoId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['catalogo', 'bloque', grupoId],
+    queryFn: () => api<BloqueGrupoDTO>(`/catalogo/grupos/${grupoId}/operaciones`),
+    enabled: !!grupoId,
+  });
+}
+
+/** Lee el bloque una vez (para agregarlo a un modelo), sin dejar una query viva. */
+export function obtenerBloqueGrupo(grupoId: string) {
+  return api<BloqueGrupoDTO>(`/catalogo/grupos/${grupoId}/operaciones`);
+}
+
+/** Guarda la lista completa del bloque. Invalida todo el catálogo: el árbol
+ *  muestra cuántas operaciones tiene cada bloque y los usos cambian. */
+export function useGuardarBloqueGrupo() {
+  return useMutacionCatalogo(
+    ({ grupoId, operaciones }: { grupoId: string } & GuardarBloqueGrupoInput) =>
+      api<BloqueGrupoDTO>(`/catalogo/grupos/${grupoId}/operaciones`, {
+        method: 'PUT',
+        body: JSON.stringify({ operaciones }),
+      }),
   );
 }

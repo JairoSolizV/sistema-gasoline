@@ -30,20 +30,50 @@ export const catalogoRepository = {
     return prisma.grupo.findMany({
       where: soloActivos ? { activo: true } : undefined,
       orderBy: ordenNatural,
+      include: { _count: { select: { operaciones: true } } }, // tamaño del bloque
     });
   },
 
-  /** Textos de todo lo que usa el catálogo — operaciones de modelos Y de
-   *  plantillas — para contar el uso de cada entrada (no hay FK,
+  /** Bloque reutilizable del grupo: sus operaciones estándar, por orden. */
+  bloque(grupoId: string) {
+    return prisma.grupo.findUnique({
+      where: { id: grupoId },
+      include: { operaciones: { orderBy: { orden: 'asc' } } },
+    });
+  },
+
+  /** Guarda la lista completa del bloque (se edita entera y se guarda de una vez). */
+  reemplazarBloque(
+    grupoId: string,
+    operaciones: Omit<Prisma.GrupoOperacionCreateManyInput, 'grupoId' | 'orden'>[],
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.grupoOperacion.deleteMany({ where: { grupoId } });
+      await tx.grupoOperacion.createMany({
+        data: operaciones.map((o, i) => ({ ...o, grupoId, orden: i + 1 })),
+      });
+    });
+  },
+
+  /** Textos de todo lo que usa el catálogo — operaciones de modelos, de
+   *  plantillas y de bloques de grupo — para contar el uso de cada entrada (no hay FK,
    *  PLAN_CATALOGO §3). Si las plantillas no contaran, se podría borrar del
    *  catálogo algo que una plantilla necesita. Son pocas filas. */
   async textosDeOperaciones() {
     const select = { grupo: true, equipo: true, proceso: true, pieza: true };
-    const [deModelos, dePlantillas] = await Promise.all([
+    const [deModelos, dePlantillas, deBloques] = await Promise.all([
       prisma.operacion.findMany({ select }),
       prisma.plantillaOperacion.findMany({ select }),
+      // los bloques de grupo también usan el catálogo (y su grupo)
+      prisma.grupoOperacion.findMany({
+        select: { equipo: true, proceso: true, pieza: true, grupo: { select: { nombre: true } } },
+      }),
     ]);
-    return [...deModelos, ...dePlantillas];
+    return [
+      ...deModelos,
+      ...dePlantillas,
+      ...deBloques.map((b) => ({ ...b, grupo: b.grupo.nombre })),
+    ];
   },
 
   /** Procesos y piezas (activos o no) con su tiempo estimado, para congelarlo

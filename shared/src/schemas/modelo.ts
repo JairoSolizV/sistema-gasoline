@@ -72,7 +72,14 @@ export const reordenarOperacionesSchema = z.object({
     .refine((ids) => new Set(ids).size === ids.length, 'Hay operaciones repetidas en el orden'),
 });
 
+/** Agregar varias operaciones de una vez a una versión (ej. el bloque de un
+ *  grupo del catálogo). Van al final, en el orden recibido. */
+export const agregarOperacionesLoteSchema = z.object({
+  operaciones: z.array(operacionInputSchema).min(1, 'No hay operaciones para agregar').max(200),
+});
+
 export type OperacionInput = z.infer<typeof operacionInputSchema>;
+export type AgregarOperacionesLoteInput = z.infer<typeof agregarOperacionesLoteSchema>;
 export type ReordenarOperacionesInput = z.infer<typeof reordenarOperacionesSchema>;
 export type CrearModeloInput = z.infer<typeof crearModeloSchema>;
 export type CrearVersionInput = z.infer<typeof crearVersionSchema>;

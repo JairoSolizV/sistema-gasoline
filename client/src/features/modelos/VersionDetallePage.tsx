@@ -19,12 +19,14 @@ import { OperacionFormModal } from './OperacionFormModal';
 import { HojaOperacionesImprimible } from './HojaOperacionesImprimible';
 import { CamposMolde, moldeVacio, validarMolde, type MoldeForm } from './CamposDiseno';
 import { TarjetaDiseno } from './TarjetaDiseno';
+import { AgregarBloqueModal } from './AgregarBloqueModal';
 
 type ModalAbierto =
   | { tipo: 'agregar'; grupo?: string }
   | { tipo: 'editar'; operacion: OperacionDTO }
   | { tipo: 'eliminar'; operacion: OperacionDTO }
   | { tipo: 'nueva-version' }
+  | { tipo: 'bloque' }
   | null;
 
 // Nueva versión = copia de esta. Si en la versión nueva se modificaron los
@@ -318,12 +320,24 @@ export function VersionDetallePage() {
           )}
         </div>
 
-        <button
-          onClick={() => setModal({ tipo: 'agregar' })}
-          className="mt-4 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
-        >
-          + Agregar operación (nuevo grupo)
-        </button>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            onClick={() => setModal({ tipo: 'agregar' })}
+            className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
+          >
+            + Agregar operación (nuevo grupo)
+          </button>
+          <button
+            onClick={() => setModal({ tipo: 'bloque' })}
+            title="Agrega todas las operaciones estándar de un grupo (Catálogo → Grupos)"
+            className="rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-acento hover:text-acento"
+          >
+            + Agregar grupo del catálogo
+          </button>
+        </div>
+        {modal?.tipo === 'bloque' && (
+          <AgregarBloqueModal detalle={detalle} onCerrar={() => setModal(null)} />
+        )}
 
         {modal?.tipo === 'agregar' && (
           <OperacionFormModal

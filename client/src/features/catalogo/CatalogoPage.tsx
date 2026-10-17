@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { CatalogoNodoDTO } from '@taller/shared';
+import type { CatalogoGrupoDTO, CatalogoNodoDTO } from '@taller/shared';
+import { EditorBloqueGrupo } from './BloqueGrupo';
 import {
   rutasCatalogo,
   useBorrarNodo,
@@ -176,12 +177,17 @@ function ElegirDestinoFusion({
  *  cuarto nivel de la jerarquía. */
 function PanelGrupos({
   grupos,
+  abiertoId,
+  onAbrir,
   onCrear,
   onEditar,
   onBorrar,
   onFusionar,
 }: {
-  grupos: CatalogoNodoDTO[];
+  grupos: CatalogoGrupoDTO[];
+  /** Grupo cuyo bloque de operaciones está abierto abajo. */
+  abiertoId: string | null;
+  onAbrir: (id: string) => void;
   onCrear: (nombre: string) => void;
   onEditar: (id: string, cambios: CambiosNodo) => void;
   onBorrar: (id: string) => void;
@@ -197,7 +203,8 @@ function PanelGrupos({
         <div>
           <span className="text-sm font-semibold">Grupos</span>
           <span className="ml-2 text-[11px] text-gray-500">
-            los bloques en los que se ordenan las operaciones de un modelo
+            los bloques en los que se ordenan las operaciones de un modelo · hacé clic en un
+            grupo para ver y cargar sus operaciones estándar
           </span>
         </div>
         <span className="text-[11px] text-gray-500">{grupos.length}</span>
@@ -250,12 +257,29 @@ function PanelGrupos({
             <div
               key={g.id}
               className={`group flex items-center gap-2 rounded-full border px-3 py-1 ${
-                g.activo ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50'
+                abiertoId === g.id
+                  ? 'border-acento bg-acento/10'
+                  : g.activo
+                    ? 'border-gray-200 bg-white'
+                    : 'border-gray-200 bg-gray-50'
               }`}
             >
-              <span className={`text-sm ${g.activo ? '' : 'text-gray-400 line-through'}`}>
+              <button
+                type="button"
+                onClick={() => onAbrir(g.id)}
+                title="Ver y editar las operaciones del bloque de este grupo"
+                className={`text-sm hover:text-acento ${g.activo ? '' : 'text-gray-400 line-through'}`}
+              >
                 {g.nombre}
-              </span>
+              </button>
+              {g.operacionesBloque > 0 && (
+                <span
+                  className="rounded-full bg-acento/10 px-1.5 text-[10px] font-semibold text-acento"
+                  title={`Bloque con ${g.operacionesBloque} operación(es)`}
+                >
+                  {g.operacionesBloque} ops
+                </span>
+              )}
               <span
                 className="rounded-full bg-gray-100 px-1.5 text-[10px] text-gray-500"
                 title={`Usado en ${g.usos} operación(es)`}
@@ -498,6 +522,7 @@ export function CatalogoPage() {
 
   const [maquinaId, setMaquinaId] = useState<string | null>(null);
   const [procesoId, setProcesoId] = useState<string | null>(null);
+  const [grupoAbierto, setGrupoAbierto] = useState<string | null>(null);
 
   const maquinas = data?.maquinas ?? [];
   const maquina = maquinas.find((m) => m.id === maquinaId) ?? null;
@@ -543,9 +568,18 @@ export function CatalogoPage() {
         <div className="mt-6 space-y-5">
           <PanelGrupos
             grupos={data?.grupos ?? []}
+            abiertoId={grupoAbierto}
+            onAbrir={(id) => setGrupoAbierto((actual) => (actual === id ? null : id))}
             onCrear={(nombre) => crear.mutate({ ruta: rutasCatalogo.grupos, nombre })}
             {...acciones(rutasCatalogo.grupo)}
           />
+          {grupoAbierto && (
+            <EditorBloqueGrupo
+              key={grupoAbierto}
+              grupoId={grupoAbierto}
+              onCerrar={() => setGrupoAbierto(null)}
+            />
+          )}
 
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-3">

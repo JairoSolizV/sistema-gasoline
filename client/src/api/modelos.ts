@@ -154,3 +154,29 @@ export function ordenarPorIds<T extends { id: string }>(lista: T[], ids: string[
   const pos = new Map(ids.map((id, i) => [id, i]));
   return [...lista].sort((a, b) => (pos.get(a.id) ?? Infinity) - (pos.get(b.id) ?? Infinity));
 }
+
+/** Agregar varias operaciones de una vez (el bloque de un grupo del catálogo). */
+export function useAgregarOperacionesLote() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ versionId, operaciones }: { versionId: string; operaciones: OperacionInput[] }) =>
+      api<ModeloVersionDetalleDTO>(`/versiones/${versionId}/operaciones/lote`, {
+        method: 'POST',
+        body: JSON.stringify({ operaciones }),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+/** Eliminar un modelo entero (solo sin cortes ni moldes; si no, el server responde 409). */
+export function useEliminarModelo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modeloId: string) =>
+      api<{ eliminado: boolean }>(`/modelos/${modeloId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modelos'] });
+      qc.invalidateQueries({ queryKey: ['version'] });
+    },
+  });
+}

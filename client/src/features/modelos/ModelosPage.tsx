@@ -1,10 +1,71 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatBs } from '@taller/shared';
-import { useModelos } from '../../api/modelos';
+import { formatBs, type ModeloDTO } from '@taller/shared';
+import { useEliminarModelo, useModelos } from '../../api/modelos';
+import { ErrorApi } from '../../api/client';
+import { Modal } from '../../components/Modal';
+
+/** Confirmación antes de eliminar. Un modelo con cortes o moldes no se puede
+ *  borrar (perdería el historial de pagos): se explica y no se ofrece borrar. */
+function ModalEliminarModelo({ modelo, onCerrar }: { modelo: ModeloDTO; onCerrar: () => void }) {
+  const eliminar = useEliminarModelo();
+  const cortes = modelo.versiones.reduce((a, v) => a + v.cantidadCortes, 0);
+  const conMoldes = modelo.versiones.some((v) => v.molde);
+  const operaciones = modelo.versiones.reduce((a, v) => a + v.cantidadOperaciones, 0);
+  const bloqueado = cortes > 0 || conMoldes;
+
+  return (
+    <Modal onCerrar={onCerrar}>
+      <h2 className="text-lg font-semibold">Eliminar modelo</h2>
+      {bloqueado ? (
+        <p className="mt-2 text-sm text-gray-600">
+          <strong>{modelo.nombre}</strong> no se puede eliminar:{' '}
+          {cortes > 0
+            ? `ya tiene ${cortes} corte(s) hechos con él`
+            : 'tiene moldes registrados (es un pago)'}
+          . Borrarlo perdería el historial de lo que se pagó.
+          {cortes === 0 && ' Si los moldes fueron un error, quitalos primero desde la versión.'}
+        </p>
+      ) : (
+        <p className="mt-2 text-sm text-gray-600">
+          ¿Estás seguro de que querés eliminar <strong>{modelo.nombre}</strong>? Se borran sus{' '}
+          {modelo.versiones.length} versión(es) y {operaciones} operación(es).{' '}
+          <strong>No se puede deshacer.</strong>
+        </p>
+      )}
+      {eliminar.error != null && (
+        <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">
+          {eliminar.error instanceof ErrorApi ? eliminar.error.message : 'Error al eliminar'}
+        </p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          onClick={onCerrar}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+        >
+          {bloqueado ? 'Entendido' : 'Cancelar'}
+        </button>
+        {!bloqueado && (
+          <button
+            onClick={async () => {
+              await eliminar.mutateAsync(modelo.id);
+              onCerrar();
+            }}
+            disabled={eliminar.isPending}
+            className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-[#a52d24] disabled:opacity-60"
+          >
+            Sí, eliminar
+          </button>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 export function ModelosPage() {
   const { data: modelos, isLoading, error } = useModelos();
   const navigate = useNavigate();
+  const [aEliminar, setAEliminar] = useState<ModeloDTO | null>(null);
 
   return (
     <div className="p-8">
@@ -39,6 +100,7 @@ export function ModelosPage() {
                 <th className="px-5 py-3">Búsqueda</th>
                 <th className="px-5 py-3">Operaciones</th>
                 <th className="px-5 py-3 text-right">Mano de obra / prenda</th>
+                <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -88,12 +150,20 @@ export function ModelosPage() {
                         Bs {ultima ? formatBs(ultima.costoManoObraPrenda) : '—'}
                       </span>
                     </td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={() => setAEliminar(m)}
+                        className="text-[13px] font-medium text-error hover:underline"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
               {modelos.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
                     No hay modelos todavía. Creá el primero con "+ Nuevo modelo".
                   </td>
                 </tr>
@@ -102,6 +172,7 @@ export function ModelosPage() {
           </table>
         )}
       </div>
+      {aEliminar && <ModalEliminarModelo modelo={aEliminar} onCerrar={() => setAEliminar(null)} />}
     </div>
   );
 }

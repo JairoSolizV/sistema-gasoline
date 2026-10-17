@@ -7,6 +7,7 @@ import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
 import { datosOperario } from './helpers/operario.js';
+import { datosCorte } from './helpers/corte.js';
 
 const app = crearApp();
 
@@ -376,5 +377,59 @@ describe('PUT /versiones/:id/operaciones/orden — reordenar (arrastrar)', () =>
     expect(
       (await request(app).put('/api/v1/versiones/00000000-0000-0000-0000-000000000000/operaciones/orden').send({ operacionIds: [a] })).status,
     ).toBe(404);
+  });
+});
+
+describe('DELETE /modelos/:id — eliminar modelo (solo sin historial)', () => {
+  test('sin cortes ni moldes: se borra con todas sus versiones y operaciones', async () => {
+    const modelo = await crearModeloTest('TEST MODELO BORRAR');
+    const { id: versionId, modeloId } = modelo.body.data;
+    await request(app).post(`/api/v1/modelos/${modeloId}/versiones`).send({});
+
+    const res = await request(app).delete(`/api/v1/modelos/${modeloId}`);
+    expect(res.status).toBe(200);
+    expect((await request(app).get(`/api/v1/versiones/${versionId}`)).status).toBe(404);
+    const lista = await request(app).get('/api/v1/modelos');
+    expect(lista.body.data.some((m: { id: string }) => m.id === modeloId)).toBe(false);
+    expect(await prisma.operacion.count({ where: { version: { modeloId } } })).toBe(0);
+  });
+
+  test('con un corte: 409 CON_HISTORIAL y el modelo queda intacto', async () => {
+    const modelo = await crearModeloTest('TEST MODELO CON CORTE');
+    const { id: versionId, modeloId } = modelo.body.data;
+    const corte = await request(app)
+      .post('/api/v1/cortes')
+      .send({ ...(await datosCorte()), modeloVersionId: versionId, tallas: [28], cortePorTalla: [10] });
+
+    const lista = await request(app).get('/api/v1/modelos');
+    const enLista = lista.body.data.find((m: { id: string }) => m.id === modeloId);
+    expect(enLista.versiones[0].cantidadCortes).toBe(1);
+
+    const res = await request(app).delete(`/api/v1/modelos/${modeloId}`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('CON_HISTORIAL');
+    expect((await request(app).get(`/api/v1/versiones/${versionId}`)).status).toBe(200);
+
+    await prisma.corte.delete({ where: { id: corte.body.data.id } }); // limpieza
+  });
+
+  test('con moldes registrados: 409; inexistente: 404', async () => {
+    const modelo = await crearModeloTest('TEST MODELO CON MOLDE');
+    const { id: versionId, modeloId } = modelo.body.data;
+    const operario = await prisma.operario.findFirstOrThrow();
+    await prisma.pagoMolde.create({
+      data: {
+        modeloVersionId: versionId,
+        operarioId: operario.id,
+        tipo: 'nuevo',
+        monto: 20000,
+        fecha: new Date('2026-09-10T12:00:00Z'),
+      },
+    });
+    expect((await request(app).delete(`/api/v1/modelos/${modeloId}`)).status).toBe(409);
+    await prisma.pagoMolde.delete({ where: { modeloVersionId: versionId } }); // limpieza
+
+    const nada = await request(app).delete('/api/v1/modelos/00000000-0000-0000-0000-000000000000');
+    expect(nada.status).toBe(404);
   });
 });

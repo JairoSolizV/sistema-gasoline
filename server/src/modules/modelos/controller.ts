@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type {
+  AgregarOperacionesLoteInput,
   CrearModeloInput,
   CrearVersionInput,
   EditarBuscadorInput,
@@ -68,6 +69,18 @@ export const modelosController = {
   async eliminarOperacion(req: Request, res: Response) {
     const dto = await modelosService.eliminarOperacion(String(req.params.opId));
     res.json({ data: dto });
+  },
+
+  async eliminarModelo(req: Request, res: Response) {
+    res.json({ data: await modelosService.eliminarModelo(String(req.params.id)) });
+  },
+
+  async agregarOperacionesLote(req: Request, res: Response) {
+    const dto = await modelosService.agregarOperacionesLote(
+      String(req.params.id),
+      req.body as AgregarOperacionesLoteInput,
+    );
+    res.status(201).json({ data: dto });
   },
 
   async reordenarOperaciones(req: Request, res: Response) {

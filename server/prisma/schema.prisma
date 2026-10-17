@@ -347,6 +347,26 @@ model Grupo {
   orden     Int      @default(0)
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
+  // bloque reutilizable: las operaciones estándar del grupo. Al crear o editar
+  // un modelo se agregan todas de una vez (y ahí se ajustan).
+  operaciones GrupoOperacion[]
+}
+
+// Una operación del bloque estándar de un grupo. Como en las plantillas, guarda
+// el texto (sin FK al catálogo) y un CT de REFERENCIA opcional: el CT que se
+// paga es el que queda escrito en cada modelo.
+model GrupoOperacion {
+  id           String  @id @default(uuid())
+  grupo        Grupo   @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  grupoId      String
+  orden        Int
+  n            String? // número de paso dentro del grupo
+  equipo       String
+  proceso      String
+  pieza        String?
+  ctReferencia Int? // centavos; precio sugerido (null = sin referencia)
+
+  @@index([grupoId, orden])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  agregarOperacionesLoteSchema,
   crearModeloSchema,
   crearVersionSchema,
   editarBuscadorSchema,
@@ -16,6 +17,8 @@ export const modelosRouter = Router();
 
 modelosRouter.get('/modelos', modelosController.listar);
 modelosRouter.post('/modelos', validar(crearModeloSchema), modelosController.crearModelo);
+// solo sin historial (sin cortes ni moldes); con historial → 409
+modelosRouter.delete('/modelos/:id', modelosController.eliminarModelo);
 modelosRouter.post(
   '/modelos/:id/versiones',
   validar(crearVersionSchema),
@@ -33,6 +36,11 @@ modelosRouter.post(
   '/versiones/:id/operaciones',
   validar(operacionInputSchema),
   modelosController.agregarOperacion,
+);
+modelosRouter.post(
+  '/versiones/:id/operaciones/lote',
+  validar(agregarOperacionesLoteSchema),
+  modelosController.agregarOperacionesLote,
 );
 modelosRouter.put(
   '/versiones/:id/operaciones/orden',

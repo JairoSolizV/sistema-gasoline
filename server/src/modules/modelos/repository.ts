@@ -32,9 +32,35 @@ export const modelosRepository = {
         buscador: persona,
         versiones: {
           orderBy: { numeroVersion: 'desc' },
-          include: { _count: { select: { operaciones: true } }, molde: incluirMolde },
+          include: {
+            _count: { select: { operaciones: true, cortes: true } },
+            molde: incluirMolde,
+          },
         },
       },
+    });
+  },
+
+  /** Lo que impide borrar un modelo: cortes y moldes de sus versiones. */
+  modeloConHistorial(modeloId: string) {
+    return prisma.modelo.findUnique({
+      where: { id: modeloId },
+      include: {
+        versiones: {
+          select: { _count: { select: { cortes: true } }, molde: { select: { id: true } } },
+        },
+      },
+    });
+  },
+
+  /** Borrado físico del modelo con sus versiones y operaciones, atómico. Solo
+   *  llega acá si el service verificó que no tiene cortes ni moldes (historial). */
+  eliminarModelo(modeloId: string) {
+    return prisma.$transaction(async (tx) => {
+      const filtro = { version: { modeloId } };
+      await tx.operacion.deleteMany({ where: filtro });
+      await tx.modeloVersion.deleteMany({ where: { modeloId } });
+      await tx.modelo.delete({ where: { id: modeloId } });
     });
   },
 
@@ -139,6 +165,24 @@ export const modelosRepository = {
       });
       await tx.operacion.create({
         data: { ...data, modeloVersionId: versionId, orden: (ultimo._max.orden ?? 0) + 1 },
+      });
+      await recalcularCosto(tx, versionId);
+    });
+  },
+
+  /** Varias operaciones al final, en el orden recibido, y recalcula el costo; atómico. */
+  agregarOperaciones(
+    versionId: string,
+    operaciones: Omit<Prisma.OperacionCreateManyVersionInput, 'orden'>[],
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const ultimo = await tx.operacion.aggregate({
+        where: { modeloVersionId: versionId },
+        _max: { orden: true },
+      });
+      const base = ultimo._max.orden ?? 0;
+      await tx.operacion.createMany({
+        data: operaciones.map((o, i) => ({ ...o, modeloVersionId: versionId, orden: base + i + 1 })),
       });
       await recalcularCosto(tx, versionId);
     });

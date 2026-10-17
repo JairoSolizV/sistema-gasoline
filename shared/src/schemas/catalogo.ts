@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { plantillaOperacionInputSchema } from './plantilla.js';
 
 // C-2 — Normalización al guardar. Un solo lugar para toda la app (server, seed,
 // backfill y cliente) para que "Recta ", "RECTA" y "recta" sean la misma fila.
@@ -63,6 +64,14 @@ export const editarProcesoSchema = edicionConTiempo(nombreCatalogo(60));
 export const editarPiezaSchema = edicionConTiempo(nombreCatalogo(60));
 export const editarGrupoSchema = edicion(nombreGrupo);
 
+// Bloque reutilizable de un grupo: sus operaciones estándar, igual que una fila
+// de plantilla pero sin grupo (es el del bloque). Se guarda la lista completa.
+export const bloqueOperacionInputSchema = plantillaOperacionInputSchema.omit({ grupo: true });
+
+export const guardarBloqueGrupoSchema = z.object({
+  operaciones: z.array(bloqueOperacionInputSchema).max(200),
+});
+
 // Fusionar A en B: A desaparece y sus operaciones pasan a decir B.
 export const fusionarSchema = z.object({
   destinoId: z.uuid('Destino inválido'),
@@ -77,6 +86,8 @@ export const listarCatalogoQuerySchema = z.object({
 });
 
 export type FusionarInput = z.infer<typeof fusionarSchema>;
+export type BloqueOperacionInput = z.infer<typeof bloqueOperacionInputSchema>;
+export type GuardarBloqueGrupoInput = z.infer<typeof guardarBloqueGrupoSchema>;
 export type CrearNodoCatalogoInput = z.infer<typeof crearMaquinaSchema>;
 export type EditarNodoCatalogoInput = z.infer<typeof editarMaquinaSchema> & {
   tiempoSeg?: number | null; // solo procesos y piezas

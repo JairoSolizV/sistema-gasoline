@@ -59,9 +59,9 @@ async function migrarProcesos(tx: Prisma.TransactionClient, origenId: string, de
   }
 }
 
-/** Las dos tablas que guardan el texto de una operación: los modelos y las
- *  plantillas. Las dos se reescriben juntas, o una plantilla quedaría apuntando
- *  a un nombre que ya no está en el catálogo. */
+/** Las tablas que guardan el texto de una operación: los modelos, las
+ *  plantillas y los bloques de grupo. Se reescriben juntas, o una plantilla o un
+ *  bloque quedaría apuntando a un nombre que ya no está en el catálogo. */
 type FiltroRama = {
   grupo?: Prisma.StringFilter;
   equipo?: Prisma.StringFilter;
@@ -71,13 +71,21 @@ type FiltroRama = {
 type CambioTexto = { grupo?: string; equipo?: string; proceso?: string; pieza?: string };
 
 /** Reescribe el texto viejo por el nuevo, acotado a la rama. Devuelve cuántas
- *  filas cambiaron entre modelos y plantillas. */
+ *  filas cambiaron entre modelos, plantillas y bloques de grupo. Los bloques no
+ *  guardan el grupo como texto (cuelgan del Grupo por FK): un renombre o unión
+ *  de grupo no los toca acá. */
 async function reescribir(tx: Prisma.TransactionClient, where: FiltroRama, data: CambioTexto) {
-  const [modelos, plantillas] = await Promise.all([
+  const [modelos, plantillas, bloques] = await Promise.all([
     tx.operacion.updateMany({ where, data }),
     tx.plantillaOperacion.updateMany({ where, data }),
+    where.grupo
+      ? Promise.resolve({ count: 0 })
+      : tx.grupoOperacion.updateMany({
+          where: { equipo: where.equipo, proceso: where.proceso, pieza: where.pieza },
+          data: { equipo: data.equipo, proceso: data.proceso, pieza: data.pieza },
+        }),
   ]);
-  return modelos.count + plantillas.count;
+  return modelos.count + plantillas.count + bloques.count;
 }
 
 /** Renombrar (y de paso activar/desactivar u ordenar). Si el nombre cambia, las
@@ -172,6 +180,22 @@ export const fusionRepository = {
         { grupo: mismoTexto(origen.nombre) },
         { grupo: destino.nombre },
       );
+      // el bloque del grupo absorbido se suma al final del bloque del destino
+      // (si no, el borrado en cascada lo perdería)
+      const ultimo = await tx.grupoOperacion.aggregate({
+        where: { grupoId: destinoId },
+        _max: { orden: true },
+      });
+      const bloqueOrigen = await tx.grupoOperacion.findMany({
+        where: { grupoId: origenId },
+        orderBy: { orden: 'asc' },
+      });
+      for (const [i, op] of bloqueOrigen.entries()) {
+        await tx.grupoOperacion.update({
+          where: { id: op.id },
+          data: { grupoId: destinoId, orden: (ultimo._max.orden ?? 0) + i + 1 },
+        });
+      }
       await tx.grupo.delete({ where: { id: origenId } });
       return { destino, nombreAbsorbido: origen.nombre, operaciones };
     });

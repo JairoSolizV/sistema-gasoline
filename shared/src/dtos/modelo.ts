@@ -29,6 +29,7 @@ export interface ModeloVersionResumenDTO {
   activa: boolean;
   createdAt: string; // ISO
   cantidadOperaciones: number;
+  cantidadCortes: number; // cortes hechos con esta versión (historial: impide eliminar el modelo)
   molde: PagoMoldeDTO | null;
 }
 

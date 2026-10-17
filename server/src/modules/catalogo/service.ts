@@ -13,7 +13,9 @@ import { Prisma } from '@prisma/client';
 import {
   normalizarNombreCatalogo,
   normalizarNombreGrupo,
+  type BloqueGrupoDTO,
   type CatalogoArbolDTO,
+  type GuardarBloqueGrupoInput,
   type CatalogoNodoDTO,
   type CatalogoNodoConTiempoDTO,
   type FusionDTO,
@@ -113,8 +115,49 @@ export const catalogoService = {
           })),
         })),
       })),
-      grupos: grupos.map((g) => nodo(g, usos.grupos, g.nombre)),
+      grupos: grupos.map((g) => ({
+        ...nodo(g, usos.grupos, g.nombre),
+        operacionesBloque: g._count.operaciones,
+      })),
     };
+  },
+
+  // ── Bloque reutilizable de un grupo (sus operaciones estándar) ──
+
+  async bloque(grupoId: string): Promise<BloqueGrupoDTO> {
+    const grupo = await catalogoRepository.bloque(grupoId);
+    if (!grupo) throw new AppError('NO_ENCONTRADO', 'Grupo no encontrado', 404);
+    return {
+      grupo: { id: grupo.id, nombre: grupo.nombre },
+      operaciones: grupo.operaciones.map((o) => ({
+        id: o.id,
+        orden: o.orden,
+        n: o.n,
+        equipo: o.equipo,
+        proceso: o.proceso,
+        pieza: o.pieza,
+        ctReferencia: o.ctReferencia,
+      })),
+    };
+  },
+
+  /** Guarda la lista completa. Los textos se normalizan como en el resto del
+   *  catálogo (minúsculas) para que crucen con máquinas, procesos y piezas. */
+  async guardarBloque(grupoId: string, input: GuardarBloqueGrupoInput): Promise<BloqueGrupoDTO> {
+    if (!(await catalogoRepository.grupo(grupoId))) {
+      throw new AppError('NO_ENCONTRADO', 'Grupo no encontrado', 404);
+    }
+    await catalogoRepository.reemplazarBloque(
+      grupoId,
+      input.operaciones.map((o) => ({
+        n: o.n ?? null,
+        equipo: normalizarNombreCatalogo(o.equipo),
+        proceso: normalizarNombreCatalogo(o.proceso),
+        pieza: o.pieza ? normalizarNombreCatalogo(o.pieza) : null,
+        ctReferencia: o.ctReferencia ?? null,
+      })),
+    );
+    return this.bloque(grupoId);
   },
 
   async crearMaquina(input: CrearNodoCatalogoInput): Promise<CatalogoNodoDTO> {

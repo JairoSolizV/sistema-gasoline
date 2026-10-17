@@ -5,6 +5,7 @@
 // pagados una vez en su fecha, con rol y mes sin liquidar exigidos.
 import { Prisma } from '@prisma/client';
 import type {
+  AgregarOperacionesLoteInput,
   CrearModeloInput,
   CrearVersionInput,
   EditarBuscadorInput,
@@ -122,9 +123,35 @@ export const modelosService = {
         activa: v.activa,
         createdAt: v.createdAt.toISOString(),
         cantidadOperaciones: v._count.operaciones,
+        cantidadCortes: v._count.cortes,
         molde: aMoldeDTO(v.molde),
       })),
     }));
+  },
+
+  /** Eliminar un modelo (con todas sus versiones y operaciones). Como con los
+   *  operarios (CA-8.2), solo si no tiene historial: un corte o un pago de
+   *  moldes usan sus versiones y borrarlo perdería lo que se pagó. */
+  async eliminarModelo(modeloId: string): Promise<{ eliminado: true }> {
+    const modelo = await modelosRepository.modeloConHistorial(modeloId);
+    if (!modelo) throw new AppError('NO_ENCONTRADO', 'Modelo no encontrado', 404);
+    const cortes = modelo.versiones.reduce((a, v) => a + v._count.cortes, 0);
+    if (cortes > 0) {
+      throw new AppError(
+        'CON_HISTORIAL',
+        `No se puede eliminar "${modelo.nombre}": tiene ${cortes} corte(s). Borrarlo perdería el historial de pagos.`,
+        409,
+      );
+    }
+    if (modelo.versiones.some((v) => v.molde)) {
+      throw new AppError(
+        'CON_HISTORIAL',
+        `No se puede eliminar "${modelo.nombre}": tiene moldes registrados (es un pago). Quitá los moldes de sus versiones primero.`,
+        409,
+      );
+    }
+    await modelosRepository.eliminarModelo(modeloId);
+    return { eliminado: true };
   },
 
   /** Asigna el buscador, marca "sin buscador" o lo deja pendiente (ambos vacíos).
@@ -221,6 +248,16 @@ export const modelosService = {
   ): Promise<ModeloVersionDetalleDTO> {
     await detalleDeVersion(versionId); // 404 si no existe
     await modelosRepository.agregarOperacion(versionId, input);
+    return detalleDeVersion(versionId);
+  },
+
+  /** Varias operaciones de una vez (ej. el bloque de un grupo del catálogo). */
+  async agregarOperacionesLote(
+    versionId: string,
+    input: AgregarOperacionesLoteInput,
+  ): Promise<ModeloVersionDetalleDTO> {
+    await detalleDeVersion(versionId); // 404 si no existe
+    await modelosRepository.agregarOperaciones(versionId, input.operaciones);
     return detalleDeVersion(versionId);
   },
 

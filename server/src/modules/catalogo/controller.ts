@@ -4,6 +4,7 @@ import type {
   CrearNodoCatalogoInput,
   EditarNodoCatalogoInput,
   FusionarInput,
+  GuardarBloqueGrupoInput,
 } from '@taller/shared';
 import { catalogoService } from './service.js';
 
@@ -23,6 +24,15 @@ export const catalogoController = {
   fusionarProceso: fusionar('procesos'),
   fusionarPieza: fusionar('piezas'),
   fusionarGrupo: fusionar('grupos'),
+
+  async bloqueGrupo(req: Request, res: Response) {
+    res.json({ data: await catalogoService.bloque(id(req)) });
+  },
+
+  async guardarBloqueGrupo(req: Request, res: Response) {
+    const input = req.body as GuardarBloqueGrupoInput;
+    res.json({ data: await catalogoService.guardarBloque(id(req), input) });
+  },
 
   async arbol(_req: Request, res: Response) {
     const { soloActivos } = res.locals.query as { soloActivos: boolean };
