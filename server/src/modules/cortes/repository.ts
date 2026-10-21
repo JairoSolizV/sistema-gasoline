@@ -140,6 +140,13 @@ export const cortesRepository = {
     return prisma.corte.update({ where: { id: corteId }, data });
   },
 
+  actualizarRollos(
+    corteId: string,
+    data: { rollosCm: number[]; traslapeCm: number; retazoMinimoCm: number },
+  ) {
+    return prisma.corte.update({ where: { id: corteId }, data });
+  },
+
   /** Marca interno/externo; al pasar a interno se copian las tarifas si faltan. */
   actualizarServicio(
     corteId: string,

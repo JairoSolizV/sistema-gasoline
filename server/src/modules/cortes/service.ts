@@ -13,6 +13,7 @@ import type {
   CrearCorteInput,
   EditarCodigoInput,
   EditarOperacionInput,
+  EditarRollosInput,
   EditarServicioInput,
   EditarTendidoInput,
   OperacionInput,
@@ -150,6 +151,14 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     tela: corte.tela,
     anchoCm: corte.anchoCm,
     trazadoCm: corte.trazadoCm,
+    rollos:
+      corte.rollosCm != null
+        ? {
+            rollosCm: corte.rollosCm as number[],
+            traslapeCm: corte.traslapeCm ?? 0,
+            retazoMinimoCm: corte.retazoMinimoCm ?? 0,
+          }
+        : null,
     esInterno: corte.esInterno,
     servicio,
     estado: corte.estado,
@@ -315,6 +324,14 @@ export const cortesService = {
       anchoCm: input.anchoCm,
       trazadoCm: input.trazadoCm,
     });
+    return detalle(corteId);
+  },
+
+  /** Rollos de tela para la calculadora de tendido (informativo, no toca pagos).
+   *  Como el tendido: se puede cargar o corregir mientras el corte no esté cerrado. */
+  async editarRollos(corteId: string, input: EditarRollosInput): Promise<CorteDetalleDTO> {
+    const corte = await corteNoCerradoOError(corteId);
+    await cortesRepository.actualizarRollos(corte.id, input);
     return detalle(corteId);
   },
 

@@ -733,3 +733,23 @@ describe('cambios de último momento a las operaciones del corte', () => {
     expect(enBorrador.status).toBe(409);
   });
 });
+
+describe('PUT /cortes/:id/rollos — calculadora de tendido', () => {
+  test('guarda rollos, traslape y retazo mínimo; inválidos 400; cerrado 409', async () => {
+    const detalle = await crearCorteAbierto();
+    expect(detalle.rollos).toBeNull();
+    const url = `/api/v1/cortes/${detalle.id}/rollos`;
+    const datos = { rollosCm: [6880, 7015, 6550], traslapeCm: 50, retazoMinimoCm: 50 };
+
+    const res = await request(app).put(url).send(datos);
+    expect(res.status).toBe(200);
+    expect(res.body.data.rollos).toEqual(datos);
+
+    expect((await request(app).put(url).send({ ...datos, rollosCm: [] })).status).toBe(400);
+    expect((await request(app).put(url).send({ ...datos, rollosCm: [0] })).status).toBe(400);
+    expect((await request(app).put(url).send({ ...datos, traslapeCm: -1 })).status).toBe(400);
+
+    await prisma.corte.update({ where: { id: detalle.id }, data: { estado: 'cerrado' } });
+    expect((await request(app).put(url).send(datos)).status).toBe(409);
+  });
+});

@@ -5,6 +5,7 @@ import type {
   CrearCorteInput,
   EditarCodigoInput,
   EditarOperacionInput,
+  EditarRollosInput,
   EditarServicioInput,
   EditarTendidoInput,
   OperacionInput,
@@ -54,6 +55,11 @@ export const cortesController = {
       String(req.params.id),
       req.body as EditarTendidoInput,
     );
+    res.json({ data: dto });
+  },
+
+  async editarRollos(req: Request, res: Response) {
+    const dto = await cortesService.editarRollos(String(req.params.id), req.body as EditarRollosInput);
     res.json({ data: dto });
   },
 

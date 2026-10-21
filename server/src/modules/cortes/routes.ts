@@ -6,6 +6,7 @@ import {
   crearCorteSchema,
   editarCodigoSchema,
   editarOperacionSchema,
+  editarRollosSchema,
   editarServicioSchema,
   editarTendidoSchema,
   listarCortesQuerySchema,
@@ -31,6 +32,8 @@ cortesRouter.get('/:id', cortesController.obtener);
 cortesRouter.patch('/:id/codigo', validar(editarCodigoSchema), cortesController.editarCodigo);
 cortesRouter.post('/:id/abrir', cortesController.abrir);
 cortesRouter.put('/:id/tendido', validar(editarTendidoSchema), cortesController.editarTendido);
+// calculadora de tendido: rollos de tela, traslape y retazo mínimo
+cortesRouter.put('/:id/rollos', validar(editarRollosSchema), cortesController.editarRollos);
 // Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md)
 cortesRouter.patch('/:id/servicio', validar(editarServicioSchema), cortesController.editarServicio);
 cortesRouter.put(

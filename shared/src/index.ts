@@ -3,6 +3,7 @@ export * from './medidas.js';
 export * from './dias.js';
 export * from './servicioCorte.js';
 export * from './tiempos.js';
+export * from './tendido.js';
 export * from './dtos/operario.js';
 export * from './dtos/modelo.js';
 export * from './dtos/catalogo.js';

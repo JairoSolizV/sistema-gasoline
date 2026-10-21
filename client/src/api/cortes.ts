@@ -7,6 +7,7 @@ import type {
   CrearCorteInput,
   EditarCodigoInput,
   EditarOperacionInput,
+  EditarRollosInput,
   EditarServicioInput,
   EditarTendidoInput,
   OperacionInput,
@@ -241,6 +242,19 @@ export function useQuitarOperacionCorte() {
     mutationFn: ({ corteId, corteOperacionId }: { corteId: string; corteOperacionId: string }) =>
       api<CorteDetalleDTO>(`/cortes/${corteId}/operaciones/${corteOperacionId}`, {
         method: 'DELETE',
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+/** Calculadora de tendido: guarda los rollos, el traslape y el retazo mínimo. */
+export function useEditarRollos() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: EditarRollosInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/rollos`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
       }),
     onSuccess: aplicar,
   });

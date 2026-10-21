@@ -12,6 +12,17 @@ const camposTendido = {
 
 export const editarTendidoSchema = z.object(camposTendido);
 
+// Calculadora de tendido: metros de cada rollo (en cm, en el orden en que se
+// tienden), traslape de cada empalme y retazo mínimo útil.
+export const editarRollosSchema = z.object({
+  rollosCm: z
+    .array(z.number().int().min(1, 'Cada rollo debe tener más de 0 m').max(999_999))
+    .min(1, 'Ingresá al menos un rollo')
+    .max(200, 'Demasiados rollos'),
+  traslapeCm: z.number().int().min(0).max(500, 'El traslape es demasiado grande'),
+  retazoMinimoCm: z.number().int().min(0).max(5_000, 'El retazo mínimo es demasiado grande'),
+});
+
 // Numeración del corte (N° 1, 2, 3…). Al crear es opcional: si falta, el server
 // asigna el siguiente (mayor + 1). Nunca se repite (lo valida el server).
 const codigoCorte = z
@@ -100,6 +111,7 @@ export const listarCortesQuerySchema = z.object({
 export type CrearCorteInput = z.infer<typeof crearCorteSchema>;
 export type EditarTendidoInput = z.infer<typeof editarTendidoSchema>;
 export type EditarCodigoInput = z.infer<typeof editarCodigoSchema>;
+export type EditarRollosInput = z.infer<typeof editarRollosSchema>;
 export type RegistrarProcesoInput = z.infer<typeof registrarProcesoSchema>;
 export type EditarServicioInput = z.infer<typeof editarServicioSchema>;
 export type AsignacionInput = z.infer<typeof asignacionInputSchema>;

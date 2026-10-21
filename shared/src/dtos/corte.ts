@@ -143,6 +143,9 @@ export interface CorteDetalleDTO {
   tela: string | null;
   anchoCm: number | null;
   trazadoCm: number | null;
+  // calculadora de tendido (null = sin cargar); el resultado se calcula con
+  // calcularTendido() de shared
+  rollos: { rollosCm: number[]; traslapeCm: number; retazoMinimoCm: number } | null;
   esInterno: boolean;
   servicio: ServicioCorteDTO | null; // null en cortes externos
   estado: EstadoCorte;

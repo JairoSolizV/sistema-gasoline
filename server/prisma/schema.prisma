@@ -136,6 +136,12 @@ model Corte {
   tela            String?
   anchoCm         Int? // ancho de la tela, en cm (se ingresa en metros con 2 decimales)
   trazadoCm       Int? // largo del trazado, en cm
+  // Calculadora de tendido (informativa): metros de cada rollo (cm, en orden),
+  // traslape de cada empalme y retazo mínimo útil. Las hojas y retazos que
+  // sobran se calculan al vuelo (shared/src/tendido.ts). null = sin cargar.
+  rollosCm        Json?
+  traslapeCm      Int?
+  retazoMinimoCm  Int?
   // Servicio de corte interno (docs/PLAN_SERVICIO_CORTE.md). Un corte externo
   // (llega cortado de afuera) no paga ningún proceso.
   esInterno       Boolean          @default(true)

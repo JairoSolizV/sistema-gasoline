@@ -31,6 +31,7 @@ import { hoyLocalISO } from '../../lib/fechas';
 import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendido';
 import { ServicioCorte } from './ServicioCorte';
 import { DuracionEstimada } from './DuracionEstimada';
+import { CalculadoraTendido } from './CalculadoraTendido';
 
 // Datos del tendido: informativos, no entran al cálculo de pagos. Mientras el
 // corte no esté cerrado se pueden completar (cortes creados antes de pedirlos)
@@ -392,6 +393,8 @@ export function CorteDetallePage() {
         )}
         {modalCodigo && <ModalCodigo corte={corte} onCerrar={() => setModalCodigo(false)} />}
       </div>
+
+      <CalculadoraTendido corte={corte} />
 
       <ServicioCorte corte={corte} />
 
