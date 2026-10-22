@@ -1,5 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { formatBs, type DashboardCorteDTO } from '@taller/shared';
+import {
+  ETIQUETA_CUENTA,
+  formatBs,
+  type DashboardCorteDTO,
+  type DashboardCuentaDTO,
+} from '@taller/shared';
 import { useDashboard } from '../../api/dashboard';
 import { MESES } from '../../lib/meses';
 
@@ -39,12 +44,7 @@ export function InicioPage() {
 
       {data && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-            <Kpi titulo={`Total a pagar · ${MESES[data.kpis.mes - 1]}`} valor={`Bs ${formatBs(data.kpis.totalAPagar)}`} sub="costura + servicio de corte + moldes" />
-            <Kpi titulo="Anticipos entregados" valor={`Bs ${formatBs(data.kpis.anticiposEntregados)}`} sub="del período" />
-            <Kpi titulo="Saldo pendiente" valor={`Bs ${formatBs(data.kpis.saldoPendiente)}`} sub="por liquidar" acento />
-            <Kpi titulo="Cortes activos" valor={String(data.kpis.cortesActivos)} sub="en producción" />
-          </div>
+          <CuentasDelMes cuentas={data.kpis.cuentas} mes={data.kpis.mes} />
 
           <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -94,12 +94,46 @@ export function InicioPage() {
   );
 }
 
-function Kpi({ titulo, valor, sub, acento }: { titulo: string; valor: string; sub: string; acento?: boolean }) {
+/** Una fila por cuenta: cada una se paga aparte, así que no hay total general
+ *  (docs/PLAN_CUENTAS_SEPARADAS.md §6). Clic en una fila → su planilla. */
+function CuentasDelMes({ cuentas, mes }: { cuentas: DashboardCuentaDTO[]; mes: number }) {
+  const navigate = useNavigate();
+  const monto = (c: number) => (c !== 0 ? `Bs ${formatBs(c)}` : '—');
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">{titulo}</div>
-      <div className={`mono mt-1 text-2xl font-semibold ${acento ? 'text-acento' : ''}`}>{valor}</div>
-      <div className="mt-0.5 text-[11px] text-gray-400">{sub}</div>
+    <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+            <th className="px-5 py-3">Cuenta · {MESES[mes - 1]}</th>
+            <th className="px-4 py-3 text-right">Total a pagar</th>
+            <th className="px-4 py-3 text-right">Anticipos entregados</th>
+            <th className="px-4 py-3 text-right">Saldo pendiente</th>
+            <th className="px-5 py-3 text-right">Cortes activos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cuentas.map((c) => {
+            const vacia = c.totalAPagar === 0 && c.anticiposEntregados === 0 && c.saldoPendiente === 0;
+            return (
+              <tr
+                key={c.cuenta}
+                onClick={() => navigate(`/liquidacion?cuenta=${c.cuenta}`)}
+                className={`cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50/60 ${vacia ? 'text-gray-400' : ''}`}
+              >
+                <td className="px-5 py-3 font-medium">{ETIQUETA_CUENTA[c.cuenta]}</td>
+                <td className="mono px-4 py-3 text-right">{monto(c.totalAPagar)}</td>
+                <td className="mono px-4 py-3 text-right">{monto(c.anticiposEntregados)}</td>
+                <td className={`mono px-4 py-3 text-right font-semibold ${c.saldoPendiente < 0 ? 'text-error' : vacia ? '' : 'text-acento'}`}>
+                  {monto(c.saldoPendiente)}
+                </td>
+                <td className="mono px-5 py-3 text-right">
+                  {c.cortesActivos == null ? '—' : c.cortesActivos}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

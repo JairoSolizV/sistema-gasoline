@@ -2,9 +2,11 @@
 // §5.3): el payload jamás incluye a otros. Reutiliza el dominio de saldo y el
 // repositorio de liquidación para el arrastre y el estado del mes.
 import {
+  CUENTAS,
   dateADia,
-  type GanadoDesgloseDTO,
+  type Cuenta,
   type RendicionCorteDTO,
+  type RendicionCuentaDTO,
   type RendicionDTO,
   type RendicionMoldeDTO,
   type RendicionOperacionDTO,
@@ -14,8 +16,7 @@ import {
 import { calcularSaldo } from '../../domain/saldo.js';
 import { AppError } from '../../middleware/errors.js';
 import { sueldosDelMes } from '../asistencia/sueldoMes.js';
-import { liquidacionRepository } from '../liquidacion/repository.js';
-import { desglosePersistido } from '../liquidacion/service.js';
+import { claveSaldo, liquidacionRepository } from '../liquidacion/repository.js';
 import { rendicionRepository } from './repository.js';
 
 export const rendicionService = {
@@ -123,33 +124,58 @@ export const rendicionService = {
     const suma = (lista: RendicionCorteDTO[]) => lista.reduce((acc, c) => acc + c.totalCorte, 0);
 
     const cerrado = periodo?.estado === 'cerrado';
-    const liquidacion = cerrado
-      ? periodo!.liquidaciones.find((l) => l.operarioId === operarioId)
-      : undefined;
 
-    // Mes cerrado: mandan los totales persistidos en Liquidacion (lo que de
-    // verdad se liquidó); el cálculo en vivo queda solo para meses abiertos.
-    const desglose: GanadoDesgloseDTO = liquidacion
-      ? desglosePersistido(liquidacion)
-      : {
-          sueldo: sueldo?.total ?? 0,
-          costura: suma(cortes),
-          empaque: suma(empaque),
-          servicioCorte: servicioCorte.reduce((acc, t) => acc + t.total, 0),
-          moldes: moldesDTO.reduce((acc, m) => acc + m.monto, 0),
-        };
-    const totalGanado = liquidacion
-      ? liquidacion.totalGanado
-      : desglose.sueldo + desglose.costura + desglose.empaque + desglose.servicioCorte + desglose.moldes;
-    const totalAnticipos = liquidacion
-      ? liquidacion.totalAnticipos
-      : anticipos.reduce((acc, a) => acc + a.monto, 0);
-    const saldoEntrada = liquidacion
-      ? liquidacion.saldoEntrada
-      : (saldosEntrada.get(operarioId) ?? 0);
-    const saldoPeriodo = liquidacion
-      ? liquidacion.saldoPeriodo
-      : calcularSaldo(saldoEntrada, totalGanado, totalAnticipos);
+    // Un saldo por cuenta, nunca sumados entre sí (PLAN_CUENTAS_SEPARADAS §3).
+    // Mes cerrado: mandan las filas persistidas en Liquidacion (lo que de verdad
+    // se liquidó); el cálculo en vivo queda solo para meses abiertos.
+    let cuentas: RendicionCuentaDTO[];
+    if (cerrado) {
+      const propias = periodo!.liquidaciones.filter((l) => l.operarioId === operarioId);
+      cuentas = CUENTAS.flatMap((cuenta) => {
+        const l = propias.find((x) => x.cuenta === cuenta);
+        return l
+          ? [
+              {
+                cuenta,
+                saldoEntrada: l.saldoEntrada,
+                ganado: l.totalGanado,
+                anticipos: l.totalAnticipos,
+                saldoPeriodo: l.saldoPeriodo,
+                pagado: l.pagado,
+                saldoSalida: l.saldoSalida,
+              },
+            ]
+          : [];
+      });
+    } else {
+      const ganado: Record<Cuenta, number> = {
+        operaciones: suma(cortes),
+        empaque: suma(empaque),
+        servicio_corte: servicioCorte.reduce((acc, t) => acc + t.total, 0),
+        moldes: moldesDTO.reduce((acc, m) => acc + m.monto, 0),
+        sueldo: sueldo?.total ?? 0,
+        lavanderia: 0, // rebanada 4 (envíos a proveedores externos)
+        bordado: 0,
+      };
+      cuentas = CUENTAS.flatMap((cuenta) => {
+        const saldoEntrada = saldosEntrada.get(claveSaldo(operarioId, cuenta)) ?? 0;
+        const antic = anticipos
+          .filter((a) => a.cuenta === cuenta)
+          .reduce((acc, a) => acc + a.monto, 0);
+        if (saldoEntrada === 0 && ganado[cuenta] === 0 && antic === 0) return [];
+        return [
+          {
+            cuenta,
+            saldoEntrada,
+            ganado: ganado[cuenta],
+            anticipos: antic,
+            saldoPeriodo: calcularSaldo(saldoEntrada, ganado[cuenta], antic),
+            pagado: null,
+            saldoSalida: null,
+          },
+        ];
+      });
+    }
 
     return {
       operarioId: operario.id,
@@ -159,19 +185,14 @@ export const rendicionService = {
       anio,
       mes,
       cerrado,
-      saldoEntrada,
-      totalGanado,
-      desglose,
-      totalAnticipos,
-      saldoPeriodo,
-      pagado: liquidacion ? liquidacion.pagado : null,
-      saldoSalida: liquidacion ? liquidacion.saldoSalida : null,
+      cuentas,
       sueldo,
       cortes,
       empaque,
       servicioCorte,
       moldes: moldesDTO,
       anticipos: anticipos.map((a) => ({
+        cuenta: a.cuenta,
         fecha: a.fecha.toISOString(),
         monto: a.monto,
         nota: a.nota,

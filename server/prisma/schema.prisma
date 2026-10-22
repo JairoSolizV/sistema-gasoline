@@ -242,6 +242,7 @@ model Anticipo {
   id         String   @id @default(uuid())
   operario   Operario @relation(fields: [operarioId], references: [id])
   operarioId String
+  cuenta     Cuenta   @default(operaciones) // solo descuenta del saldo de esta cuenta
   fecha      DateTime
   monto      Int // centavos; si supera el tope → advertencia, no bloqueo
   nota       String?
@@ -266,21 +267,30 @@ model Liquidacion {
   periodoId      String
   operario       Operario @relation(fields: [operarioId], references: [id])
   operarioId     String
-  saldoEntrada   Int      @default(0) // centavos; arrastre del mes anterior (puede ser negativo)
-  totalGanado    Int      @default(0) // = sueldo + costura + empaque + servicio de corte + moldes
-  // desglose persistido del ganado (PLAN_SERVICIO_CORTE.md §2.12 y
-  // PLAN_AYUDANTES.md §4); la costura es totalGanado − estos cuatro
-  ganadoServicioCorte Int  @default(0)
-  ganadoMoldes        Int  @default(0)
-  ganadoEmpaque       Int  @default(0)
-  ganadoSueldo        Int  @default(0)
-  totalAnticipos Int      @default(0)
+  // una fila por operario y CUENTA: los saldos de cuentas distintas no se
+  // mezclan ni se compensan (docs/PLAN_CUENTAS_SEPARADAS.md §3)
+  cuenta         Cuenta
+  saldoEntrada   Int      @default(0) // centavos; arrastre del mes anterior en esta cuenta (puede ser negativo)
+  totalGanado    Int      @default(0) // ganado del mes en esta cuenta
+  totalAnticipos Int      @default(0) // anticipos del mes cargados a esta cuenta
   saldoPeriodo   Int      @default(0) // = saldoEntrada + totalGanado − totalAnticipos
   pagado         Int      @default(0)
   arrastraSaldo  Boolean  @default(false)
-  saldoSalida    Int      @default(0) // 0 si se liquidó todo; pasa a saldoEntrada del siguiente
+  saldoSalida    Int      @default(0) // 0 si se liquidó todo; pasa a saldoEntrada del siguiente (misma cuenta)
 
-  @@unique([periodoId, operarioId])
+  @@unique([periodoId, operarioId, cuenta])
+}
+
+// Cuentas de pago separadas (docs/PLAN_CUENTAS_SEPARADAS.md §2): cada una con
+// su ganado, anticipos, saldo y arrastre por operario.
+enum Cuenta {
+  operaciones // costura (operaciones del corte que no son de empaque)
+  empaque
+  servicio_corte // búsqueda, trazado, doblado, corte y clasificación
+  moldes
+  sueldo // sueldo semanal de ayudantes
+  lavanderia // proveedor externo, por prenda
+  bordado // proveedor externo, por prenda
 }
 
 model Configuracion {

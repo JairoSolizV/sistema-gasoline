@@ -87,6 +87,19 @@ export const cortesRepository = {
     });
   },
 
+  /** Cortes abiertos con lo justo para contar, por cuenta, cuáles tienen
+   *  trabajo pendiente (inicio, PLAN_CUENTAS_SEPARADAS §6). */
+  abiertosConPendientes() {
+    return prisma.corte.findMany({
+      where: { estado: 'abierto' },
+      select: {
+        esInterno: true,
+        operaciones: { select: { esEmpaque: true, estado: true } },
+        trabajos: { select: { proceso: true } },
+      },
+    });
+  },
+
   obtenerDetalle(id: string): Promise<CorteConDetalle | null> {
     return prisma.corte.findUnique({ where: { id }, include: incluirDetalle });
   },

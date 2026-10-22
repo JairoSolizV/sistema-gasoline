@@ -1,15 +1,17 @@
-// Rebanada 5 del servicio de corte (docs/PLAN_SERVICIO_CORTE.md): el ganado del
-// mes = costura (por fechaCierre) + servicio de corte + moldes (por la fecha de
-// cada trabajo), con desglose por operario, semana y totales; se persiste al
-// cerrar el mes; la rendición los muestra separados y sin datos de compañeros.
+// Rebanada 5 del servicio de corte (docs/PLAN_SERVICIO_CORTE.md), con cuentas
+// separadas (PLAN_CUENTAS_SEPARADAS.md): costura (por fechaCierre), servicio de
+// corte y moldes (por la fecha de cada trabajo) van cada uno en su cuenta, con
+// sus filas, semanas y totales; se persisten al cerrar el mes; la rendición
+// muestra cada cuenta aparte y sin datos de compañeros.
 // Usa marzo de 2031 para no cruzarse con los meses de otros tests.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
-import type { ConsolidadoDTO, LiquidacionFilaDTO } from '@taller/shared';
+import type { ConsolidadoDTO, Cuenta } from '@taller/shared';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
 import { datosCorte } from './helpers/corte.js';
 import { datosOperario } from './helpers/operario.js';
+import { cuentaDe, filaDe, saldoDe } from './helpers/cuentas.js';
 
 const app = crearApp();
 const ids: Record<string, string> = {};
@@ -39,8 +41,7 @@ async function limpiar() {
 
 const consolidado = async () =>
   (await request(app).get('/api/v1/liquidacion?anio=2031&mes=3')).body.data as ConsolidadoDTO;
-const fila = (c: ConsolidadoDTO, clave: string) =>
-  c.filas.find((x) => x.operarioId === ids[clave]) as LiquidacionFilaDTO;
+const fila = (c: ConsolidadoDTO, clave: string, cuenta: Cuenta) => filaDe(c, ids[clave], cuenta);
 
 beforeAll(async () => {
   await limpiar();
@@ -95,10 +96,10 @@ afterAll(async () => {
 });
 
 describe('consolidado del mes con servicio de corte y moldes', () => {
-  test('cada operario gana lo suyo, separado por tipo', async () => {
+  test('cada operario gana lo suyo, en la cuenta de cada tipo de trabajo', async () => {
     const c = await consolidado();
     const esperado: Record<string, [number, number, number]> = {
-      // [costura, servicio de corte, moldes]
+      // [operaciones, servicio de corte, moldes]
       COSTURA: [14420, 0, 0],
       TRAZ: [0, 21630, 0],
       DOB1: [0, 5408, 0],
@@ -108,33 +109,35 @@ describe('consolidado del mes con servicio de corte y moldes', () => {
       BUSC: [0, 7210, 0],
       MOLD: [0, 0, 20000],
     };
-    for (const [clave, [costura, servicioCorte, moldes]] of Object.entries(esperado)) {
-      const fl = fila(c, clave);
-      expect(fl.desglose, clave).toEqual({ sueldo: 0, costura, empaque: 0, servicioCorte, moldes });
-      expect(fl.ganado, clave).toBe(costura + servicioCorte + moldes);
-      expect(fl.saldoPeriodo, clave).toBe(fl.ganado); // sin anticipos ni arrastre
+    for (const [clave, montos] of Object.entries(esperado)) {
+      (['operaciones', 'servicio_corte', 'moldes'] as const).forEach((cuenta, i) => {
+        const fl = fila(c, clave, cuenta);
+        if (montos[i] === 0) {
+          expect(fl, `${clave} no tiene fila en ${cuenta}`).toBeUndefined();
+        } else {
+          expect(fl.ganado, `${clave} ${cuenta}`).toBe(montos[i]);
+          expect(fl.saldoPeriodo, `${clave} ${cuenta}`).toBe(montos[i]); // sin anticipos ni arrastre
+        }
+      });
     }
   });
 
-  test('totales y semanas cuadran con las filas', async () => {
+  test('en cada cuenta, totales y semanas cuadran con sus filas', async () => {
     const c = await consolidado();
-    const suma = (k: keyof typeof c.totales.desglose) =>
-      c.filas.reduce((a, x) => a + x.desglose[k], 0);
-    expect(c.totales.desglose).toEqual({
-      sueldo: suma('sueldo'),
-      costura: suma('costura'),
-      empaque: suma('empaque'),
-      servicioCorte: suma('servicioCorte'),
-      moldes: suma('moldes'),
-    });
-    expect(c.totales.desglose.servicioCorte).toBeGreaterThanOrEqual(21630 + 10815 + 18025 + 7210 + 7210);
-    // lo de este test está entero en las semanas de marzo
-    const enSemanas = c.semanas.reduce((a, s) => a + s.ganado, 0);
-    expect(enSemanas).toBe(c.totales.ganado);
+    for (const cuenta of c.cuentas) {
+      expect(cuenta.totales.ganado, cuenta.cuenta).toBe(cuenta.filas.reduce((a, x) => a + x.ganado, 0));
+      // lo de este test está entero en las semanas de marzo
+      expect(cuenta.semanas.reduce((a, s) => a + s.ganado, 0), cuenta.cuenta).toBe(cuenta.totales.ganado);
+    }
+    expect(cuentaDe(c, 'servicio_corte').totales.ganado).toBeGreaterThanOrEqual(
+      21630 + 10815 + 18025 + 7210 + 7210,
+    );
     // la semana del 3 y 4 de marzo trae moldes + trazado + doblado, y ningún cierre de costura
-    const s = c.semanas.find((x) => x.inicioISO <= f(4) && f(4) <= x.finISO)!;
-    expect(s.desglose.moldes).toBeGreaterThanOrEqual(20000);
-    expect(s.desglose.servicioCorte).toBeGreaterThanOrEqual(21630 + 10815);
+    const semana = (cuenta: Cuenta) =>
+      cuentaDe(c, cuenta).semanas.find((x) => x.inicioISO <= f(4) && f(4) <= x.finISO)!;
+    expect(semana('moldes').ganado).toBeGreaterThanOrEqual(20000);
+    expect(semana('servicio_corte').ganado).toBeGreaterThanOrEqual(21630 + 10815);
+    expect(semana('operaciones').cortesCerrados).toBe(0);
   });
 });
 
@@ -154,8 +157,9 @@ describe('rendición: separada por tipo y sin datos de compañeros', () => {
       fecha: f(4),
       modeloNombre: 'TEST MODELO LS',
     });
-    expect(r.desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 5408, moldes: 0 });
-    expect(r.totalGanado).toBe(5408);
+    // solo la cuenta del servicio de corte: no se mezcla con operaciones
+    expect(r.cuentas.map((x: { cuenta: string }) => x.cuenta)).toEqual(['servicio_corte']);
+    expect(saldoDe(r, 'servicio_corte')).toMatchObject({ ganado: 5408, anticipos: 0, saldoPeriodo: 5408 });
     const json = JSON.stringify(r);
     expect(json).not.toContain('TEST LS DOB2');
     expect(json).not.toContain('5407');
@@ -166,7 +170,7 @@ describe('rendición: separada por tipo y sin datos de compañeros', () => {
     expect(mold.moldes).toEqual([
       { modeloNombre: 'TEST MODELO LS', numeroVersion: 1, tipo: 'nuevo', fecha: f(3), monto: 20000 },
     ]);
-    expect(mold.desglose.moldes).toBe(20000);
+    expect(saldoDe(mold, 'moldes').ganado).toBe(20000);
 
     const busc = (await request(app).get(`/api/v1/rendicion/${ids.BUSC}?anio=2031&mes=3`)).body.data;
     expect(busc.servicioCorte.map((t: { proceso: string; total: number }) => [t.proceso, t.total])).toEqual([
@@ -198,23 +202,34 @@ describe('cierre del mes', () => {
     }
   });
 
-  test('al cerrar, el desglose queda guardado y la rendición usa lo liquidado', async () => {
+  test('al cerrar, cada cuenta queda guardada aparte y la rendición usa lo liquidado', async () => {
     const res = await request(app).post('/api/v1/liquidacion/cerrar-mes').send({ anio: 2031, mes: 3, excepciones: [] });
     expect(res.status).toBe(200);
     const c = res.body.data as ConsolidadoDTO;
     expect(c.cerrado).toBe(true);
-    expect(fila(c, 'DOB2').desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 5407, moldes: 0 });
-    expect(fila(c, 'MOLD').desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 0, moldes: 20000 });
-    expect(fila(c, 'COSTURA').desglose).toEqual({ sueldo: 0, costura: 14420, empaque: 0, servicioCorte: 0, moldes: 0 });
+    expect(fila(c, 'DOB2', 'servicio_corte')).toMatchObject({ ganado: 5407, pagado: 5407, saldoSalida: 0 });
+    expect(fila(c, 'MOLD', 'moldes').ganado).toBe(20000);
+    expect(fila(c, 'COSTURA', 'operaciones').ganado).toBe(14420);
+    expect(fila(c, 'COSTURA', 'servicio_corte')).toBeUndefined();
 
-    const guardada = await prisma.liquidacion.findFirstOrThrow({
+    const guardadas = await prisma.liquidacion.findMany({
       where: { operarioId: ids.TRAZ, periodo: { anio: 2031, mes: 3 } },
     });
-    expect([guardada.totalGanado, guardada.ganadoServicioCorte, guardada.ganadoMoldes]).toEqual([21630, 21630, 0]);
+    expect(guardadas.map((l) => [l.cuenta, l.totalGanado])).toEqual([['servicio_corte', 21630]]);
 
     const r = (await request(app).get(`/api/v1/rendicion/${ids.TRAZ}?anio=2031&mes=3`)).body.data;
     expect(r.cerrado).toBe(true);
-    expect(r.desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 21630, moldes: 0 });
+    expect(r.cuentas).toEqual([
+      {
+        cuenta: 'servicio_corte',
+        saldoEntrada: 0,
+        ganado: 21630,
+        anticipos: 0,
+        saldoPeriodo: 21630,
+        pagado: 21630,
+        saldoSalida: 0,
+      },
+    ]);
 
     // mes liquidado: ya no se puede tocar un trabajo de ese mes
     const corte = await prisma.trabajoCorte.findFirstOrThrow({ where: { operarioId: ids.TRAZ } });

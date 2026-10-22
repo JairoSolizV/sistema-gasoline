@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { formatBs, type AnticipoDTO } from '@taller/shared';
+import { CUENTAS, ETIQUETA_CUENTA, formatBs, type AnticipoDTO } from '@taller/shared';
 import { useAnticipos } from '../../api/anticipos';
 import { useOperarios } from '../../api/operarios';
 import { claveSemana, etiquetaSemana } from '../../lib/semana';
@@ -38,7 +38,6 @@ export function AnticiposPage() {
     return [...mapa.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [anticipos]);
 
-  const totalMostrado = anticipos?.reduce((a, x) => a + x.monto, 0) ?? 0;
 
   return (
     <div className="p-8">
@@ -73,8 +72,7 @@ export function AnticiposPage() {
         </select>
         {anticipos && (
           <span className="text-sm text-gray-500">
-            {anticipos.length} anticipos · total{' '}
-            <span className="mono font-semibold text-gray-800">Bs {formatBs(totalMostrado)}</span>
+            {anticipos.length} anticipos · <SubtotalesCuenta anticipos={anticipos} />
           </span>
         )}
       </div>
@@ -97,14 +95,12 @@ export function AnticiposPage() {
         )}
 
         {semanas.map(([clave, lista]) => {
-          const totalSemana = lista.reduce((a, x) => a + x.monto, 0);
           return (
             <div key={clave} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-5 py-2.5">
                 <span className="text-sm font-semibold">Semana {etiquetaSemana(clave)}</span>
                 <span className="text-xs text-gray-500">
-                  {lista.length} anticipos · Σ{' '}
-                  <span className="mono font-semibold text-gray-700">Bs {formatBs(totalSemana)}</span>
+                  {lista.length} anticipos · <SubtotalesCuenta anticipos={lista} />
                 </span>
               </div>
               <table className="w-full text-sm">
@@ -113,6 +109,11 @@ export function AnticiposPage() {
                     <tr key={a.id} className="border-b border-gray-100 last:border-0">
                       <td className="px-5 py-2.5 text-gray-500 capitalize">{formatearFecha(a.fecha)}</td>
                       <td className="px-3 py-2.5 font-medium">{a.operarioNombre}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-600">
+                          {ETIQUETA_CUENTA[a.cuenta]}
+                        </span>
+                      </td>
                       <td className="px-3 py-2.5 text-gray-500">{a.nota ?? ''}</td>
                       <td className="mono px-3 py-2.5 text-right font-semibold">Bs {formatBs(a.monto)}</td>
                       <td className="px-5 py-2.5">
@@ -188,5 +189,25 @@ export function AnticiposPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** Total de anticipos por cuenta: las cuentas se pagan aparte y no se suman
+ *  entre sí (docs/PLAN_CUENTAS_SEPARADAS.md). */
+function SubtotalesCuenta({ anticipos }: { anticipos: AnticipoDTO[] }) {
+  const porCuenta = CUENTAS.map((c) => ({
+    cuenta: c,
+    total: anticipos.filter((x) => x.cuenta === c).reduce((a, x) => a + x.monto, 0),
+  })).filter((x) => x.total > 0);
+  return (
+    <>
+      {porCuenta.map((x, i) => (
+        <span key={x.cuenta}>
+          {i > 0 && ' · '}
+          {ETIQUETA_CUENTA[x.cuenta]}{' '}
+          <span className="mono font-semibold text-gray-700">Bs {formatBs(x.total)}</span>
+        </span>
+      ))}
+    </>
   );
 }

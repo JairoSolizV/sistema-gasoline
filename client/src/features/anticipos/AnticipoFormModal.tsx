@@ -1,8 +1,12 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import {
   aCentavos,
+  CUENTAS,
+  ETIQUETA_CUENTA,
   formatBs,
   type AnticipoDTO,
+  type Cuenta,
   type OperarioDTO,
 } from '@taller/shared';
 import { Modal } from '../../components/Modal';
@@ -14,6 +18,7 @@ const PATRON_BS = /^\d+(\.\d{1,2})?$/;
 
 interface FormValores {
   operarioId: string;
+  cuenta: Cuenta;
   fecha: string; // yyyy-mm-dd
   montoBs: string;
   nota: string;
@@ -37,22 +42,35 @@ export function AnticipoFormModal({
     register,
     handleSubmit,
     watch,
-    formState: { errors, isSubmitting },
+    setValue,
+    formState: { errors, isSubmitting, dirtyFields },
   } = useForm<FormValores>({
     defaultValues: anticipo
       ? {
           operarioId: anticipo.operarioId,
+          cuenta: anticipo.cuenta,
           fecha: anticipo.fecha.slice(0, 10),
           montoBs: formatBs(anticipo.monto).replace(/ /g, ''),
           nota: anticipo.nota ?? '',
         }
       : {
           operarioId: '',
+          cuenta: 'operaciones',
           fecha: hoyLocalISO(),
           montoBs: '',
           nota: '',
         },
   });
+
+  // Alta: al elegir el operario se propone la cuenta según su rol, mientras el
+  // dueño no la haya elegido a mano (PLAN_CUENTAS_SEPARADAS §6).
+  const operarioId = watch('operarioId');
+  const cuentaTocada = dirtyFields.cuenta === true;
+  useEffect(() => {
+    if (anticipo || cuentaTocada) return;
+    const o = operarios.find((x) => x.id === operarioId);
+    if (o) setValue('cuenta', cuentaSugerida(o));
+  }, [anticipo, cuentaTocada, operarioId, operarios, setValue]);
 
   const montoBs = watch('montoBs');
   const mutacion = anticipo ? editar : crear;
@@ -63,11 +81,17 @@ export function AnticipoFormModal({
     if (anticipo) {
       await editar.mutateAsync({
         id: anticipo.id,
-        cambios: { fecha: new Date(`${v.fecha}T12:00:00`), monto: aCentavos(v.montoBs), nota: v.nota },
+        cambios: {
+          cuenta: v.cuenta,
+          fecha: new Date(`${v.fecha}T12:00:00`),
+          monto: aCentavos(v.montoBs),
+          nota: v.nota,
+        },
       });
     } else {
       await crear.mutateAsync({
         operarioId: v.operarioId,
+        cuenta: v.cuenta,
         fecha: new Date(`${v.fecha}T12:00:00`),
         monto: aCentavos(v.montoBs),
         nota: v.nota,
@@ -101,6 +125,19 @@ export function AnticipoFormModal({
             )}
           </div>
         )}
+        <div>
+          <label className="mb-1 block text-sm font-medium">Cuenta</label>
+          <select {...register('cuenta')} className={claseInput}>
+            {CUENTAS.map((c) => (
+              <option key={c} value={c}>
+                {ETIQUETA_CUENTA[c]}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Solo se descuenta del saldo de esta cuenta; las demás cuentas no se tocan.
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium">Fecha</label>
@@ -159,4 +196,15 @@ export function AnticipoFormModal({
       </form>
     </Modal>
   );
+}
+
+/** Cuenta más probable para el anticipo según los roles del operario. */
+function cuentaSugerida(o: OperarioDTO): Cuenta {
+  if (o.roles.includes('ayudante')) return 'sueldo';
+  if (o.roles.includes('costurero')) return 'operaciones';
+  if (o.roles.some((r) => ['cortador', 'doblador', 'trazador', 'clasificador', 'buscador'].includes(r))) {
+    return 'servicio_corte';
+  }
+  if (o.roles.includes('moldista')) return 'moldes';
+  return 'operaciones';
 }

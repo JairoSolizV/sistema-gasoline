@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { saldoDe } from './helpers/cuentas.js';
 import { datosCorte } from './helpers/corte.js';
 import { datosOperario } from './helpers/operario.js';
 
@@ -94,9 +95,8 @@ describe('CA-7.1 — vista filtrada por operario', () => {
     expect(corte.operaciones[0].total).toBe(1500); // 100 × 15
     expect(corte.totalCorte).toBe(1500);
 
-    expect(r.totalGanado).toBe(1500);
-    expect(r.totalAnticipos).toBe(3000);
-    expect(r.saldoPeriodo).toBe(-1500); // 0 + 1500 − 3000
+    expect(saldoDe(r)).toMatchObject({ ganado: 1500, anticipos: 3000, saldoPeriodo: -1500 }); // 0 + 1500 − 3000
+    expect(r.cuentas).toHaveLength(1); // solo Operaciones: las demás cuentas no se mezclan
     expect(r.anticipos).toHaveLength(1);
     expect(r.anticipos[0].monto).toBe(3000);
   });
@@ -116,7 +116,7 @@ describe('CA-7.2 — sin fuga en el payload', () => {
     expect(payload).not.toContain(NOMBRE_CLARIS);
     expect(payload).not.toContain(clarisId);
     // RUBEN sí ve lo suyo: op2 (ensamble), 100 × 20 = 2000
-    expect(res.body.data.totalGanado).toBe(2000);
+    expect(saldoDe(res.body.data).ganado).toBe(2000);
     expect(res.body.data.cortes[0].operaciones[0].proceso).toBe('ensamble');
   });
 });
@@ -127,7 +127,7 @@ describe('casos borde', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.cortes).toHaveLength(0);
     expect(res.body.data.anticipos).toHaveLength(0);
-    expect(res.body.data.saldoPeriodo).toBe(0);
+    expect(res.body.data.cuentas).toEqual([]); // sin saldo en ninguna cuenta
   });
 
   test('operario inexistente responde 404', async () => {

@@ -91,7 +91,7 @@ export const rendicionRepository = {
     return prisma.anticipo.findMany({
       where: { operarioId, fecha: { gte: inicio, lt: fin } },
       orderBy: { fecha: 'asc' },
-      select: { fecha: true, monto: true, nota: true },
+      select: { fecha: true, monto: true, nota: true, cuenta: true },
     });
   },
 };

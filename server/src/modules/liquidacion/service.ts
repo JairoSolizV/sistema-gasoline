@@ -1,48 +1,33 @@
-// Consolidado y cierre de mes. Invariantes 5 y 6 (CLAUDE.md §6):
-//  - ganado = sueldo + costura + empaque + servicio de corte + moldes. Costura
-//    y empaque salen SOLO de cortes cerrados agrupados por fechaCierre; el
-//    servicio de corte y los moldes, por la fecha del trabajo
-//    (docs/PLAN_SERVICIO_CORTE.md §2.5); el sueldo de los ayudantes, por la
-//    fecha de asistencia (docs/PLAN_AYUDANTES.md §7);
-//  - saldo = entrada + ganado − anticipos; el saldoSalida persistido es la ÚNICA
-//    fuente del saldoEntrada del mes siguiente (arrastre auditable, negativo incluido).
+// Consolidado y cierre de mes POR CUENTA (docs/PLAN_CUENTAS_SEPARADAS.md).
+// Invariantes 5 y 6 (CLAUDE.md §6):
+//  - cada cuenta gana con su regla: operaciones (costura) y empaque, SOLO de
+//    cortes cerrados agrupados por fechaCierre; servicio de corte y moldes, por
+//    la fecha del trabajo (docs/PLAN_SERVICIO_CORTE.md §2.5); sueldo de
+//    ayudantes, por la fecha de asistencia (docs/PLAN_AYUDANTES.md §7);
+//  - saldo(operario, cuenta) = entrada + ganado − anticipos DE ESA CUENTA; el
+//    saldoSalida persistido es la ÚNICA fuente del saldoEntrada del mes
+//    siguiente en la misma cuenta (arrastre auditable, negativo incluido).
+//  Las cuentas nunca se suman ni se compensan entre sí.
 import type { Operario } from '@prisma/client';
-import type {
-  CerrarMesInput,
-  ConsolidadoDTO,
-  GanadoDesgloseDTO,
-  LiquidacionFilaDTO,
-  SemanaConsolidadoDTO,
+import {
+  CUENTAS,
+  type CerrarMesInput,
+  type ConsolidadoDTO,
+  type Cuenta,
+  type CuentaConsolidadoDTO,
+  type LiquidacionFilaDTO,
+  type SemanaConsolidadoDTO,
 } from '@taller/shared';
 import { calcularCierreMes, calcularSaldo, semanasDelMes } from '../../domain/saldo.js';
 import { AppError } from '../../middleware/errors.js';
 import { asistenciaFaltante, sueldosDelMes } from '../asistencia/sueldoMes.js';
-import { liquidacionRepository, mesAnteriorA } from './repository.js';
+import { claveSaldo, liquidacionRepository, mesAnteriorA } from './repository.js';
 
-interface DatosOperario {
-  operario: Operario;
-  saldoEntrada: number;
-  ganado: number;
-  desglose: GanadoDesgloseDTO;
-  anticipos: number;
-  saldoPeriodo: number;
-}
+/** Algo ganado en el mes, con la fecha que lo ubica en una semana. */
+type Movimiento = { operarioId: string; total: number; fecha: Date; corteId?: string };
+type MovimientosPorCuenta = Record<Cuenta, Movimiento[]>;
 
-/** Todo lo que se gana en el mes, con la fecha que lo ubica en una semana. */
-type Movimiento = { operarioId: string; total: number; fecha: Date };
-type MovimientoCorte = Movimiento & { corteId: string };
-
-interface MovimientosGanado {
-  sueldo: Movimiento[]; // un movimiento por día de asistencia (Σ = sueldo del mes)
-  costura: MovimientoCorte[];
-  empaque: MovimientoCorte[];
-  servicioCorte: Movimiento[];
-  moldes: Movimiento[];
-}
-
-const TIPOS = ['sueldo', 'costura', 'empaque', 'servicioCorte', 'moldes'] as const;
-
-async function movimientosGanado(anio: number, mes: number): Promise<MovimientosGanado> {
+async function movimientosDelMes(anio: number, mes: number): Promise<MovimientosPorCuenta> {
   const [asignaciones, trabajos, moldes, sueldos] = await Promise.all([
     liquidacionRepository.asignacionesGanadoDelMes(anio, mes),
     liquidacionRepository.trabajosCorteDelMes(anio, mes),
@@ -57,102 +42,74 @@ async function movimientosGanado(anio: number, mes: number): Promise<Movimientos
     corteId: a.corteOperacion.corteId,
   }));
   return {
+    operaciones: deCortes.filter((m) => !m.esEmpaque),
+    empaque: deCortes.filter((m) => m.esEmpaque),
+    servicio_corte: trabajos,
+    moldes: moldes.map((m) => ({ operarioId: m.operarioId, total: m.monto, fecha: m.fecha })),
     sueldo: [...sueldos.values()]
       .flat()
       .map((d) => ({ operarioId: d.operarioId, total: d.monto, fecha: d.fecha })),
-    costura: deCortes.filter((m) => !m.esEmpaque),
-    empaque: deCortes.filter((m) => m.esEmpaque),
-    servicioCorte: trabajos,
-    moldes: moldes.map((m) => ({ operarioId: m.operarioId, total: m.monto, fecha: m.fecha })),
+    lavanderia: [], // rebanada 4 (envíos a proveedores externos)
+    bordado: [],
   };
 }
 
-const desgloseVacio = (): GanadoDesgloseDTO => ({
-  sueldo: 0,
-  costura: 0,
-  empaque: 0,
-  servicioCorte: 0,
-  moldes: 0,
-});
-const totalDesglose = (d: GanadoDesgloseDTO) => TIPOS.reduce((acc, tipo) => acc + d[tipo], 0);
-
-/** Desglose de un mes ya cerrado, desde lo persistido en Liquidacion: la
- *  costura es lo que queda del total. */
-export function desglosePersistido(l: {
-  totalGanado: number;
-  ganadoSueldo: number;
-  ganadoEmpaque: number;
-  ganadoServicioCorte: number;
-  ganadoMoldes: number;
-}): GanadoDesgloseDTO {
-  return {
-    sueldo: l.ganadoSueldo,
-    costura:
-      l.totalGanado - l.ganadoSueldo - l.ganadoEmpaque - l.ganadoServicioCorte - l.ganadoMoldes,
-    empaque: l.ganadoEmpaque,
-    servicioCorte: l.ganadoServicioCorte,
-    moldes: l.ganadoMoldes,
-  };
+/** Un operario en una cuenta, calculado en vivo. */
+interface FilaCalculada {
+  operario: Operario;
+  cuenta: Cuenta;
+  saldoEntrada: number;
+  ganado: number;
+  anticipos: number;
+  saldoPeriodo: number;
 }
 
-/** Suma por tipo los movimientos que cumplan el filtro (por operario o semana). */
-function desglosar(
-  mov: MovimientosGanado,
-  incluir: (m: { operarioId: string; fecha: Date }) => boolean,
-): GanadoDesgloseDTO {
-  const d = desgloseVacio();
-  for (const tipo of TIPOS) {
-    for (const m of mov[tipo]) if (incluir(m)) d[tipo] += m.total;
-  }
-  return d;
-}
-
-/** Reúne, por operario, saldoEntrada + ganado + anticipos + saldoPeriodo del mes.
- *  Incluye a todo operario activo y a cualquiera con movimiento o arrastre ≠ 0. */
-async function reunirDatos(anio: number, mes: number): Promise<DatosOperario[]> {
+/** Saldo por operario y cuenta del mes. Solo entran las combinaciones con
+ *  algo: ganado, anticipos o arrastre ≠ 0 (cada cuenta muestra a los suyos). */
+async function reunirDatos(anio: number, mes: number) {
   const [operarios, mov, anticipos, saldosEntrada] = await Promise.all([
     liquidacionRepository.operariosTodos(),
-    movimientosGanado(anio, mes),
+    movimientosDelMes(anio, mes),
     liquidacionRepository.anticiposDelMes(anio, mes),
     liquidacionRepository.saldosEntradaDesde(anio, mes),
   ]);
 
-  const anticiposPorOp = new Map<string, number>();
-  for (const a of anticipos) {
-    anticiposPorOp.set(a.operarioId, (anticiposPorOp.get(a.operarioId) ?? 0) + a.monto);
+  const sumar = (mapa: Map<string, number>, clave: string, monto: number) =>
+    mapa.set(clave, (mapa.get(clave) ?? 0) + monto);
+  const anticiposPor = new Map<string, number>();
+  for (const a of anticipos) sumar(anticiposPor, claveSaldo(a.operarioId, a.cuenta), a.monto);
+  const ganadoPor = new Map<string, number>();
+  for (const cuenta of CUENTAS) {
+    for (const m of mov[cuenta]) sumar(ganadoPor, claveSaldo(m.operarioId, cuenta), m.total);
   }
 
-  const datos: DatosOperario[] = [];
-  for (const operario of operarios) {
-    const saldoEntrada = saldosEntrada.get(operario.id) ?? 0;
-    const desglose = desglosar(mov, (m) => m.operarioId === operario.id);
-    const ganado = totalDesglose(desglose);
-    const antic = anticiposPorOp.get(operario.id) ?? 0;
-    const conMovimiento = ganado !== 0 || antic !== 0 || saldoEntrada !== 0;
-    if (!operario.activo && !conMovimiento) continue; // inactivo sin nada que mostrar
-    datos.push({
-      operario,
-      saldoEntrada,
-      ganado,
-      desglose,
-      anticipos: antic,
-      saldoPeriodo: calcularSaldo(saldoEntrada, ganado, antic),
-    });
+  const filas: FilaCalculada[] = [];
+  for (const cuenta of CUENTAS) {
+    for (const operario of operarios) {
+      const clave = claveSaldo(operario.id, cuenta);
+      const saldoEntrada = saldosEntrada.get(clave) ?? 0;
+      const ganado = ganadoPor.get(clave) ?? 0;
+      const antic = anticiposPor.get(clave) ?? 0;
+      if (saldoEntrada === 0 && ganado === 0 && antic === 0) continue;
+      filas.push({
+        operario,
+        cuenta,
+        saldoEntrada,
+        ganado,
+        anticipos: antic,
+        saldoPeriodo: calcularSaldo(saldoEntrada, ganado, antic),
+      });
+    }
   }
-  return datos;
+  return { filas, mov };
 }
 
-function semanasConGanado(anio: number, mes: number, mov: MovimientosGanado): SemanaConsolidadoDTO[] {
-  const semanas = semanasDelMes(anio, mes);
-  return semanas.map((s) => {
-    const enSemana = (f: Date) =>
-      f.getTime() >= s.inicio.getTime() && f.getTime() < s.finExclusivo.getTime();
-    const desglose = desglosar(mov, (m) => enSemana(m.fecha));
-    const ganado = totalDesglose(desglose);
-    // "cortes cerrados" cuenta los cierres de la semana (costura o empaque)
-    const cortes = new Set(
-      [...mov.costura, ...mov.empaque].filter((m) => enSemana(m.fecha)).map((m) => m.corteId),
+function semanasDeCuenta(anio: number, mes: number, movs: Movimiento[]): SemanaConsolidadoDTO[] {
+  return semanasDelMes(anio, mes).map((s) => {
+    const enSemana = movs.filter(
+      (m) => m.fecha.getTime() >= s.inicio.getTime() && m.fecha.getTime() < s.finExclusivo.getTime(),
     );
+    const cortes = new Set(enSemana.flatMap((m) => (m.corteId ? [m.corteId] : [])));
     const sabado = new Date(s.inicio);
     sabado.setUTCDate(sabado.getUTCDate() + 5);
     const dia = (d: Date) => String(d.getUTCDate()).padStart(2, '0');
@@ -162,73 +119,79 @@ function semanasConGanado(anio: number, mes: number, mov: MovimientosGanado): Se
       finISO: sabado.toISOString(),
       label,
       cortesCerrados: cortes.size,
-      ganado,
-      desglose,
+      ganado: enSemana.reduce((acc, m) => acc + m.total, 0),
     };
   });
+}
+
+const porSaldo = (a: LiquidacionFilaDTO, b: LiquidacionFilaDTO) => b.saldoPeriodo - a.saldoPeriodo;
+
+function datosOperario(o: Operario) {
+  return {
+    operarioId: o.id,
+    nombre: o.nombre,
+    activo: o.activo,
+    esMaestro: o.tipo === 'maestro_externo',
+  };
 }
 
 export const liquidacionService = {
   async consolidado(anio: number, mes: number): Promise<ConsolidadoDTO> {
     const periodo = await liquidacionRepository.periodo(anio, mes);
-    const semanas = semanasConGanado(anio, mes, await movimientosGanado(anio, mes));
+    const cerrado = periodo?.estado === 'cerrado';
 
-    // Mes CERRADO: se muestran los valores persistidos en Liquidacion.
-    if (periodo && periodo.estado === 'cerrado') {
-      const filas: LiquidacionFilaDTO[] = periodo.liquidaciones
-        .map((l) => ({
-          operarioId: l.operarioId,
-          nombre: l.operario.nombre,
-          activo: l.operario.activo,
-          esMaestro: l.operario.tipo === 'maestro_externo',
-          saldoEntrada: l.saldoEntrada,
-          ganado: l.totalGanado,
-          desglose: desglosePersistido(l),
-          anticipos: l.totalAnticipos,
-          saldoPeriodo: l.saldoPeriodo,
-          pagado: l.pagado,
-          arrastraSaldo: l.arrastraSaldo,
-          saldoSalida: l.saldoSalida,
-        }))
-        .sort((a, b) => b.saldoPeriodo - a.saldoPeriodo);
-      return {
-        anio,
-        mes,
-        cerrado: true,
-        fechaCierre: periodo.fechaCierre ? periodo.fechaCierre.toISOString() : null,
-        semanas,
-        filas,
-        totales: sumarTotales(filas, true),
-      };
-    }
-
-    // Mes ABIERTO: consolidado calculado en vivo.
-    const datos = await reunirDatos(anio, mes);
-    const filas: LiquidacionFilaDTO[] = datos
-      .map((d) => ({
-        operarioId: d.operario.id,
-        nombre: d.operario.nombre,
-        activo: d.operario.activo,
-        esMaestro: d.operario.tipo === 'maestro_externo',
+    let filas: (LiquidacionFilaDTO & { cuenta: Cuenta })[];
+    let mov: MovimientosPorCuenta;
+    if (periodo && cerrado) {
+      // Mes CERRADO: mandan los valores persistidos en Liquidacion.
+      mov = await movimientosDelMes(anio, mes);
+      filas = periodo.liquidaciones.map((l) => ({
+        cuenta: l.cuenta,
+        ...datosOperario(l.operario),
+        saldoEntrada: l.saldoEntrada,
+        ganado: l.totalGanado,
+        anticipos: l.totalAnticipos,
+        saldoPeriodo: l.saldoPeriodo,
+        pagado: l.pagado,
+        arrastraSaldo: l.arrastraSaldo,
+        saldoSalida: l.saldoSalida,
+      }));
+    } else {
+      // Mes ABIERTO: calculado en vivo.
+      const datos = await reunirDatos(anio, mes);
+      mov = datos.mov;
+      filas = datos.filas.map((d) => ({
+        cuenta: d.cuenta,
+        ...datosOperario(d.operario),
         saldoEntrada: d.saldoEntrada,
         ganado: d.ganado,
-        desglose: d.desglose,
         anticipos: d.anticipos,
         saldoPeriodo: d.saldoPeriodo,
         pagado: null,
         arrastraSaldo: false,
         saldoSalida: null,
-      }))
-      .sort((a, b) => b.saldoPeriodo - a.saldoPeriodo);
+      }));
+    }
+
+    const cuentas: CuentaConsolidadoDTO[] = CUENTAS.map((cuenta) => {
+      const deCuenta = filas
+        .filter((f) => f.cuenta === cuenta)
+        .map(({ cuenta: _c, ...fila }) => fila)
+        .sort(porSaldo);
+      return {
+        cuenta,
+        semanas: semanasDeCuenta(anio, mes, mov[cuenta]),
+        filas: deCuenta,
+        totales: sumarTotales(deCuenta, cerrado),
+      };
+    });
 
     return {
       anio,
       mes,
-      cerrado: false,
-      fechaCierre: null,
-      semanas,
-      filas,
-      totales: sumarTotales(filas, false),
+      cerrado,
+      fechaCierre: periodo?.fechaCierre ? periodo.fechaCierre.toISOString() : null,
+      cuentas,
     };
   },
 
@@ -275,11 +238,14 @@ export const liquidacionService = {
       );
     }
 
-    const datos = await reunirDatos(anio, mes);
-    const excepciones = new Map(input.excepciones.map((e) => [e.operarioId, e]));
-
-    const liquidaciones = datos.map((d) => {
-      const exc = excepciones.get(d.operario.id);
+    // Un solo cierre para todas las cuentas; cada (operario, cuenta) con su
+    // propia excepción de pago y arrastre (PLAN_CUENTAS_SEPARADAS §2.3).
+    const { filas } = await reunirDatos(anio, mes);
+    const excepciones = new Map(
+      input.excepciones.map((e) => [claveSaldo(e.operarioId, e.cuenta), e]),
+    );
+    const liquidaciones = filas.map((d) => {
+      const exc = excepciones.get(claveSaldo(d.operario.id, d.cuenta));
       const { pagado, saldoSalida } = calcularCierreMes(
         d.saldoPeriodo,
         exc?.arrastraSaldo ?? false,
@@ -287,12 +253,9 @@ export const liquidacionService = {
       );
       return {
         operarioId: d.operario.id,
+        cuenta: d.cuenta,
         saldoEntrada: d.saldoEntrada,
         totalGanado: d.ganado,
-        ganadoServicioCorte: d.desglose.servicioCorte,
-        ganadoMoldes: d.desglose.moldes,
-        ganadoEmpaque: d.desglose.empaque,
-        ganadoSueldo: d.desglose.sueldo,
         totalAnticipos: d.anticipos,
         saldoPeriodo: d.saldoPeriodo,
         pagado,
@@ -318,14 +281,9 @@ function sumarTotales(filas: LiquidacionFilaDTO[], cerrado: boolean) {
     }),
     { saldoEntrada: 0, ganado: 0, anticipos: 0, saldoPeriodo: 0, pagado: 0, saldoSalida: 0 },
   );
-  const desglose = desgloseVacio();
-  for (const f of filas) {
-    for (const tipo of TIPOS) desglose[tipo] += f.desglose[tipo];
-  }
   return {
     saldoEntrada: t.saldoEntrada,
     ganado: t.ganado,
-    desglose,
     anticipos: t.anticipos,
     saldoPeriodo: t.saldoPeriodo,
     pagado: cerrado ? t.pagado : null,

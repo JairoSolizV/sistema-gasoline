@@ -4,7 +4,7 @@
 
 import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
 import type { EstadoAsistencia } from '../sueldo.js';
-import type { GanadoDesgloseDTO } from './liquidacion.js';
+import type { Cuenta } from '../cuentas.js';
 import type { TipoMolde } from './modelo.js';
 
 export interface RendicionOperacionDTO {
@@ -78,9 +78,21 @@ export interface RendicionSueldoDTO {
 }
 
 export interface RendicionAnticipoDTO {
+  cuenta: Cuenta; // de qué cuenta se descontó
   fecha: string;
   monto: number; // centavos
   nota: string | null;
+}
+
+/** El saldo de UNA cuenta del operario en el mes (PLAN_CUENTAS_SEPARADAS §3). */
+export interface RendicionCuentaDTO {
+  cuenta: Cuenta;
+  saldoEntrada: number; // centavos (puede ser negativo)
+  ganado: number; // centavos
+  anticipos: number; // centavos
+  saldoPeriodo: number; // = saldoEntrada + ganado − anticipos
+  pagado: number | null; // solo si el mes está cerrado
+  saldoSalida: number | null; // solo si el mes está cerrado
 }
 
 export interface RendicionDTO {
@@ -91,13 +103,7 @@ export interface RendicionDTO {
   anio: number;
   mes: number;
   cerrado: boolean;
-  saldoEntrada: number; // centavos (puede ser negativo)
-  totalGanado: number; // centavos = suma del desglose
-  desglose: GanadoDesgloseDTO;
-  totalAnticipos: number; // centavos
-  saldoPeriodo: number; // = saldoEntrada + totalGanado − totalAnticipos
-  pagado: number | null; // solo si el mes está cerrado
-  saldoSalida: number | null; // solo si el mes está cerrado
+  cuentas: RendicionCuentaDTO[]; // solo las cuentas con movimiento o saldo; nunca se suman entre sí
   sueldo: RendicionSueldoDTO | null; // solo si tuvo asistencia en el mes (ayudantes)
   cortes: RendicionCorteDTO[]; // costura (sin las operaciones de empaque)
   empaque: RendicionCorteDTO[]; // solo operaciones de empaque

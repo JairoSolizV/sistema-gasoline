@@ -7,6 +7,7 @@ import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
 import { datosCorte } from './helpers/corte.js';
 import { datosOperario } from './helpers/operario.js';
+import { filaDe } from './helpers/cuentas.js';
 
 const app = crearApp();
 
@@ -86,7 +87,7 @@ describe('GET /api/v1/liquidacion — consolidado en vivo', () => {
 
     const res = await request(app).get('/api/v1/liquidacion?anio=2099&mes=3');
     expect(res.status).toBe(200);
-    const fila = res.body.data.filas.find((f: { operarioId: string }) => f.operarioId === rubenT);
+    const fila = filaDe(res.body.data, rubenT);
     expect(fila.ganado).toBe(171120); // CA-5.1
     expect(fila.saldoPeriodo).toBe(171120); // sin anticipos ni entrada
     expect(res.body.data.cerrado).toBe(false);
@@ -98,7 +99,7 @@ describe('GET /api/v1/liquidacion — consolidado en vivo', () => {
     await anticipo(chemaT, 50000, '2099-04-18T12:00:00.000Z');
 
     const res = await request(app).get('/api/v1/liquidacion?anio=2099&mes=4');
-    const fila = res.body.data.filas.find((f: { operarioId: string }) => f.operarioId === chemaT);
+    const fila = filaDe(res.body.data, chemaT);
     expect(fila.ganado).toBe(24360);
     expect(fila.anticipos).toBe(50000);
     expect(fila.saldoPeriodo).toBe(-25640); // CA-5.3
@@ -116,9 +117,9 @@ describe('GET /api/v1/liquidacion — consolidado en vivo', () => {
       .send({ asignaciones: [{ operarioId: opT, cantidad: 99999 }] });
 
     const res = await request(app).get('/api/v1/liquidacion?anio=2099&mes=5');
-    const fila = res.body.data.filas.find((f: { operarioId: string }) => f.operarioId === opT);
-    // aparece (es activo) pero con ganado 0
-    expect(fila.ganado).toBe(0);
+    const fila = filaDe(res.body.data, opT);
+    // sin ganado, anticipos ni arrastre no tiene fila en Operaciones (PLAN_CUENTAS_SEPARADAS §6)
+    expect(fila).toBeUndefined();
   });
 });
 
@@ -133,18 +134,14 @@ describe('POST /api/v1/liquidacion/cerrar-mes', () => {
       .send({ anio: 2099, mes: 6, excepciones: [] });
     expect(cierre.status).toBe(200);
     expect(cierre.body.data.cerrado).toBe(true);
-    const filaCierre = cierre.body.data.filas.find(
-      (f: { operarioId: string }) => f.operarioId === chemaT,
-    );
+    const filaCierre = filaDe(cierre.body.data, chemaT);
     expect(filaCierre.saldoPeriodo).toBe(-25640);
     expect(filaCierre.pagado).toBe(0);
     expect(filaCierre.saldoSalida).toBe(-25640);
 
     // el mes siguiente (julio) arranca con saldoEntrada −25640 para CHEMA
     const julio = await request(app).get('/api/v1/liquidacion?anio=2099&mes=7');
-    const filaJulio = julio.body.data.filas.find(
-      (f: { operarioId: string }) => f.operarioId === chemaT,
-    );
+    const filaJulio = filaDe(julio.body.data, chemaT);
     expect(filaJulio.saldoEntrada).toBe(-25640); // CA-5.4
   });
 
@@ -164,19 +161,19 @@ describe('POST /api/v1/liquidacion/cerrar-mes', () => {
       });
     expect(cierre.status).toBe(200);
 
-    const normal = cierre.body.data.filas.find((f: { operarioId: string }) => f.operarioId === normalT);
+    const normal = filaDe(cierre.body.data, normalT);
     expect(normal.pagado).toBe(80000); // CA-6.1
     expect(normal.saldoSalida).toBe(0);
 
-    const teo = cierre.body.data.filas.find((f: { operarioId: string }) => f.operarioId === teoT);
+    const teo = filaDe(cierre.body.data, teoT);
     expect(teo.pagado).toBe(50000); // CA-6.2
     expect(teo.saldoSalida).toBe(30000);
 
     // CA-6.3: septiembre arranca en 0 para el operario normal; TEO con 30000
     const sep = await request(app).get('/api/v1/liquidacion?anio=2099&mes=9');
-    const normalSep = sep.body.data.filas.find((f: { operarioId: string }) => f.operarioId === normalT);
-    expect(normalSep.saldoEntrada).toBe(0); // CA-6.3
-    const teoSep = sep.body.data.filas.find((f: { operarioId: string }) => f.operarioId === teoT);
+    const normalSep = filaDe(sep.body.data, normalT);
+    expect(normalSep?.saldoEntrada ?? 0).toBe(0); // CA-6.3 (sin arrastre ni movimiento: sin fila)
+    const teoSep = filaDe(sep.body.data, teoT);
     expect(teoSep.saldoEntrada).toBe(30000);
   });
 

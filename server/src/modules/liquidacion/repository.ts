@@ -1,12 +1,15 @@
 // Único acceso a Prisma del módulo. El cierre de mes es transaccional
 // (ARQUITECTURA §3.2): crea el Periodo y todas las Liquidacion de una sola vez.
-import type { Prisma } from '@prisma/client';
+import type { Cuenta, Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 
 /** Rango [inicio, fin) del mes en UTC — consistente con la comparación del dominio. */
 export function rangoMesUTC(anio: number, mes: number) {
   return { inicio: new Date(Date.UTC(anio, mes - 1, 1)), fin: new Date(Date.UTC(anio, mes, 1)) };
 }
+
+/** Clave del saldo de un operario en una cuenta (los saldos son por cuenta). */
+export const claveSaldo = (operarioId: string, cuenta: Cuenta) => `${operarioId}:${cuenta}`;
 
 /** ¿(anioA, mesA) es un mes anterior a (anioB, mesB)? */
 export function mesAnteriorA(anioA: number, mesA: number, anioB: number, mesB: number): boolean {
@@ -61,7 +64,7 @@ export const liquidacionRepository = {
     const { inicio, fin } = rangoMesUTC(anio, mes);
     return prisma.anticipo.findMany({
       where: { fecha: { gte: inicio, lt: fin } },
-      select: { operarioId: true, monto: true },
+      select: { operarioId: true, monto: true, cuenta: true },
     });
   },
 
@@ -73,8 +76,9 @@ export const liquidacionRepository = {
   },
 
   /** Liquidaciones del último Periodo cerrado ANTERIOR al mes → mapa
-   *  operarioId ⇒ saldoSalida (arrastre). Busca hacia atrás (no solo el mes
-   *  inmediato) para que el arrastre atraviese meses vacíos sin cerrar. */
+   *  claveSaldo(operarioId, cuenta) ⇒ saldoSalida (arrastre por cuenta). Busca
+   *  hacia atrás (no solo el mes inmediato) para que el arrastre atraviese
+   *  meses vacíos sin cerrar. */
   async saldosEntradaDesde(anio: number, mes: number): Promise<Map<string, number>> {
     const periodo = await prisma.periodo.findFirst({
       where: {
@@ -82,10 +86,14 @@ export const liquidacionRepository = {
         OR: [{ anio: { lt: anio } }, { anio, mes: { lt: mes } }],
       },
       orderBy: [{ anio: 'desc' }, { mes: 'desc' }],
-      include: { liquidaciones: { select: { operarioId: true, saldoSalida: true } } },
+      include: {
+        liquidaciones: { select: { operarioId: true, cuenta: true, saldoSalida: true } },
+      },
     });
     const mapa = new Map<string, number>();
-    for (const l of periodo?.liquidaciones ?? []) mapa.set(l.operarioId, l.saldoSalida);
+    for (const l of periodo?.liquidaciones ?? []) {
+      mapa.set(claveSaldo(l.operarioId, l.cuenta), l.saldoSalida);
+    }
     return mapa;
   },
 

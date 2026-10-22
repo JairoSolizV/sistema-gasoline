@@ -15,6 +15,7 @@ function aDTO(a: AnticipoConOperario): AnticipoDTO {
     id: a.id,
     operarioId: a.operarioId,
     operarioNombre: a.operario.nombre,
+    cuenta: a.cuenta,
     fecha: a.fecha.toISOString(),
     monto: a.monto,
     nota: a.nota,
@@ -52,6 +53,7 @@ export const anticiposService = {
 
     const anticipo = await anticiposRepository.crear({
       operarioId: input.operarioId,
+      cuenta: input.cuenta,
       fecha: input.fecha,
       monto: input.monto,
       nota: input.nota ?? null,
@@ -67,6 +69,7 @@ export const anticiposService = {
     if (input.fecha !== undefined) await exigirFechaSinLiquidar(input.fecha, 'mover un anticipo');
 
     const anticipo = await anticiposRepository.actualizar(id, {
+      ...(input.cuenta !== undefined ? { cuenta: input.cuenta } : {}),
       ...(input.fecha !== undefined ? { fecha: input.fecha } : {}),
       ...(input.monto !== undefined ? { monto: input.monto } : {}),
       ...(input.nota !== undefined ? { nota: input.nota } : {}),

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
+import { filaDe, saldoDe } from './helpers/cuentas.js';
 import { datosCorte } from './helpers/corte.js';
 import { datosOperario } from './helpers/operario.js';
 
@@ -98,7 +99,7 @@ describe('meses liquidados: integridad de fechas y orden de cierre', () => {
 
     // febrero queda vacío y sin cerrar; en marzo el arrastre NO debe perderse
     const marzo = await request(app).get('/api/v1/liquidacion?anio=2097&mes=3');
-    const fila = marzo.body.data.filas.find((f: { operarioId: string }) => f.operarioId === anaId);
+    const fila = filaDe(marzo.body.data, anaId);
     expect(fila.saldoEntrada).toBe(30000);
   });
 
@@ -192,7 +193,7 @@ describe('meses liquidados: integridad de fechas y orden de cierre', () => {
     const res = await request(app).get(`/api/v1/rendicion/${anaId}?anio=2097&mes=2`);
     expect(res.status).toBe(200);
     expect(res.body.data.cerrado).toBe(true);
-    expect(res.body.data.totalGanado).toBe(777777);
+    expect(saldoDe(res.body.data).ganado).toBe(777777);
   });
 });
 

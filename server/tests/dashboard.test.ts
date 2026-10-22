@@ -1,6 +1,7 @@
 // Rebanada 8 — dashboard: KPIs del mes, cortes activos y alertas.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
+import { CUENTAS, type DashboardCuentaDTO } from '@taller/shared';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
 import { datosCorte } from './helpers/corte.js';
@@ -56,6 +57,12 @@ describe('GET /api/v1/dashboard', () => {
     const d = res.body.data;
     expect(d.kpis.cortesActivos).toBeGreaterThanOrEqual(1);
     expect(d.cortesActivos.some((c: { id: string }) => c.id === corteAbiertoId)).toBe(true);
+    // una fila por cuenta, sin total general; las operaciones sin cuadrar cuentan en Operaciones
+    const cuentas = d.kpis.cuentas as DashboardCuentaDTO[];
+    expect(cuentas.map((c) => c.cuenta)).toEqual([...CUENTAS]);
+    expect(cuentas.find((c) => c.cuenta === 'operaciones')!.cortesActivos).toBeGreaterThanOrEqual(1);
+    expect(cuentas.find((c) => c.cuenta === 'sueldo')!.cortesActivos).toBeNull();
+    expect(d.kpis).not.toHaveProperty('totalAPagar');
     // el corte abierto tiene 2 operaciones sin asignar → alerta de error
     expect(d.alertas.some((a: { tipo: string; texto: string }) => a.tipo === 'error')).toBe(true);
   });
@@ -63,6 +70,6 @@ describe('GET /api/v1/dashboard', () => {
   test('sin anio/mes usa el mes en curso (no falla)', async () => {
     const res = await request(app).get('/api/v1/dashboard');
     expect(res.status).toBe(200);
-    expect(res.body.data.kpis).toHaveProperty('totalAPagar');
+    expect(res.body.data.kpis.cuentas).toHaveLength(CUENTAS.length);
   });
 });

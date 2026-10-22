@@ -1,6 +1,7 @@
 // Panorama del taller en el mes en curso. Reutiliza los servicios existentes:
 // no hay acceso a datos propio, solo composición (ARQUITECTURA §2).
-import type { DashboardAlertaDTO, DashboardDTO } from '@taller/shared';
+import type { Cuenta, DashboardAlertaDTO, DashboardDTO } from '@taller/shared';
+import { cortesRepository } from '../cortes/repository.js';
 import { cortesService } from '../cortes/service.js';
 import { liquidacionService } from '../liquidacion/service.js';
 import { anticiposRepository } from '../anticipos/repository.js';
@@ -9,21 +10,51 @@ import { rangoMesUTC } from '../liquidacion/repository.js';
 import { asistenciaFaltante } from '../asistencia/sueldoMes.js';
 import { hoyEnBolivia } from '../../lib/hoy.js';
 
+// procesos del servicio de corte que siempre se registran a mano (la búsqueda
+// se resuelve sola al registrar el corte)
+const PROCESOS_OBLIGATORIOS = ['trazado', 'doblado', 'corte', 'clasificacion'] as const;
+
 export const dashboardService = {
   async panorama(anio: number, mes: number): Promise<DashboardDTO> {
-    const [consolidado, abiertos, config] = await Promise.all([
+    const [consolidado, abiertos, pendientes, config] = await Promise.all([
       liquidacionService.consolidado(anio, mes),
       cortesService.listar({ estado: 'abierto' }),
+      cortesRepository.abiertosConPendientes(),
       configuracionRepository.obtener(),
     ]);
 
-    // KPIs del período (reusa los totales del consolidado)
+    // Cortes abiertos con trabajo pendiente de cada cuenta; null = no aplica
+    // (el sueldo y los moldes no dependen de un corte).
+    const sinCuadrar = (empaque: boolean) =>
+      pendientes.filter((c) =>
+        c.operaciones.some((o) => o.esEmpaque === empaque && o.estado !== 'asignada'),
+      ).length;
+    const cortesPorCuenta: Record<Cuenta, number | null> = {
+      operaciones: sinCuadrar(false),
+      empaque: sinCuadrar(true),
+      servicio_corte: pendientes.filter(
+        (c) =>
+          c.esInterno &&
+          PROCESOS_OBLIGATORIOS.some((p) => !c.trabajos.some((t) => t.proceso === p)),
+      ).length,
+      moldes: null,
+      sueldo: null,
+      lavanderia: 0, // rebanada 4: envíos sin devolver
+      bordado: 0,
+    };
+
+    // Una fila por cuenta (reusa los totales del consolidado); sin total
+    // general: las cuentas no se mezclan (PLAN_CUENTAS_SEPARADAS §6).
     const kpis = {
       anio,
       mes,
-      totalAPagar: consolidado.totales.ganado,
-      anticiposEntregados: consolidado.totales.anticipos,
-      saldoPendiente: consolidado.totales.saldoPeriodo,
+      cuentas: consolidado.cuentas.map((c) => ({
+        cuenta: c.cuenta,
+        totalAPagar: c.totales.ganado,
+        anticiposEntregados: c.totales.anticipos,
+        saldoPendiente: c.totales.saldoPeriodo,
+        cortesActivos: cortesPorCuenta[c.cuenta],
+      })),
       cortesActivos: abiertos.length,
     };
 
@@ -82,7 +113,7 @@ export const dashboardService = {
     const hoy = new Date();
     if (!consolidado.cerrado && hoy.getUTCFullYear() === anio && hoy.getUTCMonth() + 1 === mes) {
       const ultimoDia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
-      if (ultimoDia - hoy.getUTCDate() <= 3 && consolidado.filas.length > 0) {
+      if (ultimoDia - hoy.getUTCDate() <= 3 && consolidado.cuentas.some((c) => c.filas.length > 0)) {
         alertas.push({
           tipo: 'warn',
           texto: `Fin de mes cercano — la liquidación de este mes aún está pendiente.`,

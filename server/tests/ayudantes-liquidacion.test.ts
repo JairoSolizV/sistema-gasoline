@@ -1,15 +1,16 @@
 // Rebanada 4 de ayudantes (docs/PLAN_AYUDANTES.md §5-§7): el sueldo (por fecha
-// de asistencia) y el empaque (por fechaCierre, aparte de la costura) entran a
-// la liquidación y a la rendición; el cierre de mes exige la asistencia
-// completa. Usa marzo de 2032 (el 1.º es lunes) para no cruzarse con otros tests.
+// de asistencia) y el empaque (por fechaCierre) entran a la liquidación y a la
+// rendición, cada uno en su cuenta (PLAN_CUENTAS_SEPARADAS.md); el cierre de mes
+// exige la asistencia completa. Usa marzo de 2032 (el 1.º es lunes) para no cruzarse con otros tests.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
-import type { ConsolidadoDTO, LiquidacionFilaDTO, RendicionDTO } from '@taller/shared';
+import type { ConsolidadoDTO, Cuenta, RendicionDTO } from '@taller/shared';
 import { crearApp } from '../src/app.js';
 import { asistenciaFaltante } from '../src/modules/asistencia/sueldoMes.js';
 import { prisma } from './helpers/db.js';
 import { datosCorte } from './helpers/corte.js';
 import { datosOperario } from './helpers/operario.js';
+import { cuentaDe, filaDe, saldoDe } from './helpers/cuentas.js';
 
 const app = crearApp();
 const ids: Record<string, string> = {};
@@ -50,8 +51,7 @@ async function limpiar() {
 
 const consolidado = async () =>
   (await request(app).get('/api/v1/liquidacion?anio=2032&mes=3')).body.data as ConsolidadoDTO;
-const fila = (c: ConsolidadoDTO, clave: string) =>
-  c.filas.find((x) => x.operarioId === ids[clave]) as LiquidacionFilaDTO;
+const fila = (c: ConsolidadoDTO, clave: string, cuenta: Cuenta) => filaDe(c, ids[clave], cuenta);
 const rendicion = async (clave: string) =>
   (await request(app).get(`/api/v1/rendicion/${ids[clave]}?anio=2032&mes=3`)).body
     .data as RendicionDTO;
@@ -110,28 +110,25 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('consolidado: sueldo y empaque en columnas propias', () => {
-  test('el ayudante cobra sueldo + empaque; el costurero, costura', async () => {
+describe('consolidado: sueldo y empaque, cada uno en su cuenta', () => {
+  test('el ayudante tiene una fila en Sueldo y otra en Empaque; el costurero, en Operaciones', async () => {
     const c = await consolidado();
-    expect(fila(c, 'AYU').desglose).toEqual({
-      sueldo: SUELDO_MES,
-      costura: 0,
-      empaque: 1000,
-      servicioCorte: 0,
-      moldes: 0,
-    });
-    expect(fila(c, 'AYU').ganado).toBe(SUELDO_MES + 1000);
-    expect(fila(c, 'COS').desglose).toEqual({ sueldo: 0, costura: 2000, empaque: 0, servicioCorte: 0, moldes: 0 });
+    expect(fila(c, 'AYU', 'sueldo')).toMatchObject({ ganado: SUELDO_MES, saldoPeriodo: SUELDO_MES });
+    expect(fila(c, 'AYU', 'empaque')).toMatchObject({ ganado: 1000, saldoPeriodo: 1000 });
+    expect(fila(c, 'AYU', 'operaciones')).toBeUndefined();
+    expect(fila(c, 'COS', 'operaciones').ganado).toBe(2000);
+    expect(fila(c, 'COS', 'empaque')).toBeUndefined();
   });
 
   test('una semana completa paga exacto Bs 400 y las semanas suman el mes', async () => {
     const c = await consolidado();
-    const semana = (lunes: string) => c.semanas.find((s) => s.inicioISO.startsWith(lunes))!;
-    expect(semana('2032-03-08').desglose.sueldo).toBe(40000);
-    expect(semana('2032-03-15').desglose.sueldo).toBe(40000);
-    expect(semana('2032-03-15').desglose.empaque).toBeGreaterThanOrEqual(1000); // cierre del 20
-    const sueldoSemanas = c.semanas.reduce((a, s) => a + s.desglose.sueldo, 0);
-    expect(sueldoSemanas).toBe(c.totales.desglose.sueldo);
+    const sueldo = cuentaDe(c, 'sueldo');
+    const semana = (lunes: string) => sueldo.semanas.find((s) => s.inicioISO.startsWith(lunes))!;
+    expect(semana('2032-03-08').ganado).toBe(40000);
+    expect(semana('2032-03-15').ganado).toBe(40000);
+    expect(sueldo.semanas.reduce((a, s) => a + s.ganado, 0)).toBe(sueldo.totales.ganado);
+    const empaque = cuentaDe(c, 'empaque').semanas.find((s) => s.inicioISO.startsWith('2032-03-15'))!;
+    expect(empaque).toMatchObject({ ganado: 1000, cortesCerrados: 1 }); // cierre del 20
   });
 });
 
@@ -150,7 +147,11 @@ describe('rendición', () => {
     expect(r.cortes).toEqual([]);
     expect(r.empaque).toHaveLength(1);
     expect(r.empaque[0].operaciones[0]).toMatchObject({ proceso: 'embolsado', esEmpaque: true, total: 1000 });
-    expect(r.totalGanado).toBe(SUELDO_MES + 1000);
+    // dos saldos que no se suman
+    expect(r.cuentas.map((x) => [x.cuenta, x.ganado])).toEqual([
+      ['empaque', 1000],
+      ['sueldo', SUELDO_MES],
+    ]);
   });
 
   test('privacidad: el costurero no recibe el sueldo ni el empaque del ayudante', async () => {
@@ -184,28 +185,23 @@ describe('cierre de mes', () => {
     }
   });
 
-  test('completo: guarda sueldo y empaque, y la rendición usa lo liquidado', async () => {
+  test('completo: guarda sueldo y empaque en filas separadas, y la rendición usa lo liquidado', async () => {
     const res = await cerrarMes();
     expect(res.status).toBe(200);
     const c = res.body.data as ConsolidadoDTO;
-    expect(fila(c, 'AYU').desglose).toEqual({
-      sueldo: SUELDO_MES,
-      costura: 0,
-      empaque: 1000,
-      servicioCorte: 0,
-      moldes: 0,
-    });
-    const guardada = await prisma.liquidacion.findFirstOrThrow({
+    expect(fila(c, 'AYU', 'sueldo')).toMatchObject({ ganado: SUELDO_MES, pagado: SUELDO_MES, saldoSalida: 0 });
+    expect(fila(c, 'AYU', 'empaque')).toMatchObject({ ganado: 1000, pagado: 1000, saldoSalida: 0 });
+    const guardadas = await prisma.liquidacion.findMany({
       where: { operarioId: ids.AYU, periodo: { anio: 2032, mes: 3 } },
+      orderBy: { cuenta: 'asc' },
     });
-    expect([guardada.totalGanado, guardada.ganadoSueldo, guardada.ganadoEmpaque]).toEqual([
-      SUELDO_MES + 1000,
-      SUELDO_MES,
-      1000,
+    expect(guardadas.map((l) => [l.cuenta, l.totalGanado])).toEqual([
+      ['empaque', 1000],
+      ['sueldo', SUELDO_MES],
     ]);
     const r = await rendicion('AYU');
     expect(r.cerrado).toBe(true);
-    expect(r.desglose.sueldo).toBe(SUELDO_MES);
+    expect(saldoDe(r, 'sueldo').ganado).toBe(SUELDO_MES);
 
     // mes liquidado: la asistencia de marzo ya no se toca
     const tarde = await request(app)
