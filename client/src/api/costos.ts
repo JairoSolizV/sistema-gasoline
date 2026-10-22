@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CompraDTO,
+  CompraGastoInput,
+  CostosFijosMesDTO,
+  EditarGastoFijoInput,
+  EditarPrestamoInput,
+  GastoFijoInput,
+  MontoGastoInput,
+  PagoPrestamoInput,
+  PrestamoInput,
   CompraInput,
   ConteoDTO,
   ConteoInput,
@@ -147,3 +155,58 @@ export function useGuardarPlan() {
     onSuccess: (dto) => qc.setQueryData(['costos', 'proyeccion', dto.anio, dto.mes], dto),
   });
 }
+
+// ── Etapa 5: costos fijos del taller ──
+
+export function useCostosFijos(anio: number, mes: number) {
+  return useQuery({
+    queryKey: ['costos', 'fijos', anio, mes],
+    queryFn: () => api<CostosFijosMesDTO>(`/costos/fijos?anio=${anio}&mes=${mes}`),
+  });
+}
+
+/** Todas las escrituras de costos fijos: invalidan costos (cambian fichas y proyección). */
+export function useMutacionFijos() {
+  const onSuccess = useInvalidarCostos();
+  const enviar = (ruta: string, metodo: string, body?: unknown) =>
+    api(`/costos/fijos${ruta}`, { method: metodo, body: body ? JSON.stringify(body) : undefined });
+  return useMutation({
+    mutationFn: (op: OperacionFijos) => {
+      switch (op.tipo) {
+        case 'crearGasto':
+          return enviar('/gastos', 'POST', op.input);
+        case 'editarGasto':
+          return enviar(`/gastos/${op.id}`, 'PATCH', op.input);
+        case 'eliminarGasto':
+          return enviar(`/gastos/${op.id}`, 'DELETE');
+        case 'monto':
+          return enviar(`/gastos/${op.id}/montos`, 'POST', op.input);
+        case 'compra':
+          return enviar(`/gastos/${op.id}/compras`, 'POST', op.input);
+        case 'quitarCompra':
+          return enviar(`/compras/${op.id}`, 'DELETE');
+        case 'crearPrestamo':
+          return enviar('/prestamos', 'POST', op.input);
+        case 'editarPrestamo':
+          return enviar(`/prestamos/${op.id}`, 'PATCH', op.input);
+        case 'pagar':
+          return enviar(`/prestamos/${op.id}/pagos`, 'PUT', op.input);
+        case 'quitarPago':
+          return enviar(`/prestamos/${op.id}/pagos?anio=${op.anio}&mes=${op.mes}`, 'DELETE');
+      }
+    },
+    onSuccess,
+  });
+}
+
+export type OperacionFijos =
+  | { tipo: 'crearGasto'; input: GastoFijoInput }
+  | { tipo: 'editarGasto'; id: string; input: EditarGastoFijoInput }
+  | { tipo: 'eliminarGasto'; id: string }
+  | { tipo: 'monto'; id: string; input: MontoGastoInput }
+  | { tipo: 'compra'; id: string; input: CompraGastoInput }
+  | { tipo: 'quitarCompra'; id: string }
+  | { tipo: 'crearPrestamo'; input: PrestamoInput }
+  | { tipo: 'editarPrestamo'; id: string; input: EditarPrestamoInput }
+  | { tipo: 'pagar'; id: string; input: PagoPrestamoInput }
+  | { tipo: 'quitarPago'; id: string; anio: number; mes: number };

@@ -81,6 +81,7 @@ export function ConfiguracionPage() {
   const [topeBs, setTopeBs] = useState('');
   const [difBs, setDifBs] = useState('');
   const [margenPct, setMargenPct] = useState('');
+  const [prendasMes, setPrendasMes] = useState('');
   const [tarifas, setTarifas] = useState<TextosTarifa | null>(null);
   const [guardado, setGuardado] = useState(false);
 
@@ -90,6 +91,7 @@ export function ConfiguracionPage() {
       setTopeBs(aTexto(data.topeAnticipoAdvertencia));
       setDifBs(aTexto(data.diferencialMaestroExterno));
       setMargenPct(String(data.margenVenta / 100));
+      setPrendasMes(String(data.prendasMesCostoFijo));
       setTarifas(textosDesde(data));
     }
   }, [data]);
@@ -97,8 +99,10 @@ export function ConfiguracionPage() {
   const topeValido = PATRON_BS.test(topeBs);
   const difValido = PATRON_BS.test(difBs);
   const margenValido = /^\d+([.,]\d{1,2})?$/.test(margenPct.trim());
+  const prendasValidas = Number(prendasMes) >= 1;
   const tarifaValida = (k: ClaveTarifaCorte) => tarifas != null && PATRON_BS.test(tarifas[k]);
-  const todoValido = topeValido && difValido && margenValido && CLAVES_TARIFA_CORTE.every(tarifaValida);
+  const todoValido =
+    topeValido && difValido && margenValido && prendasValidas && CLAVES_TARIFA_CORTE.every(tarifaValida);
 
   const onGuardar = async () => {
     if (!todoValido || !tarifas) return;
@@ -107,6 +111,7 @@ export function ConfiguracionPage() {
       topeAnticipoAdvertencia: aCentavos(topeBs),
       diferencialMaestroExterno: aCentavos(difBs),
       margenVenta: Math.round(Number(margenPct.trim().replace(',', '.')) * 100),
+      prendasMesCostoFijo: Number(prendasMes),
       ...Object.fromEntries(CLAVES_TARIFA_CORTE.map((k) => [k, aCentavos(tarifas[k])])),
     });
     setGuardado(true);
@@ -187,6 +192,24 @@ export function ConfiguracionPage() {
               <span className="text-sm text-gray-500">%</span>
             </div>
             {!margenValido && <p className="mt-1 text-xs text-error">Porcentaje inválido (ej. 30)</p>}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-sm font-medium">Prendas por mes para los costos fijos</label>
+            <p className="mb-2 text-xs text-gray-500">
+              Los costos fijos del taller del mes se dividen por estas prendas y se suman a cada ficha
+              de costo. Conviene el mínimo que producen (precio seguro aunque un mes salga poco).
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                value={prendasMes}
+                onChange={(e) => setPrendasMes(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                className={`${claseInput} mono max-w-32`}
+              />
+              <span className="text-sm text-gray-500">prendas</span>
+            </div>
+            {!prendasValidas && <p className="mt-1 text-xs text-error">Indicá cuántas prendas (ej. 1500)</p>}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

@@ -1,7 +1,7 @@
 # Costos de producción (insumos, ficha de costo por modelo, costo real del corte y proyección)
 
-> **Estado:** aprobado el 2026-10-22 (respuestas §7). **Etapas 1 a 4 implementadas** (y datos del catálogo
-> importados); la 5 (costos fijos) queda a decidir.
+> **Estado:** aprobado el 2026-10-22 (respuestas §7). **Etapas 1 a 5 implementadas** (y datos del catálogo
+> importados); la 5 (costos fijos) según §7c.
 > **Amplía el alcance** (CLAUDE.md §2: hoy "otros costos del taller" está fuera). Al aprobar se
 > actualizan `CLAUDE.md` y `CONTEXTO_NEGOCIO_TALLER.md`. **No toca ningún pago**: es un módulo de
 > consulta; lee lo que ya existe (CT, servicio de corte, empaque, lavandería/bordado) sin modificarlo.
@@ -72,7 +72,7 @@ Plan de producción (modelo × prendas) → materiales necesarios, **stock** (co
 cortes), **lo que falta comprar** y **cuánta plata se necesita** (materiales + mano de obra +
 servicios).
 
-### Etapa 5 — Costos fijos del taller (opcional, a decidir)
+### Etapa 5 — Costos fijos del taller (implementada, decisiones §7c)
 Servicios básicos con historial, pagos a bancos programados con aviso y prorrateo de los fijos por
 prenda. Es más administración que costo de producción.
 
@@ -126,6 +126,29 @@ Diseño:
 - **Consumo de un corte** (para el stock): se descuenta en su fecha de inicio: por prenda = cantidad
   × prendas; tela = tizado (real si hay prendas por capa); hilo = prendas ÷ rendimiento (conos).
 
+## 7c. Etapa 5 — Costos fijos del taller (decisiones del dueño, 2026-10-22)
+
+1. **Volumen:** producción mínima 1500 prendas/mes (habitual 2000, meta 3000, objetivo 4000 = 1000
+   por semana). El **costo fijo que se suma a cada ficha se divide por 1500** (editable en
+   Configuración): precio seguro aunque un mes salga poco. Se muestra además el costo fijo por prenda
+   con la producción real del mes (prendas de los cortes cerrados) y la tabla 1500 / 2000 / 3000 /
+   4000.
+2. **Préstamo FIE:** se carga la **cuota completa** (Bs 10,500) como costo (decisión del dueño, para
+   recuperarse); se muestra aparte como "recuperación de deuda". Aviso en Inicio antes del vencimiento
+   y se marca cada cuota pagada. (Fassil, PSNK: terminados.)
+3. **Sueldo de los dueños** = lo que necesita la casa (Bs 14,025, editable); reemplaza a "Adm" y
+   "Ventas" del Excel. De ahí sale universidad, colegio y alimentación de la familia.
+4. **Gastos compartidos con la casa** (mismo medidor de luz y agua; la comida se compra junta): cada
+   concepto tiene un **porcentaje del taller**.
+5. **Comida:** se anota **cada compra** (verduras semanales, pan y carne diarios; sin factura) y se
+   aplica el porcentaje del taller.
+
+Diseño: concepto de gasto fijo (grupo, monto mensual con historial **o** suma de las compras
+anotadas del mes, % del taller); préstamo (cuota, día de vencimiento, cuotas que faltan, pagos);
+costo fijo del mes = Σ parte del taller de cada concepto + cuotas; para las fichas se usa el monto
+vigente y, en los conceptos por compras, el promedio de los últimos 3 meses con compras. Las fichas
+y la proyección suman el costo fijo por prenda. Solo consulta: no toca pagos.
+
 ## 8. Bitácora
 
 - **2026-10-22 — Propuesta.** Base: respuestas del 2026-10-21 (tasa oficial del día, tabla de
@@ -164,3 +187,13 @@ Diseño:
   diferencial de maestro + servicio 721.00); plan de prueba 31 × 1000 → producir Bs 11 300.00 (luego
   borrado). Ojo: hasta el primer conteo, el stock suma todo lo comprado para los cortes 25–32 (no están
   en Taller · Pagos, su consumo no se descuenta). 369 tests en verde (`costos-produccion` nuevo).
+- **2026-10-22 — Etapa 5 (costos fijos del taller).** Decisiones §7c. Tablas `GastoFijo` (mensual con
+  historial de montos `GastoFijoMonto`, o por compras `CompraGasto`; % del taller), `Prestamo` y
+  `PagoPrestamo`, y `Configuracion.prendasMesCostoFijo` (1500) — migración `20261022240000_costos_fijos`.
+  `costos/fijos.ts`: gastos del mes (parte del taller), deuda = cuota completa, presupuesto para las fichas
+  (montos vigentes hoy; comida = promedio de los 3 meses anteriores con compras, o el mes actual si no hay
+  historia) ÷ prendas de referencia, tabla 1500/2000/3000/4000 y aviso en Inicio de cuotas por vencer o
+  vencidas hasta marcarlas pagadas. Las fichas suman la línea **Costos fijos del taller** (también la
+  proyección). Pantalla: pestaña **Costos fijos** (mes, gastos por grupo, compras de comida, préstamos).
+  Verificado en el navegador con datos de prueba (luego borrados): 14 025 + 85 % de 1250 + 60 % de 450 +
+  10 500 = Bs 25 857.50 → Bs 17.24 por prenda en las fichas. 375 tests en verde (`costos-fijos` nuevo).

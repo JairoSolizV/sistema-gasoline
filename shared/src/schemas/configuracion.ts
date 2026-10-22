@@ -22,6 +22,7 @@ export const editarConfiguracionSchema = z
     diferencialMaestroExterno: z.number().int().min(0).optional(),
     // costos: margen general del precio de venta, centésimas de % (máx. 1000 %)
     margenVenta: z.number().int().min(0).max(100_000).optional(),
+    prendasMesCostoFijo: z.number().int().min(1).max(1_000_000).optional(),
     nombreTaller: z
       .preprocess((v) => (v === '' || v == null ? null : v), z.string().trim().max(80).nullable())
       .optional(),

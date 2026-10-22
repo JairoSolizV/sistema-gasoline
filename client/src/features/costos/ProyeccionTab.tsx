@@ -161,6 +161,7 @@ function Totales({ p }: { p: ProyeccionDTO }) {
       {fila('Comprar materiales', p.totales.comprarMateriales, 'lo que falta según el stock')}
       {fila('Producir el plan', p.totales.producirPlan, 'costura, empaque, servicio de corte, lavandería…')}
       {fila('Terminar cortes abiertos', p.totales.terminarCortes, 'costura y empaque al cerrar + envíos por devolver')}
+      {fila('Costos fijos del taller', p.totales.costosFijos, 'sueldos, servicios, comida y la cuota del FIE del mes')}
       <div className="mt-2 flex justify-between border-t border-gray-200 pt-2 text-base">
         <span className="font-semibold">Total</span>
         <span className="mono font-semibold">Bs {formatBs(p.totales.total)}</span>

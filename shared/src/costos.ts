@@ -90,7 +90,8 @@ export interface CostoFicha {
   manoDeObra: number; // centavos (costura), del modelo o a mano
   empaque: number; // centavos
   servicioCorte: number; // centavos
-  total: number; // materiales + mano de obra + empaque + servicio (desde la suma exacta)
+  costoFijo: number; // centavos por prenda: costos fijos del taller ÷ prendas del mes (etapa 5)
+  total: number; // materiales + mano de obra + empaque + servicio + fijo (desde la suma exacta)
   precioVenta: number; // total × (1 + margen), redondeado una vez
   incompleto: boolean; // alguna línea sin precio: el total es parcial
 }
@@ -102,17 +103,23 @@ export function costoFicha(input: {
   manoDeObra: number;
   empaque: number;
   servicioCorte: number;
+  costoFijo?: Fraccion; // por prenda, exacto (etapa 5)
   margen: number; // centésimas de %
 }): CostoFicha {
   const exactas = input.lineas.map(costoLinea);
   const materiales = exactas.reduce<Fraccion>((a, c) => (c ? sumar(a, c) : a), CERO);
-  const total = sumar(materiales, fr(input.manoDeObra + input.empaque + input.servicioCorte));
+  const costoFijo = input.costoFijo ?? CERO;
+  const total = sumar(
+    sumar(materiales, fr(input.manoDeObra + input.empaque + input.servicioCorte)),
+    costoFijo,
+  );
   return {
     lineas: exactas.map((c) => (c ? redondear(c) : null)),
     materiales: redondear(materiales),
     manoDeObra: input.manoDeObra,
     empaque: input.empaque,
     servicioCorte: input.servicioCorte,
+    costoFijo: redondear(costoFijo),
     total: redondear(total),
     precioVenta: redondear(multiplicar(total, fr(MARGEN_ESCALA + input.margen, MARGEN_ESCALA))),
     incompleto: exactas.some((c) => c === null),
@@ -170,3 +177,15 @@ export const sumarFracciones = (fs: (Fraccion | null)[]): Fraccion =>
 
 /** Milésimas redondeadas half-up (para mostrar cantidades de material). */
 export const redondearCantidad = redondear;
+
+// ── Etapa 5: costos fijos del taller (docs/PLAN_COSTOS.md §7c) ──
+
+export const PORCENTAJE_ESCALA = 10_000; // centésimas de % (100 % = 10 000)
+
+/** Parte del taller de un gasto compartido con la casa: monto × %, exacto. */
+export const parteTaller = (monto: number, porcentaje: number): Fraccion =>
+  fr(monto * porcentaje, PORCENTAJE_ESCALA);
+
+/** Costo fijo por prenda: total del mes ÷ prendas (exacto). */
+export const fijoPorPrenda = (totalMes: Fraccion, prendas: number): Fraccion =>
+  multiplicar(totalMes, fr(1, prendas));

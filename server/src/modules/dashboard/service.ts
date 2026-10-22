@@ -9,6 +9,7 @@ import { configuracionRepository } from '../configuracion/repository.js';
 import { rangoMesUTC } from '../liquidacion/repository.js';
 import { asistenciaFaltante } from '../asistencia/sueldoMes.js';
 import { hoyEnBolivia } from '../../lib/hoy.js';
+import { fijosService } from '../costos/fijos.js';
 
 // procesos del servicio de corte que siempre se registran a mano (la búsqueda
 // se resuelve sola al registrar el corte)
@@ -111,7 +112,16 @@ export const dashboardService = {
       }
     }
 
-    // 4) fin de mes cercano con liquidación pendiente
+    // 4) cuotas de préstamos por vencer o vencidas (costos fijos, PLAN_COSTOS §7c)
+    for (const c of await fijosService.cuotasPorVencer()) {
+      const fecha = c.vence.split('-').reverse().join('/');
+      alertas.push({
+        tipo: c.vencida ? 'error' : 'warn',
+        texto: `Cuota ${c.banco} de Bs ${(c.cuota / 100).toFixed(2)} ${c.vencida ? `vencida el ${fecha}` : `vence el ${fecha}`}: marcala como pagada en Costos fijos.`,
+      });
+    }
+
+    // 5) fin de mes cercano con liquidación pendiente
     const hoy = new Date();
     if (!consolidado.cerrado && hoy.getUTCFullYear() === anio && hoy.getUTCMonth() + 1 === mes) {
       const ultimoDia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();

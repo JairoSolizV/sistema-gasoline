@@ -13,7 +13,13 @@ import {
   type LineaCostoInput,
   type LineaParaCosto,
 } from '@taller/shared';
-import { useEliminarFichaCosto, useFichaCosto, useGuardarFichaCosto, useInsumos } from '../../api/costos';
+import {
+  useCostosFijos,
+  useEliminarFichaCosto,
+  useFichaCosto,
+  useGuardarFichaCosto,
+  useInsumos,
+} from '../../api/costos';
 import { useConfiguracion } from '../../api/configuracion';
 import { useModelos } from '../../api/modelos';
 import { ErrorApi } from '../../api/client';
@@ -157,6 +163,8 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const { data: insumos } = useInsumos();
   const { data: modelos } = useModelos();
   const { data: config } = useConfiguracion();
+  const ahora = new Date();
+  const { data: fijos } = useCostosFijos(ahora.getFullYear(), ahora.getMonth() + 1);
   const guardar = useGuardarFichaCosto();
   const eliminar = useEliminarFichaCosto();
 
@@ -201,6 +209,11 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
     manoDeObra: manoDeObra ?? 0,
     empaque: empaque ?? 0,
     servicioCorte,
+    // costos fijos del taller ÷ prendas de referencia (vista previa; lo guardado lo
+    // calcula el server con el presupuesto exacto)
+    costoFijo: fijos
+      ? { num: BigInt(fijos.presupuestoMensual), den: BigInt(fijos.prendasReferencia) }
+      : undefined,
     margen,
   });
 
@@ -422,6 +435,7 @@ function ResumenCosto({
       {fila('Costura', calculo.manoDeObra)}
       {fila('Empaque', calculo.empaque)}
       {fila('Servicio de corte', calculo.servicioCorte)}
+      {fila('Costos fijos del taller', calculo.costoFijo)}
       <div className="mt-2 flex justify-between gap-6 border-t border-gray-200 pt-2">
         <span className="font-semibold">Costo por prenda</span>
         <span className="mono text-lg font-semibold">Bs {formatBs(calculo.total)}</span>

@@ -32,6 +32,7 @@ import {
 } from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
 import { configuracionRepository } from '../configuracion/repository.js';
+import { costoFijoPorPrenda } from './fijos.js';
 import { costosRepository, type FichaConDatos, type InsumoConCompra } from './repository.js';
 import {
   aResumenCorte,
@@ -137,7 +138,11 @@ export function aLineaParaCosto(l: LineaFicha): LineaParaCosto {
 }
 
 /** Calcula la ficha: cada línea, mano de obra, empaque, servicio, total y venta. */
-export function calcularFicha(f: FichaConDatos, config: Configuracion): FichaCostoDetalleDTO {
+export function calcularFicha(
+  f: FichaConDatos,
+  config: Configuracion,
+  costoFijo?: Fraccion, // costos fijos del taller por prenda (etapa 5)
+): FichaCostoDetalleDTO {
   const lineasCalculo = f.lineas.map(aLineaParaCosto);
   const lineasDTO: Omit<LineaCostoDTO, 'costo'>[] = [];
   for (const l of f.lineas) {
@@ -180,6 +185,7 @@ export function calcularFicha(f: FichaConDatos, config: Configuracion): FichaCos
     manoDeObra,
     empaque,
     servicioCorte: f.servicioCorteInterno ? servicioCortePorPrenda(config) : 0,
+    costoFijo,
     margen,
   });
 
@@ -203,6 +209,7 @@ export function calcularFicha(f: FichaConDatos, config: Configuracion): FichaCos
     manoDeObra: c.manoDeObra,
     empaque: c.empaque,
     servicioCorte: c.servicioCorte,
+    costoFijo: c.costoFijo,
     origenManoDeObra: ops ? 'modelo' : 'manual',
   };
 }
@@ -292,7 +299,8 @@ export const costosService = {
       costosRepository.listarFichas(),
       configuracionRepository.obtener(),
     ]);
-    return fichas.map((f) => aResumen(calcularFicha(f, config)));
+    const fijo = await costoFijoPorPrenda(config);
+    return fichas.map((f) => aResumen(calcularFicha(f, config, fijo)));
   },
 
   async obtenerFicha(id: string): Promise<FichaCostoDetalleDTO> {
@@ -301,7 +309,7 @@ export const costosService = {
       configuracionRepository.obtener(),
     ]);
     if (!ficha) throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
-    return calcularFicha(ficha, config);
+    return calcularFicha(ficha, config, await costoFijoPorPrenda(config));
   },
 
   async crearFicha(input: FichaCostoInput): Promise<FichaCostoDetalleDTO> {

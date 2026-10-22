@@ -3,6 +3,7 @@ import { formatBs } from '@taller/shared';
 import { useFichasCosto } from '../../api/costos';
 import { ComprasTab } from './ComprasTab';
 import { CortesCostoTab } from './CortesCostoTab';
+import { FijosTab } from './FijosTab';
 import { InsumosTab } from './InsumosTab';
 import { ProyeccionTab } from './ProyeccionTab';
 
@@ -15,6 +16,7 @@ const PESTANAS = [
   { clave: 'compras', etiqueta: 'Compras' },
   { clave: 'cortes', etiqueta: 'Costo real de cortes' },
   { clave: 'proyeccion', etiqueta: 'Proyección del mes' },
+  { clave: 'fijos', etiqueta: 'Costos fijos' },
 ] as const;
 type Pestana = (typeof PESTANAS)[number]['clave'];
 
@@ -52,6 +54,7 @@ export function CostosPage() {
         {activa === 'compras' && <ComprasTab />}
         {activa === 'cortes' && <CortesCostoTab />}
         {activa === 'proyeccion' && <ProyeccionTab />}
+        {activa === 'fijos' && <FijosTab />}
       </div>
     </div>
   );

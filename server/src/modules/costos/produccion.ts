@@ -8,6 +8,7 @@ import {
   costoDeCantidad,
   costoLinea,
   dateADia,
+  fijoPorPrenda,
   porPrendas,
   redondear,
   sumarFracciones,
@@ -23,6 +24,7 @@ import {
 } from '@taller/shared';
 import { diaEnBolivia } from '../../lib/hoy.js';
 import { costosRepository, type FichaConDatos } from './repository.js';
+import { presupuestoFijo } from './fijos.js';
 import {
   aLineaParaCosto,
   calcularFicha,
@@ -266,12 +268,14 @@ export async function proyeccion(
   mes: number,
   config: Configuracion,
 ): Promise<ProyeccionDTO> {
-  const [plan, fichas, stock, cortes] = await Promise.all([
+  const [plan, fichas, stock, cortes, presupuesto] = await Promise.all([
     costosRepository.obtenerPlan(anio, mes),
     costosRepository.listarFichas(),
     stockPorInsumo(),
     costosRepository.cortesParaCosto(),
+    presupuestoFijo(),
   ]);
+  const fijo = fijoPorPrenda(presupuesto, config.prendasMesCostoFijo);
   const avisos: string[] = [];
   const porId = new Map(fichas.map((f) => [f.id, f]));
 
@@ -283,7 +287,7 @@ export async function proyeccion(
   for (const item of plan) {
     const f = porId.get(item.fichaId);
     if (!f) continue;
-    const calculo = calcularFicha(f, config);
+    const calculo = calcularFicha(f, config, fijo);
     planDTO.push({
       ficha: { id: f.id, codigo: f.codigo, nombre: f.nombre },
       prendas: item.prendas,
@@ -347,6 +351,7 @@ export async function proyeccion(
   const comprarMateriales = necesidades.reduce((a, n) => a + (n.costoFaltante ?? 0), 0);
   const producirPlan = redondear(sumarFracciones(producir));
   const terminarCortes = cortesAbiertos.reduce((a, c) => a + c.costuraYEmpaque + c.enviosSinDevolver, 0);
+  const costosFijos = redondear(presupuesto); // el mes del taller, una vez (no por prenda)
   return {
     anio,
     mes,
@@ -357,7 +362,8 @@ export async function proyeccion(
       comprarMateriales,
       producirPlan,
       terminarCortes,
-      total: comprarMateriales + producirPlan + terminarCortes,
+      costosFijos,
+      total: comprarMateriales + producirPlan + terminarCortes + costosFijos,
     },
     avisos,
   };

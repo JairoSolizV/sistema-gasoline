@@ -146,3 +146,75 @@ export const planInputSchema = z.object({
 
 export type ConteoInput = z.infer<typeof conteoInputSchema>;
 export type PlanInput = z.infer<typeof planInputSchema>;
+
+// ── Etapa 5: costos fijos del taller (docs/PLAN_COSTOS.md §7c) ──
+
+export const GRUPOS_GASTO_FIJO = ['personal', 'operativos', 'servicios', 'maquinas', 'impuestos', 'otros'] as const;
+export type GrupoGastoFijo = (typeof GRUPOS_GASTO_FIJO)[number];
+export type TipoGastoFijo = 'mensual' | 'por_compras';
+
+const porcentaje = z.number().int().min(1, 'El porcentaje debe ser mayor a 0').max(10_000, 'Máximo 100 %');
+
+/** Alta de un gasto fijo: mensual (con su monto desde una fecha) o por compras. */
+export const gastoFijoInputSchema = z
+  .object({
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(60),
+    grupo: z.enum(GRUPOS_GASTO_FIJO),
+    tipo: z.enum(['mensual', 'por_compras']).default('mensual'),
+    porcentajeTaller: porcentaje.default(10_000),
+    monto: centavos.optional(), // mensual: monto por mes
+    vigenteDesde: dia.optional(), // mensual: desde cuándo
+    notas: texto(200).optional(),
+  })
+  .refine((g) => g.tipo !== 'mensual' || (g.monto != null && g.vigenteDesde != null), {
+    path: ['monto'],
+    message: 'Un gasto mensual necesita su monto y desde cuándo rige',
+  });
+
+export const editarGastoFijoSchema = z
+  .object({
+    nombre: z.string().trim().min(1).max(60),
+    grupo: z.enum(GRUPOS_GASTO_FIJO),
+    porcentajeTaller: porcentaje,
+    activo: z.boolean(),
+    notas: texto(200),
+  })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
+
+/** Nuevo monto mensual desde una fecha (misma fecha = lo reemplaza). */
+export const montoGastoInputSchema = z.object({ monto: centavos, vigenteDesde: dia });
+
+/** Una compra de un gasto por compras (ej. comida; sin factura). */
+export const compraGastoInputSchema = z.object({
+  fecha: dia,
+  monto: z.number().int().min(1, 'El monto debe ser mayor a 0').max(100_000_000),
+  nota: texto(120).optional(),
+});
+
+export const prestamoInputSchema = z.object({
+  banco: z.string().trim().min(1, 'Indicá el banco').max(60),
+  cuota: z.number().int().min(1, 'La cuota debe ser mayor a 0').max(100_000_000),
+  diaVencimiento: z.number().int().min(1).max(31),
+  cuotasRestantes: z.number().int().min(0).max(600).nullable().optional(),
+  notas: texto(200).optional(),
+});
+export const editarPrestamoSchema = prestamoInputSchema
+  .extend({ activo: z.boolean() })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
+
+export const pagoPrestamoInputSchema = z.object({
+  anio: z.number().int().min(2000).max(2100),
+  mes: z.number().int().min(1).max(12),
+  fecha: dia,
+  monto: z.number().int().min(1).max(100_000_000),
+});
+
+export type GastoFijoInput = z.infer<typeof gastoFijoInputSchema>;
+export type EditarGastoFijoInput = z.infer<typeof editarGastoFijoSchema>;
+export type MontoGastoInput = z.infer<typeof montoGastoInputSchema>;
+export type CompraGastoInput = z.infer<typeof compraGastoInputSchema>;
+export type PrestamoInput = z.infer<typeof prestamoInputSchema>;
+export type EditarPrestamoInput = z.infer<typeof editarPrestamoSchema>;
+export type PagoPrestamoInput = z.infer<typeof pagoPrestamoInputSchema>;

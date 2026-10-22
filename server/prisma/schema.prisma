@@ -326,6 +326,9 @@ model Configuracion {
   // Costos (docs/PLAN_COSTOS.md): margen general del precio de venta, en
   // centésimas de % (30 % = 3000); cada ficha puede tener el suyo.
   margenVenta                 Int @default(3000)
+  // costos fijos (docs/PLAN_COSTOS.md §7c): prendas por mes con las que se reparte el
+  // costo fijo en las fichas (el mínimo de producción: precio seguro)
+  prendasMesCostoFijo         Int @default(1500)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -711,4 +714,85 @@ model PlanProduccion {
   prendas Int
 
   @@unique([anio, mes, fichaId])
+}
+
+// ── Costos fijos del taller (docs/PLAN_COSTOS.md §7c) — solo consulta ────────
+enum GrupoGastoFijo {
+  personal // sueldo de los dueños, comida del personal…
+  operativos // transporte…
+  servicios // CRE, Saguapac, YPFB, Tigo
+  maquinas // mantenimiento, agujas, depreciación
+  impuestos
+  otros
+}
+
+enum TipoGastoFijo {
+  mensual // un monto por mes (con historial)
+  por_compras // la suma de las compras anotadas en el mes (ej. comida)
+}
+
+// Un gasto fijo del taller. Si se comparte con la casa (mismo medidor, la
+// comida), solo cuenta su porcentaje del taller.
+model GastoFijo {
+  id               String          @id @default(uuid())
+  nombre           String          @unique
+  grupo            GrupoGastoFijo
+  tipo             TipoGastoFijo   @default(mensual)
+  porcentajeTaller Int             @default(10000) // centésimas de % (100 % = 10 000)
+  activo           Boolean         @default(true)
+  notas            String?
+  creadoEn         DateTime        @default(now())
+  montos           GastoFijoMonto[]
+  compras          CompraGasto[]
+}
+
+// Monto mensual desde una fecha (como el sueldo de los ayudantes: rige el
+// último que ya empezó).
+model GastoFijoMonto {
+  id           String    @id @default(uuid())
+  gasto        GastoFijo @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  gastoId      String
+  monto        Int // centavos por mes (total, antes del % del taller)
+  vigenteDesde DateTime  @db.Date
+
+  @@unique([gastoId, vigenteDesde])
+}
+
+// Una compra de un gasto "por compras" (verduras, pan, carne…; sin factura).
+model CompraGasto {
+  id       String    @id @default(uuid())
+  gasto    GastoFijo @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  gastoId  String
+  fecha    DateTime  @db.Date
+  monto    Int // centavos (total de la compra, antes del % del taller)
+  nota     String?
+  creadoEn DateTime  @default(now())
+
+  @@index([gastoId, fecha])
+}
+
+// Préstamo bancario: la cuota completa se carga como costo fijo
+// ("recuperación de deuda"); aviso en Inicio antes de cada vencimiento.
+model Prestamo {
+  id              String         @id @default(uuid())
+  banco           String
+  cuota           Int // centavos por mes
+  diaVencimiento  Int // 1..31 (si el mes es más corto, el último día)
+  cuotasRestantes Int? // informativo
+  activo          Boolean        @default(true)
+  notas           String?
+  creadoEn        DateTime       @default(now())
+  pagos           PagoPrestamo[]
+}
+
+model PagoPrestamo {
+  id         String   @id @default(uuid())
+  prestamo   Prestamo @relation(fields: [prestamoId], references: [id], onDelete: Cascade)
+  prestamoId String
+  anio       Int
+  mes        Int
+  fecha      DateTime @db.Date
+  monto      Int // centavos
+
+  @@unique([prestamoId, anio, mes])
 }

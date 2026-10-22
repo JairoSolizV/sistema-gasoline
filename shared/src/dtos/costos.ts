@@ -1,4 +1,9 @@
-import type { CategoriaInsumo, OrigenCompra } from '../schemas/costos.js';
+import type {
+  CategoriaInsumo,
+  GrupoGastoFijo,
+  OrigenCompra,
+  TipoGastoFijo,
+} from '../schemas/costos.js';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Solo consulta: nada entra a pagos.
 
@@ -89,6 +94,7 @@ export interface FichaCostoDetalleDTO extends FichaCostoResumenDTO {
   manoDeObra: number;
   empaque: number;
   servicioCorte: number;
+  costoFijo: number; // centavos por prenda (etapa 5): costos fijos ÷ prendas de referencia
   origenManoDeObra: 'modelo' | 'manual'; // del modelo vinculado (CT) o escrita a mano
 }
 
@@ -179,7 +185,60 @@ export interface ProyeccionDTO {
     comprarMateriales: number; // centavos
     producirPlan: number; // mano de obra, empaque, servicio de corte, externos y logística del plan
     terminarCortes: number;
+    costosFijos: number; // costos fijos del mes del taller (etapa 5)
     total: number;
   };
   avisos: string[];
+}
+
+// ── Etapa 5: costos fijos del taller ──
+
+export interface CompraGastoDTO {
+  id: string;
+  fecha: string;
+  monto: number; // centavos (total, antes del % del taller)
+  nota: string | null;
+}
+
+export interface GastoFijoMesDTO {
+  id: string;
+  nombre: string;
+  grupo: GrupoGastoFijo;
+  tipo: TipoGastoFijo;
+  porcentajeTaller: number; // centésimas de %
+  activo: boolean;
+  notas: string | null;
+  montos: { id: string; monto: number; vigenteDesde: string }[]; // historial (mensual)
+  base: number; // centavos del mes: monto vigente o suma de las compras
+  parteTaller: number; // centavos que le tocan al taller
+  compras: CompraGastoDTO[]; // las del mes (por compras)
+}
+
+export interface PrestamoMesDTO {
+  id: string;
+  banco: string;
+  cuota: number;
+  diaVencimiento: number;
+  cuotasRestantes: number | null;
+  activo: boolean;
+  notas: string | null;
+  vence: string; // 'aaaa-mm-dd' de este mes
+  pago: { fecha: string; monto: number } | null;
+}
+
+export interface CostosFijosMesDTO {
+  anio: number;
+  mes: number;
+  gastos: GastoFijoMesDTO[];
+  prestamos: PrestamoMesDTO[];
+  totalGastos: number; // parte del taller de los gastos (sin deuda)
+  totalDeuda: number; // cuotas de préstamos activos ("recuperación de deuda")
+  total: number;
+  prendasReales: number; // de los cortes cerrados en el mes
+  porPrendaReal: number | null; // total ÷ prendas reales
+  /** lo que usan las fichas: gastos vigentes + promedio de compras + cuotas, ÷ prendas de referencia */
+  presupuestoMensual: number;
+  prendasReferencia: number; // Configuración (1500)
+  porPrendaFicha: number;
+  simulacion: { prendas: number; porPrenda: number }[]; // 1500 / 2000 / 3000 / 4000
 }

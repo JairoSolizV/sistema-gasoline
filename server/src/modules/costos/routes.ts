@@ -1,13 +1,20 @@
 import { Router } from 'express';
 import {
+  compraGastoInputSchema,
   compraInputSchema,
   conteoInputSchema,
+  editarGastoFijoSchema,
   editarInsumoSchema,
+  editarPrestamoSchema,
   fichaCostoInputSchema,
+  gastoFijoInputSchema,
   insumoInputSchema,
   listarComprasQuerySchema,
   mesQuerySchema,
+  montoGastoInputSchema,
+  pagoPrestamoInputSchema,
   planInputSchema,
+  prestamoInputSchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
 import { costosController } from './controller.js';
@@ -40,3 +47,18 @@ costosRouter.put('/plan', validar(planInputSchema), costosController.guardarPlan
 // etapa 3: costo real de cada corte frente a su ficha
 costosRouter.get('/cortes', costosController.listarCostosCortes);
 costosRouter.get('/cortes/:id', costosController.costoCorte);
+
+// etapa 5: costos fijos del taller (docs/PLAN_COSTOS.md §7c)
+costosRouter.get('/fijos', validar(mesQuerySchema, 'query'), costosController.costosFijosMes);
+costosRouter.post('/fijos/gastos', validar(gastoFijoInputSchema), costosController.crearGastoFijo);
+costosRouter.patch('/fijos/gastos/:id', validar(editarGastoFijoSchema), costosController.editarGastoFijo);
+costosRouter.delete('/fijos/gastos/:id', costosController.eliminarGastoFijo);
+costosRouter.post('/fijos/gastos/:id/montos', validar(montoGastoInputSchema), costosController.guardarMontoGasto);
+costosRouter.delete('/fijos/gastos/:id/montos/:montoId', costosController.eliminarMontoGasto);
+costosRouter.post('/fijos/gastos/:id/compras', validar(compraGastoInputSchema), costosController.crearCompraGasto);
+costosRouter.delete('/fijos/compras/:id', costosController.eliminarCompraGasto);
+costosRouter.post('/fijos/prestamos', validar(prestamoInputSchema), costosController.crearPrestamo);
+costosRouter.patch('/fijos/prestamos/:id', validar(editarPrestamoSchema), costosController.editarPrestamo);
+costosRouter.delete('/fijos/prestamos/:id', costosController.eliminarPrestamo);
+costosRouter.put('/fijos/prestamos/:id/pagos', validar(pagoPrestamoInputSchema), costosController.pagarCuota);
+costosRouter.delete('/fijos/prestamos/:id/pagos', validar(mesQuerySchema, 'query'), costosController.quitarPagoCuota);
