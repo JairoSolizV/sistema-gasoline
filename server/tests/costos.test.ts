@@ -87,6 +87,17 @@ describe('compras', () => {
     expect(boton.precioUnitarioBs).toBeCloseTo(0.3472, 4);
     expect(insumos.find((i) => i.id === ids.BOLSA)!.ultimaCompra).toBeNull();
   });
+
+  test('cada compra guarda el corte para el que se compró; el insumo lista sus cortes', async () => {
+    const res = await comprar({ insumoId: ids.HILO, cantidad: 1000, precioTotal: 2800, codigoCorte: '28-1' });
+    expect(res.body.data.codigoCorte).toBe('28-1');
+    await comprar({ insumoId: ids.HILO, cantidad: 1000, precioTotal: 2800, codigoCorte: '31' });
+    await comprar({ insumoId: ids.HILO, cantidad: 1000, precioTotal: 2800, codigoCorte: '28-1' });
+    const insumos = (await request(app).get('/api/v1/costos/insumos')).body.data as InsumoDTO[];
+    // sin repetir, la compra más reciente primero
+    expect(insumos.find((i) => i.id === ids.HILO)!.codigosCorte).toEqual(['28-1', '31']);
+    expect(insumos.find((i) => i.id === ids.BOLSA)!.codigosCorte).toEqual([]);
+  });
 });
 
 describe('ficha de costo', () => {
@@ -131,6 +142,11 @@ describe('ficha de costo', () => {
     expect(f).toMatchObject({ origenManoDeObra: 'manual', manoDeObra: 736, empaque: 100, servicioCorte: 0 });
     expect(f.total).toBe(936);
     expect(f.precioVenta).toBe(1404); // 9.36 × 1.5
+    // docena en $us con el tipo de cambio de Configuración, redondeada una vez
+    const docena = (bs: number) => Math.round((bs * 12 * 10_000) / config.tasaCambioUsd);
+    expect(f).toMatchObject({ costoDocenaUsd: docena(936), ventaDocenaUsd: docena(1404) });
+    const lista = (await request(app).get('/api/v1/costos/fichas')).body.data;
+    expect(lista.find((x: { id: string }) => x.id === f.id)).toMatchObject({ costoDocenaUsd: docena(936) });
   });
 
   test('una línea con un insumo sin compras deja la ficha incompleta', async () => {

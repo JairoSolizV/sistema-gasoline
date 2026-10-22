@@ -46,6 +46,22 @@ export const costosRepository = {
       include: incluirInsumo,
     });
   },
+  /** Códigos de corte de las compras de cada insumo, sin repetir, el más
+   *  reciente primero. */
+  async codigosCortePorInsumo(): Promise<Map<string, string[]>> {
+    const compras = await prisma.compraInsumo.findMany({
+      where: { codigoCorte: { not: null } },
+      select: { insumoId: true, codigoCorte: true },
+      orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+    });
+    const mapa = new Map<string, string[]>();
+    for (const c of compras) {
+      const lista = mapa.get(c.insumoId) ?? [];
+      if (!lista.includes(c.codigoCorte!)) lista.push(c.codigoCorte!);
+      mapa.set(c.insumoId, lista);
+    }
+    return mapa;
+  },
   obtenerInsumo(id: string): Promise<InsumoConCompra | null> {
     return prisma.insumo.findUnique({ where: { id }, include: incluirInsumo });
   },

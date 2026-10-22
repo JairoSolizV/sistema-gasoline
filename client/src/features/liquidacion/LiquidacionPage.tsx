@@ -4,12 +4,14 @@ import {
   CUENTAS,
   ETIQUETA_CUENTA,
   formatBs,
+  SERVICIOS_EXTERNOS,
   type Cuenta,
   type CuentaConsolidadoDTO,
   type LiquidacionFilaDTO,
 } from '@taller/shared';
 import { useConsolidado } from '../../api/liquidacion';
 import { MESES } from '../../lib/meses';
+import { TABLA } from '../../components/tabla';
 import { CerrarMesModal } from './CerrarMesModal';
 
 /** Qué se gana en cada cuenta y cuándo (docs/PLAN_CUENTAS_SEPARADAS.md §2). */
@@ -212,18 +214,20 @@ function SemanasCards({ cuenta }: { cuenta: CuentaConsolidadoDTO }) {
 
 function PlanillaTabla({ cuenta, cerrado }: { cuenta: CuentaConsolidadoDTO; cerrado: boolean }) {
   const t = cuenta.totales;
+  // los servicios externos los cobra una empresa (proveedor), no un operario
+  const esExterno = (SERVICIOS_EXTERNOS as readonly Cuenta[]).includes(cuenta.cuenta);
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-            <th className="px-5 py-3">Operario</th>
-            <th className="px-3 py-3 text-right">Saldo entrada</th>
-            <th className="px-3 py-3 text-right">Ganado</th>
-            <th className="px-3 py-3 text-right">Anticipos</th>
-            <th className="px-3 py-3 text-right">Saldo período</th>
-            {cerrado && <th className="px-3 py-3 text-right">Pagado</th>}
-            {cerrado && <th className="px-5 py-3 text-right">Saldo salida</th>}
+    <div className={`mt-4 ${TABLA.contenedorPagina}`}>
+      <table className="text-sm">
+        <thead className={TABLA.cabecera}>
+          <tr className={TABLA.filaCabecera}>
+            <th className="px-3 py-2.5">{esExterno ? 'Empresa' : 'Operario'}</th>
+            <th className="px-3 py-2.5 text-right">Saldo entrada</th>
+            <th className="px-3 py-2.5 text-right">Ganado</th>
+            <th className="px-3 py-2.5 text-right">Anticipos</th>
+            <th className="px-3 py-2.5 text-right">Saldo período</th>
+            {cerrado && <th className="px-3 py-2.5 text-right">Pagado</th>}
+            {cerrado && <th className="px-3 py-2.5 text-right">Saldo salida</th>}
           </tr>
         </thead>
         <tbody>
@@ -240,15 +244,15 @@ function PlanillaTabla({ cuenta, cerrado }: { cuenta: CuentaConsolidadoDTO; cerr
         </tbody>
         {cuenta.filas.length > 0 && (
           <tfoot>
-            <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-              <td className="px-5 py-3">Totales · {ETIQUETA_CUENTA[cuenta.cuenta]}</td>
-              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.saldoEntrada)}</td>
-              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.ganado)}</td>
-              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.anticipos)}</td>
-              <td className="mono px-3 py-3 text-right">Bs {formatBs(t.saldoPeriodo)}</td>
-              {cerrado && <td className="mono px-3 py-3 text-right">Bs {formatBs(t.pagado ?? 0)}</td>}
+            <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold whitespace-nowrap">
+              <td className="px-3 py-2.5">Totales · {ETIQUETA_CUENTA[cuenta.cuenta]}</td>
+              <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.saldoEntrada)}</td>
+              <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.ganado)}</td>
+              <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.anticipos)}</td>
+              <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.saldoPeriodo)}</td>
+              {cerrado && <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.pagado ?? 0)}</td>}
               {cerrado && (
-                <td className="mono px-5 py-3 text-right">Bs {formatBs(t.saldoSalida ?? 0)}</td>
+                <td className="mono px-3 py-2.5 text-right">Bs {formatBs(t.saldoSalida ?? 0)}</td>
               )}
             </tr>
           </tfoot>
@@ -260,8 +264,8 @@ function PlanillaTabla({ cuenta, cerrado }: { cuenta: CuentaConsolidadoDTO; cerr
 
 function FilaPlanilla({ f, cerrado }: { f: LiquidacionFilaDTO; cerrado: boolean }) {
   return (
-    <tr className={`border-b border-gray-100 last:border-0 ${f.activo ? '' : 'opacity-60'}`}>
-      <td className="px-5 py-2.5">
+    <tr className={`${TABLA.fila} whitespace-nowrap ${f.activo ? '' : 'opacity-60'}`}>
+      <td className="px-3 py-2">
         <span className="font-medium">{f.nombre}</span>
         {f.esMaestro && (
           <span className="ml-1 rounded-full bg-[rgba(47,111,224,0.1)] px-1.5 text-[10px] font-semibold text-acento">
@@ -270,17 +274,17 @@ function FilaPlanilla({ f, cerrado }: { f: LiquidacionFilaDTO; cerrado: boolean 
         )}
         {!f.activo && <span className="ml-1 text-[10px] text-gray-400">(baja)</span>}
       </td>
-      <td className="mono px-3 py-2.5 text-right text-gray-500">
+      <td className="mono px-3 py-2 text-right text-gray-500">
         {f.saldoEntrada !== 0 ? `Bs ${formatBs(f.saldoEntrada)}` : '—'}
       </td>
-      <td className="mono px-3 py-2.5 text-right font-semibold">Bs {formatBs(f.ganado)}</td>
-      <td className="mono px-3 py-2.5 text-right text-gray-500">Bs {formatBs(f.anticipos)}</td>
-      <td className="px-3 py-2.5 text-right">
+      <td className="mono px-3 py-2 text-right font-semibold">Bs {formatBs(f.ganado)}</td>
+      <td className="mono px-3 py-2 text-right text-gray-500">Bs {formatBs(f.anticipos)}</td>
+      <td className="px-3 py-2 text-right">
         <SaldoBadge centavos={f.saldoPeriodo} />
       </td>
-      {cerrado && <td className="mono px-3 py-2.5 text-right">Bs {formatBs(f.pagado ?? 0)}</td>}
+      {cerrado && <td className="mono px-3 py-2 text-right">Bs {formatBs(f.pagado ?? 0)}</td>}
       {cerrado && (
-        <td className="mono px-5 py-2.5 text-right">
+        <td className="mono px-3 py-2 text-right">
           {f.arrastraSaldo && (
             <span className="mr-1 text-[10px] font-semibold text-[#9a6a12]">arrastra</span>
           )}

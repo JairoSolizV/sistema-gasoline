@@ -5,6 +5,7 @@
 import type { Configuracion } from '@prisma/client';
 import {
   aBolivianos,
+  docenaEnDolares,
   CANTIDAD_ESCALA,
   consumoTela,
   costoFicha,
@@ -47,7 +48,11 @@ import {
 const bsPorUnidad = (c: { precioTotal: number; cantidad: number }) =>
   (c.precioTotal / 100) * (CANTIDAD_ESCALA / c.cantidad);
 
-function aInsumoDTO(i: InsumoConCompra, stock: StockDTO = STOCK_VACIO): InsumoDTO {
+function aInsumoDTO(
+  i: InsumoConCompra,
+  stock: StockDTO = STOCK_VACIO,
+  codigosCorte: string[] = [],
+): InsumoDTO {
   const ultima = i.compras[0] ?? null;
   return {
     id: i.id,
@@ -74,6 +79,7 @@ function aInsumoDTO(i: InsumoConCompra, stock: StockDTO = STOCK_VACIO): InsumoDT
     precioUnitarioBs: ultima ? bsPorUnidad(ultima) : null,
     usadoEnFichas: i._count.lineas,
     stock,
+    codigosCorte,
   };
 }
 
@@ -93,6 +99,7 @@ function aCompraDTO(c: CompraConInsumo): CompraDTO {
     tasaCambio: c.tasaCambio,
     precioTotal: c.precioTotal,
     precioUnitarioBs: bsPorUnidad(c),
+    codigoCorte: c.codigoCorte,
     notas: c.notas,
   };
 }
@@ -196,6 +203,8 @@ export function calcularFicha(
     modelo: f.modelo && { id: f.modelo.id, nombre: f.modelo.nombre },
     total: c.total,
     precioVenta: c.precioVenta,
+    costoDocenaUsd: docenaEnDolares(c.total, config.tasaCambioUsd),
+    ventaDocenaUsd: docenaEnDolares(c.precioVenta, config.tasaCambioUsd),
     incompleto: c.incompleto,
     actualizadoEn: f.actualizadoEn.toISOString(),
     manoDeObraManual: f.manoDeObra,
@@ -221,6 +230,8 @@ const aResumen = (d: FichaCostoDetalleDTO): FichaCostoResumenDTO => ({
   modelo: d.modelo,
   total: d.total,
   precioVenta: d.precioVenta,
+  costoDocenaUsd: d.costoDocenaUsd,
+  ventaDocenaUsd: d.ventaDocenaUsd,
   incompleto: d.incompleto,
   actualizadoEn: d.actualizadoEn,
 });
@@ -234,8 +245,12 @@ async function insumoOError(id: string): Promise<InsumoConCompra> {
 export const costosService = {
   // ── Insumos ──
   async listarInsumos(): Promise<InsumoDTO[]> {
-    const [insumos, stock] = await Promise.all([costosRepository.listarInsumos(), stockPorInsumo()]);
-    return insumos.map((i) => aInsumoDTO(i, stock.get(i.id)));
+    const [insumos, stock, codigos] = await Promise.all([
+      costosRepository.listarInsumos(),
+      stockPorInsumo(),
+      costosRepository.codigosCortePorInsumo(),
+    ]);
+    return insumos.map((i) => aInsumoDTO(i, stock.get(i.id), codigos.get(i.id)));
   },
 
   async crearInsumo(input: InsumoInput): Promise<InsumoDTO> {
@@ -282,6 +297,7 @@ export const costosService = {
       montoUsd: enDolares ? input.montoUsd! : null,
       tasaCambio: enDolares ? input.tasaCambio! : null,
       precioTotal: enDolares ? aBolivianos(input.montoUsd!, input.tasaCambio!) : input.precioTotal!,
+      codigoCorte: input.codigoCorte ?? null,
       notas: input.notas ?? null,
     });
     return aCompraDTO(compra);

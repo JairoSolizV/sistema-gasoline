@@ -77,7 +77,7 @@ export function CerrarMesModal({
         <table className="w-full text-sm">
           <thead className="sticky top-0">
             <tr className="bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase shadow-[inset_0_-1px_0_#e5e7eb]">
-              <th className="px-4 py-2">Operario</th>
+              <th className="px-4 py-2">Operario / empresa</th>
               <th className="px-3 py-2 text-right">Saldo a favor</th>
               <th className="px-3 py-2">¿Cobra menos?</th>
               <th className="px-4 py-2 text-right">Cobra</th>

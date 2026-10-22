@@ -35,6 +35,7 @@ export interface InsumoDTO {
   precioUnitarioBs: number | null;
   usadoEnFichas: number;
   stock: StockDTO; // milésimas (etapa 4)
+  codigosCorte: string[]; // cortes para los que se compró, de la compra más reciente a la más vieja
 }
 
 export interface CompraDTO {
@@ -51,6 +52,7 @@ export interface CompraDTO {
   tasaCambio: number | null; // diezmilésimos
   precioTotal: number; // centavos Bs
   precioUnitarioBs: number; // solo para mostrar
+  codigoCorte: string | null; // corte para el que se compró
   notas: string | null;
 }
 
@@ -78,6 +80,9 @@ export interface FichaCostoResumenDTO {
   modelo: { id: string; nombre: string } | null;
   total: number; // centavos por prenda
   precioVenta: number;
+  // por docena en $us (centavos de $us) con el tipo de cambio de Configuración; solo para mostrar
+  costoDocenaUsd: number;
+  ventaDocenaUsd: number;
   incompleto: boolean;
   actualizadoEn: string;
 }

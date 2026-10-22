@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatBs, type RubroCostoDTO } from '@taller/shared';
 import { useCostoCorte, useCostosCortes } from '../../api/costos';
+import { TABLA } from '../../components/tabla';
 
 // Costo real de cada corte frente a su ficha (docs/PLAN_COSTOS.md §7b): lo que se
 // pagó o se va a pagar (costura, empaque, servicio de corte, envíos) y la tela
@@ -30,16 +31,16 @@ export function CortesCostoTab() {
   const [abierto, setAbierto] = useState<string | null>(null);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-            <th className="px-5 py-3">Corte</th>
-            <th className="px-3 py-3">Ficha</th>
-            <th className="px-3 py-3 text-right">Prendas</th>
-            <th className="px-3 py-3 text-right">Ficha / prenda</th>
-            <th className="px-3 py-3 text-right">Real / prenda</th>
-            <th className="px-5 py-3 text-right">Diferencia</th>
+    <div className={TABLA.contenedor}>
+      <table className="text-sm">
+        <thead className={TABLA.cabecera}>
+          <tr className={TABLA.filaCabecera}>
+            <th className="px-3 py-2.5">Corte</th>
+            <th className="px-3 py-2.5">Ficha</th>
+            <th className="px-3 py-2.5 text-right">Prendas</th>
+            <th className="px-3 py-2.5 text-right">Ficha / prenda</th>
+            <th className="px-3 py-2.5 text-right">Real / prenda</th>
+            <th className="px-3 py-2.5 text-right">Diferencia</th>
           </tr>
         </thead>
         <tbody>
@@ -82,13 +83,13 @@ function FilaCorte({
 }) {
   return (
     <>
-      <tr onClick={onClick} className="cursor-pointer border-b border-gray-100 hover:bg-gray-50/60">
-        <td className="px-5 py-2.5">
+      <tr onClick={onClick} className={`cursor-pointer ${TABLA.fila}`}>
+        <td className="max-w-[260px] px-3 py-2">
           <span className="font-medium">COD {c.codigo}</span>{' '}
           <span className="text-gray-600">{c.modeloNombre}</span>
           <span className="ml-2 text-[11px] text-gray-400">{c.estado}</span>
         </td>
-        <td className="px-3 py-2.5 text-gray-600">
+        <td className="max-w-[220px] px-3 py-2 text-gray-600">
           {c.ficha ? (
             <Link to={`/costos/fichas/${c.ficha.id}`} onClick={(e) => e.stopPropagation()} className="text-acento hover:underline">
               {c.ficha.nombre}
@@ -97,12 +98,12 @@ function FilaCorte({
             <span className="text-xs text-amber-700">sin ficha vinculada</span>
           )}
         </td>
-        <td className="mono px-3 py-2.5 text-right text-gray-600">{c.prendas}</td>
-        <td className="mono px-3 py-2.5 text-right">
+        <td className="mono px-3 py-2 text-right text-gray-600">{c.prendas}</td>
+        <td className="mono px-3 py-2 text-right whitespace-nowrap">
           {c.fichaPorPrenda != null ? `Bs ${formatBs(c.fichaPorPrenda)}` : '—'}
         </td>
-        <td className="mono px-3 py-2.5 text-right font-semibold">Bs {formatBs(c.realPorPrenda)}</td>
-        <td className="mono px-5 py-2.5 text-right">
+        <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">Bs {formatBs(c.realPorPrenda)}</td>
+        <td className="mono px-3 py-2 text-right whitespace-nowrap">
           <Diferencia real={c.realPorPrenda} ficha={c.fichaPorPrenda} />
         </td>
       </tr>

@@ -23,6 +23,7 @@ export const editarConfiguracionSchema = z
     // costos: margen general del precio de venta, centésimas de % (máx. 1000 %)
     margenVenta: z.number().int().min(0).max(100_000).optional(),
     prendasMesCostoFijo: z.number().int().min(1).max(1_000_000).optional(),
+    tasaCambioUsd: z.number().int().min(1).max(10_000_000).optional(), // diezmilésimos
     nombreTaller: z
       .preprocess((v) => (v === '' || v == null ? null : v), z.string().trim().max(80).nullable())
       .optional(),

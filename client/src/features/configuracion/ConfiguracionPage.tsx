@@ -82,6 +82,7 @@ export function ConfiguracionPage() {
   const [difBs, setDifBs] = useState('');
   const [margenPct, setMargenPct] = useState('');
   const [prendasMes, setPrendasMes] = useState('');
+  const [tasaUsd, setTasaUsd] = useState('');
   const [tarifas, setTarifas] = useState<TextosTarifa | null>(null);
   const [guardado, setGuardado] = useState(false);
 
@@ -92,6 +93,7 @@ export function ConfiguracionPage() {
       setDifBs(aTexto(data.diferencialMaestroExterno));
       setMargenPct(String(data.margenVenta / 100));
       setPrendasMes(String(data.prendasMesCostoFijo));
+      setTasaUsd(String(data.tasaCambioUsd / 10_000));
       setTarifas(textosDesde(data));
     }
   }, [data]);
@@ -100,9 +102,15 @@ export function ConfiguracionPage() {
   const difValido = PATRON_BS.test(difBs);
   const margenValido = /^\d+([.,]\d{1,2})?$/.test(margenPct.trim());
   const prendasValidas = Number(prendasMes) >= 1;
+  const tasaValida = /^\d+([.,]\d{1,4})?$/.test(tasaUsd.trim()) && Number(tasaUsd.trim().replace(',', '.')) > 0;
   const tarifaValida = (k: ClaveTarifaCorte) => tarifas != null && PATRON_BS.test(tarifas[k]);
   const todoValido =
-    topeValido && difValido && margenValido && prendasValidas && CLAVES_TARIFA_CORTE.every(tarifaValida);
+    topeValido &&
+    difValido &&
+    margenValido &&
+    prendasValidas &&
+    tasaValida &&
+    CLAVES_TARIFA_CORTE.every(tarifaValida);
 
   const onGuardar = async () => {
     if (!todoValido || !tarifas) return;
@@ -112,6 +120,7 @@ export function ConfiguracionPage() {
       diferencialMaestroExterno: aCentavos(difBs),
       margenVenta: Math.round(Number(margenPct.trim().replace(',', '.')) * 100),
       prendasMesCostoFijo: Number(prendasMes),
+      tasaCambioUsd: Math.round(Number(tasaUsd.trim().replace(',', '.')) * 10_000),
       ...Object.fromEntries(CLAVES_TARIFA_CORTE.map((k) => [k, aCentavos(tarifas[k])])),
     });
     setGuardado(true);
@@ -210,6 +219,26 @@ export function ConfiguracionPage() {
               <span className="text-sm text-gray-500">prendas</span>
             </div>
             {!prendasValidas && <p className="mt-1 text-xs text-error">Indicá cuántas prendas (ej. 1500)</p>}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-sm font-medium">Tipo de cambio para precios en dólares</label>
+            <p className="mb-2 text-xs text-gray-500">
+              Bs por cada $us. Se usa solo para mostrar el costo y la venta <strong>por docena en
+              dólares</strong> en las fichas de costo. Cambialo cuando se mueva el dólar; las compras en
+              $us guardan su propia tasa del día.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500">Bs</span>
+              <input
+                value={tasaUsd}
+                onChange={(e) => setTasaUsd(e.target.value)}
+                inputMode="decimal"
+                className={`${claseInput} mono max-w-32`}
+              />
+              <span className="text-sm text-gray-500">por $us</span>
+            </div>
+            {!tasaValida && <p className="mt-1 text-xs text-error">Tipo de cambio inválido (ej. 11.85)</p>}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

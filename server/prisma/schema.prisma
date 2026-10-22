@@ -335,6 +335,9 @@ model Configuracion {
   // costos fijos (docs/PLAN_COSTOS.md §7c): prendas por mes con las que se reparte el
   // costo fijo en las fichas (el mínimo de producción: precio seguro)
   prendasMesCostoFijo         Int @default(1500)
+  // costos: tipo de cambio para mostrar precios por docena en $us (diezmilésimos;
+  // 11.85 = 118 500). Solo para mostrar; no cambia ningún cálculo en Bs.
+  tasaCambioUsd               Int @default(118500)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -653,6 +656,7 @@ model CompraInsumo {
   montoUsd     Int? // centavos de $us (compra en dólares)
   tasaCambio   Int? // diezmilésimos: tasa oficial del día de la compra
   precioTotal  Int // centavos Bs (en dólares: montoUsd × tasa, redondeado una vez)
+  codigoCorte  String? // corte para el que se compró (texto: "28-1"; los cortes 25–32 no están en el sistema)
   notas        String?
   creadoEn     DateTime     @default(now())
 

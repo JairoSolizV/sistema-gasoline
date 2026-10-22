@@ -12,6 +12,7 @@ import { useCostosFijos, useMutacionFijos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
 import { HojaOficio } from '../../components/HojaOficio';
 import { Modal } from '../../components/Modal';
+import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { MESES } from '../../lib/meses';
 import { aCentesimasPct, fechaCorta, PATRON_BS, PATRON_DECIMAL, pct } from './formato';
@@ -279,15 +280,15 @@ function Gastos({ d, onModal }: { d: CostosFijosMesDTO; onModal: (m: ModalFijos)
   const mutar = useMutacionFijos();
   const [abiertas, setAbiertas] = useState<string | null>(null);
   return (
-    <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-            <th className="px-5 py-3">Gasto</th>
-            <th className="px-3 py-3 text-right">Del mes</th>
-            <th className="px-3 py-3 text-right">% taller</th>
-            <th className="px-3 py-3 text-right">Parte del taller</th>
-            <th className="px-5 py-3 text-right">Acciones</th>
+    <div className={`mt-4 ${TABLA.contenedorPagina}`}>
+      <table className="text-sm">
+        <thead className={TABLA.cabecera}>
+          <tr className={TABLA.filaCabecera}>
+            <th className="px-3 py-2.5">Gasto</th>
+            <th className="px-3 py-2.5 text-right">Del mes</th>
+            <th className="px-3 py-2.5 text-right">% taller</th>
+            <th className="px-3 py-2.5 text-right">Parte del taller</th>
+            <th className="px-3 py-2.5 text-right">Acciones</th>
           </tr>
         </thead>
         {GRUPOS_GASTO_FIJO.map((grupo) => {
@@ -295,8 +296,8 @@ function Gastos({ d, onModal }: { d: CostosFijosMesDTO; onModal: (m: ModalFijos)
           if (lista.length === 0) return null;
           return (
             <tbody key={grupo}>
-              <tr className="bg-gray-50/60">
-                <td colSpan={5} className="px-5 py-1.5 text-xs font-semibold text-gray-600">
+              <tr className="bg-gray-200/70">
+                <td colSpan={5} className="px-3 py-1.5 text-xs font-semibold text-gray-700">
                   {ETIQUETA_GRUPO[grupo]}
                 </td>
               </tr>
@@ -343,8 +344,8 @@ function FilaGasto({
   const porCompras = g.tipo === 'por_compras';
   return (
     <>
-      <tr className={`border-b border-gray-100 ${g.activo ? '' : 'opacity-50'}`}>
-        <td className="px-5 py-2.5">
+      <tr className={`${TABLA.fila} ${g.activo ? '' : 'opacity-50'}`}>
+        <td className="max-w-[300px] px-3 py-2">
           <div className="font-medium">{g.nombre}</div>
           <div className="text-[11px] text-gray-400">
             {porCompras ? (
@@ -357,10 +358,10 @@ function FilaGasto({
             {g.notas && ` · ${g.notas}`}
           </div>
         </td>
-        <td className="mono px-3 py-2.5 text-right text-gray-600">Bs {formatBs(g.base)}</td>
-        <td className="mono px-3 py-2.5 text-right text-gray-600">{pct(g.porcentajeTaller)}</td>
-        <td className="mono px-3 py-2.5 text-right font-semibold">Bs {formatBs(g.parteTaller)}</td>
-        <td className="px-5 py-2.5 text-right text-[13px] font-medium whitespace-nowrap">
+        <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">Bs {formatBs(g.base)}</td>
+        <td className="mono px-3 py-2 text-right text-gray-600">{pct(g.porcentajeTaller)}</td>
+        <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">Bs {formatBs(g.parteTaller)}</td>
+        <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
           <button
             onClick={() => onModal(porCompras ? { tipo: 'compra', gasto: g } : { tipo: 'monto', gasto: g })}
             className="text-acento hover:underline"
@@ -395,15 +396,15 @@ function Prestamos({ d, onModal }: { d: CostosFijosMesDTO; onModal: (m: ModalFij
   const mutar = useMutacionFijos();
   if (d.prestamos.length === 0) return null;
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 bg-gray-50 px-5 py-2.5 text-sm font-semibold">
+    <div className="mt-4 w-fit max-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-semibold">
         Préstamos · recuperación de deuda (cuota completa)
       </div>
-      <table className="w-full text-sm">
+      <table className="text-sm">
         <tbody>
           {d.prestamos.map((p) => (
-            <tr key={p.id} className={`border-b border-gray-100 last:border-0 ${p.activo ? '' : 'opacity-50'}`}>
-              <td className="px-5 py-2.5">
+            <tr key={p.id} className={`${TABLA.fila} ${p.activo ? '' : 'opacity-50'}`}>
+              <td className="max-w-[300px] px-3 py-2">
                 <div className="font-medium">{p.banco}</div>
                 <div className="text-[11px] text-gray-400">
                   vence el {fechaCorta(p.vence)}

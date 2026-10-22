@@ -44,6 +44,12 @@ export function aBolivianos(centavosUsd: number, tasaDiezmilesimos: number): num
   return redondear(fr(centavosUsd * tasaDiezmilesimos, TASA_ESCALA));
 }
 
+/** Centavos de $us por docena de un precio por prenda en Bs: × 12 ÷ tasa,
+ *  redondeado una vez (solo para mostrar precios en dólares). */
+export function docenaEnDolares(centavosBsPorPrenda: number, tasaDiezmilesimos: number): number {
+  return redondear(fr(centavosBsPorPrenda * 12 * TASA_ESCALA, tasaDiezmilesimos));
+}
+
 /** Precio unitario exacto (centavos por 1 unidad) de una compra. */
 export function precioUnitario(compra: { precioTotal: number; cantidad: number }): Fraccion {
   // cantidad en milésimas: precioTotal / (cantidad / 1000)

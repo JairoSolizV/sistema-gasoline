@@ -11,6 +11,10 @@ export function useEditarConfiguracion() {
   return useMutation({
     mutationFn: (input: EditarConfiguracionInput) =>
       api<ConfiguracionDTO>('/configuracion', { method: 'PATCH', body: JSON.stringify(input) }),
-    onSuccess: (dto) => qc.setQueryData(['configuracion'], dto),
+    onSuccess: (dto) => {
+      qc.setQueryData(['configuracion'], dto);
+      // margen, prendas de referencia y tipo de cambio cambian lo que muestra Costos
+      void qc.invalidateQueries({ queryKey: ['costos'] });
+    },
   });
 }

@@ -4,6 +4,7 @@ import { useCrearConteo, useEliminarInsumo, useGuardarInsumo, useInsumos } from 
 import { hoyLocalISO } from '../../lib/fechas';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { TABLA } from '../../components/tabla';
 import {
   aMilesimas,
   bsUnitario,
@@ -67,34 +68,35 @@ export function InsumosTab() {
       {eliminar.error != null && (
         <p className="mb-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{mensaje(eliminar.error)}</p>
       )}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              <th className="px-5 py-3">Insumo</th>
-              <th className="px-3 py-3">Categoría</th>
-              <th className="px-3 py-3 text-right">Precio actual</th>
-              <th className="px-3 py-3">Última compra</th>
-              <th className="px-3 py-3 text-right">Stock</th>
-              <th className="px-5 py-3 text-right">Acciones</th>
+      <div className={TABLA.contenedor}>
+        <table className="text-sm">
+          <thead className={TABLA.cabecera}>
+            <tr className={TABLA.filaCabecera}>
+              <th className="px-3 py-2.5">Insumo</th>
+              <th className="px-3 py-2.5">Categoría</th>
+              <th className="px-3 py-2.5 text-right">Precio actual</th>
+              <th className="px-3 py-2.5">Última compra</th>
+              <th className="px-3 py-2.5">Comprado para</th>
+              <th className="px-3 py-2.5 text-right">Stock</th>
+              <th className="px-3 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
             )}
             {lista.map((i) => (
-              <tr key={i.id} className={`border-b border-gray-100 last:border-0 ${i.activo ? '' : 'opacity-50'}`}>
-                <td className="px-5 py-2.5">
+              <tr key={i.id} className={`${TABLA.fila} ${i.activo ? '' : 'opacity-50'}`}>
+                <td className="max-w-[240px] px-3 py-2">
                   <div className="font-medium">{i.nombre}</div>
                   <div className="text-xs text-gray-500">{detalleInsumo(i)}</div>
                 </td>
-                <td className="px-3 py-2.5 text-gray-600">{ETIQUETA_CATEGORIA[i.categoria]}</td>
-                <td className="mono px-3 py-2.5 text-right">
+                <td className="px-3 py-2 whitespace-nowrap text-gray-600">{ETIQUETA_CATEGORIA[i.categoria]}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">
                   {i.precioUnitarioBs != null ? (
                     <>
                       {bsUnitario(i.precioUnitarioBs)}
@@ -104,10 +106,26 @@ export function InsumosTab() {
                     <span className="text-xs text-amber-700">sin compras</span>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-xs text-gray-500">
-                  {i.ultimaCompra ? `${fechaCorta(i.ultimaCompra.fecha)} · ${i.ultimaCompra.tienda}` : '—'}
+                <td className="px-3 py-2 text-xs whitespace-nowrap text-gray-500">
+                  {i.ultimaCompra ? (
+                    <>
+                      {fechaCorta(i.ultimaCompra.fecha)}
+                      <div className="text-[11px] text-gray-400">{i.ultimaCompra.tienda}</div>
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </td>
-                <td className="mono px-3 py-2.5 text-right">
+                <td className="max-w-[140px] px-3 py-2 text-xs text-gray-600">
+                  {i.codigosCorte.length > 0 ? (
+                    <span title="Códigos de corte de sus compras, el más reciente primero">
+                      COD {i.codigosCorte.join(', ')}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">
                   <span className={i.stock.stock < 0 ? 'text-error' : ''}>
                     {deMilesimas(i.stock.stock)} {i.unidad}
                   </span>
@@ -115,7 +133,7 @@ export function InsumosTab() {
                     {i.stock.conteo ? `contado el ${fechaCorta(i.stock.conteo.fecha)}` : 'sin conteo'}
                   </div>
                 </td>
-                <td className="px-5 py-2.5 text-right text-[13px] font-medium whitespace-nowrap">
+                <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
                   <button onClick={() => setContar(i)} className="mr-3 text-acento hover:underline">
                     Contar
                   </button>
@@ -135,7 +153,7 @@ export function InsumosTab() {
             ))}
             {!isLoading && lista.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
                   No hay insumos {filtro ? 'en esta categoría' : 'cargados'}.
                 </td>
               </tr>

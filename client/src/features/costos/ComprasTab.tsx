@@ -10,6 +10,7 @@ import {
 import { useCompras, useCrearCompra, useEliminarCompra, useInsumos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import {
   aDiezmilesimos,
@@ -57,41 +58,45 @@ export function ComprasTab() {
           + Registrar compra
         </button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              <th className="px-5 py-3">Fecha</th>
-              <th className="px-3 py-3">Insumo</th>
-              <th className="px-3 py-3">Dónde</th>
-              <th className="px-3 py-3 text-right">Cantidad</th>
-              <th className="px-3 py-3 text-right">Pagado</th>
-              <th className="px-3 py-3 text-right">Por unidad</th>
-              <th className="px-5 py-3" />
+      <div className={TABLA.contenedor}>
+        <table className="text-sm">
+          <thead className={TABLA.cabecera}>
+            <tr className={TABLA.filaCabecera}>
+              <th className="px-3 py-2.5">Fecha</th>
+              <th className="px-3 py-2.5">Insumo</th>
+              <th className="px-3 py-2.5">Para el corte</th>
+              <th className="px-3 py-2.5">Dónde</th>
+              <th className="px-3 py-2.5 text-right">Cantidad</th>
+              <th className="px-3 py-2.5 text-right">Pagado</th>
+              <th className="px-3 py-2.5 text-right">Por unidad</th>
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
             )}
             {compras?.map((c) => (
-              <tr key={c.id} className="border-b border-gray-100 last:border-0">
-                <td className="px-5 py-2.5 text-gray-500">{fechaCorta(c.fecha)}</td>
-                <td className="px-3 py-2.5 font-medium">{c.insumo.nombre}</td>
-                <td className="px-3 py-2.5 text-xs text-gray-600">
+              <tr key={c.id} className={TABLA.fila}>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-500">{fechaCorta(c.fecha)}</td>
+                <td className="max-w-[200px] px-3 py-2 font-medium">{c.insumo.nombre}</td>
+                <td className="mono px-3 py-2 whitespace-nowrap">
+                  {c.codigoCorte ? `COD ${c.codigoCorte}` : <span className="text-gray-400">—</span>}
+                </td>
+                <td className="max-w-[200px] px-3 py-2 text-xs text-gray-600">
                   {c.tienda}
                   <div className="text-gray-400">
                     {[ETIQUETA_ORIGEN[c.origen], c.ciudad, c.presentacion].filter(Boolean).join(' · ')}
                   </div>
                 </td>
-                <td className="mono px-3 py-2.5 text-right text-gray-600">
+                <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">
                   {deMilesimas(c.cantidad)} {c.insumo.unidad}
                 </td>
-                <td className="mono px-3 py-2.5 text-right">
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">
                   Bs {formatBs(c.precioTotal)}
                   {c.moneda === 'USD' && (
                     <div className="text-[11px] text-gray-400">
@@ -99,8 +104,8 @@ export function ComprasTab() {
                     </div>
                   )}
                 </td>
-                <td className="mono px-3 py-2.5 text-right font-semibold">{bsUnitario(c.precioUnitarioBs)}</td>
-                <td className="px-5 py-2.5 text-right">
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bsUnitario(c.precioUnitarioBs)}</td>
+                <td className="px-3 py-2 text-right">
                   <button onClick={() => setQuitar(c)} className="text-[13px] font-medium text-error hover:underline">
                     Quitar
                   </button>
@@ -109,7 +114,7 @@ export function ComprasTab() {
             ))}
             {compras?.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
                   No hay compras registradas.
                 </td>
               </tr>
@@ -164,6 +169,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
     precioBs: '',
     montoUsd: '',
     tasa: '',
+    codigoCorte: '',
     notas: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -200,6 +206,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
       ...(enDolares
         ? { montoUsd: aCentavos(v.montoUsd.trim().replace(',', '.')), tasaCambio: aDiezmilesimos(v.tasa) }
         : { precioTotal: totalBs }),
+      codigoCorte: v.codigoCorte.trim() || undefined,
       notas: v.notas,
     });
     onCerrar();
@@ -306,6 +313,15 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
             />
           </div>
         )}
+        <div>
+          <label className="mb-1 block text-sm font-medium">Para el corte (código)</label>
+          <input
+            value={v.codigoCorte}
+            onChange={(e) => cambiar('codigoCorte', e.target.value)}
+            placeholder="ej. 33 o 28-1"
+            className={`mono ${claseInput}`}
+          />
+        </div>
         <div className="col-span-2">
           <label className="mb-1 block text-sm font-medium">Notas</label>
           <input value={v.notas} onChange={(e) => cambiar('notas', e.target.value)} className={claseInput} />

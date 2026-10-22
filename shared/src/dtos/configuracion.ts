@@ -13,4 +13,5 @@ export interface ConfiguracionDTO {
   tarifaClasificacionRespaldo: number; // por prenda y clasificador sin tarifa propia
   margenVenta: number; // costos: margen general del precio de venta, centésimas de % (3000 = 30 %)
   prendasMesCostoFijo: number; // costos fijos: prendas por mes con las que se reparten en las fichas
+  tasaCambioUsd: number; // costos: Bs por $us para mostrar la docena en dólares (diezmilésimos)
 }

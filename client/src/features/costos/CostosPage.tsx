@@ -1,6 +1,8 @@
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatBs } from '@taller/shared';
 import { useFichasCosto } from '../../api/costos';
+import { useConfiguracion } from '../../api/configuracion';
+import { TABLA } from '../../components/tabla';
 import { ComprasTab } from './ComprasTab';
 import { CortesCostoTab } from './CortesCostoTab';
 import { FijosTab } from './FijosTab';
@@ -65,10 +67,15 @@ export function CostosPage() {
 
 function FichasTab() {
   const { data: fichas, isLoading } = useFichasCosto();
+  const { data: config } = useConfiguracion();
   const navigate = useNavigate();
+  const tasa = config ? (config.tasaCambioUsd / 10_000).toFixed(2) : null;
   return (
     <>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="text-xs text-gray-500">
+          {tasa && <>Docena en dólares con el tipo de cambio {tasa} (se cambia en Configuración).</>}
+        </div>
         <button
           onClick={() => navigate('/costos/fichas/nueva')}
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2]"
@@ -76,35 +83,41 @@ function FichasTab() {
           + Nueva ficha de costo
         </button>
       </div>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              <th className="px-5 py-3">Código</th>
-              <th className="px-3 py-3">Modelo</th>
-              <th className="px-3 py-3">Vinculado a</th>
-              <th className="px-3 py-3 text-right">Costo por prenda</th>
-              <th className="px-5 py-3 text-right">Precio de venta</th>
+      <div className={TABLA.contenedor}>
+        <table className="text-sm">
+          <thead className={TABLA.cabecera}>
+            <tr className={TABLA.filaCabecera}>
+              <th className="px-3 py-2.5">Código</th>
+              <th className="px-3 py-2.5">Modelo</th>
+              <th className="px-3 py-2.5">Vinculado a</th>
+              <th className="px-3 py-2.5 text-right">Costo por prenda</th>
+              <th className="px-3 py-2.5 text-right">Precio de venta</th>
+              <th className="px-3 py-2.5 text-right" title={tasa ? `Tipo de cambio ${tasa} (Configuración)` : undefined}>
+                Costo docena $us
+              </th>
+              <th className="px-3 py-2.5 text-right" title={tasa ? `Tipo de cambio ${tasa} (Configuración)` : undefined}>
+                Venta docena $us
+              </th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
             )}
             {fichas?.map((f) => (
-              <tr key={f.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                <td className="mono px-5 py-2.5 text-gray-500">{f.codigo ?? '—'}</td>
-                <td className="px-3 py-2.5">
+              <tr key={f.id} className={TABLA.fila}>
+                <td className="mono px-3 py-2 text-gray-500">{f.codigo ?? '—'}</td>
+                <td className="max-w-[280px] px-3 py-2">
                   <Link to={`/costos/fichas/${f.id}`} className="font-medium text-acento hover:underline">
                     {f.nombre}
                   </Link>
                 </td>
-                <td className="px-3 py-2.5 text-gray-500">{f.modelo?.nombre ?? '—'}</td>
-                <td className="mono px-3 py-2.5 text-right font-semibold">
+                <td className="max-w-[200px] px-3 py-2 text-gray-500">{f.modelo?.nombre ?? '—'}</td>
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">
                   Bs {formatBs(f.total)}
                   {f.incompleto && (
                     <span
@@ -115,12 +128,16 @@ function FichasTab() {
                     </span>
                   )}
                 </td>
-                <td className="mono px-5 py-2.5 text-right text-ok">Bs {formatBs(f.precioVenta)}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap text-ok">Bs {formatBs(f.precioVenta)}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">$us {formatBs(f.costoDocenaUsd)}</td>
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap text-ok">
+                  $us {formatBs(f.ventaDocenaUsd)}
+                </td>
               </tr>
             ))}
             {fichas?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
                   Todavía no hay fichas de costo.
                 </td>
               </tr>

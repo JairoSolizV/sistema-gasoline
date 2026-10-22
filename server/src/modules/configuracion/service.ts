@@ -27,6 +27,7 @@ function aDTO(c: Configuracion): ConfiguracionDTO {
     tarifaClasificacionRespaldo: c.tarifaClasificacionRespaldo,
     margenVenta: c.margenVenta,
     prendasMesCostoFijo: c.prendasMesCostoFijo,
+    tasaCambioUsd: c.tasaCambioUsd,
   };
 }
 
@@ -49,6 +50,7 @@ export const configuracionService = {
       ...(input.prendasMesCostoFijo !== undefined
         ? { prendasMesCostoFijo: input.prendasMesCostoFijo }
         : {}),
+      ...(input.tasaCambioUsd !== undefined ? { tasaCambioUsd: input.tasaCambioUsd } : {}),
     };
     for (const clave of CLAVES_TARIFA_CORTE) {
       if (input[clave] !== undefined) data[clave] = input[clave];

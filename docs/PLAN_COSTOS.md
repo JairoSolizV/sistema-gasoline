@@ -197,3 +197,12 @@ y la proyección suman el costo fijo por prenda. Solo consulta: no toca pagos.
   proyección). Pantalla: pestaña **Costos fijos** (mes, gastos por grupo, compras de comida, préstamos).
   Verificado en el navegador con datos de prueba (luego borrados): 14 025 + 85 % de 1250 + 60 % de 450 +
   10 500 = Bs 25 857.50 → Bs 17.24 por prenda en las fichas. 375 tests en verde (`costos-fijos` nuevo).
+- **2026-10-23 — Docena en dólares, código de corte de las compras y tablas.** Pedido del dueño.
+  `Configuracion.tasaCambioUsd` (11.85 por defecto, editable en Configuración; solo para mostrar) y
+  `CompraInsumo.codigoCorte` (texto, ej. "28-1") — migración `20261023120000_codigo_corte_tasa_usd`, que
+  llena el código de las 59 compras importadas desde su nota. Fichas: costo y venta por docena en $us
+  (`docenaEnDolares`: × 12 ÷ tasa, un solo redondeo). Insumos: columna "Comprado para" (códigos de sus
+  compras, el más reciente primero). Compras: columna y campo "Para el corte". Todas las tablas de
+  Costos y la planilla de Liquidación con ancho ajustado, cabecera fija y filas en franjas
+  (`components/tabla.ts`); en Liquidación la primera columna de los servicios externos dice "Empresa".
+  377 tests en verde.
