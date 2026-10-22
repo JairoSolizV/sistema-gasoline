@@ -8,3 +8,6 @@ coverage/
 
 # respaldos locales de la BD (contienen datos reales)
 backups/
+
+# planillas personales del dueño (presupuesto familiar): no se suben
+planillas/
