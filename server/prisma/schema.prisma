@@ -73,6 +73,7 @@ model Operario {
   modelosBuscados Modelo[]    @relation("ModeloBuscador")
   pagosMolde      PagoMolde[]
   sueldos         SueldoAyudante[]
+  asistencias     Asistencia[]
 }
 
 model Modelo {
@@ -482,4 +483,29 @@ model SueldoAyudante {
   createdAt    DateTime @default(now())
 
   @@unique([operarioId, vigenteDesde])
+}
+
+// ── Ayudantes: asistencia diaria (docs/PLAN_AYUDANTES.md §2-3) ───────────────
+// Un registro por ayudante y día (lunes a sábado). El sueldo del día sale de
+// minutosPagados (shared/sueldo.ts): trabajo = 540 − descontados − operaciones,
+// falta = 0, feriado = 540. Es historial de pago: impide eliminar al operario.
+enum EstadoAsistencia {
+  trabajo
+  falta
+  feriado
+}
+
+model Asistencia {
+  id                 String           @id @default(uuid())
+  operario           Operario         @relation(fields: [operarioId], references: [id])
+  operarioId         String
+  fecha              DateTime         @db.Date
+  estado             EstadoAsistencia
+  minutosDescontados Int              @default(0) // atrasos y salidas antes de hora
+  minutosOperaciones Int              @default(0) // horas de horario en operaciones (se pagan aparte)
+  nota               String?
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([operarioId, fecha])
+  @@index([fecha])
 }

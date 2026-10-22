@@ -1,7 +1,7 @@
 # Ayudantes con sueldo semanal, asistencia y operaciones de empaque
 
-> **Estado:** aprobado el 2026-10-01. Rebanada 1 (**rol ayudante + sueldo**) implementada y verificada;
-> rebanadas 2–4 pendientes.
+> **Estado:** aprobado el 2026-10-01. Rebanadas 1 (**rol ayudante + sueldo**) y 2 (**asistencia**) implementadas y verificadas;
+> rebanadas 3–4 pendientes.
 > **Amplía el alcance** (CLAUDE.md §2): hasta ahora solo se pagaba por operación. Al implementar se
 > actualizan `CLAUDE.md` (alcance e invariantes 5 y 10) y `CONTEXTO_NEGOCIO_TALLER.md`.
 > Corrige `PLAN_SERVICIO_CORTE.md` §2.14: el **empaque** no es un proveedor externo; lo hacen
@@ -141,3 +141,15 @@ Liquidacion      + ganadoEmpaque Int, + ganadoSueldo Int   // desglose persistid
   Bolivia, `lib/hoy.ts`). `ROLES_COSTURA` = costurero o ayudante: los ayudantes ya reciben costura.
   UI: campo de sueldo en el alta, historial con sueldos "programados" en la ficha, chip
   "Ayudante · 400.00/sem". Migración `20261001170000_ayudante_sueldo`. 241 tests en verde.
+- **2026-10-21 — Rebanada 2 (asistencia).** Cálculo en `shared/sueldo.ts` (puro, compartido con la
+  pantalla): `minutosPagados`, `sueldoDelPeriodo` (Σ semanal × minutos ÷ 3240, half-up una vez, en
+  enteros) y `repartirSueldo` (mayor resto; las partes suman exacto el total). `Asistencia` (un
+  registro por ayudante y día `@db.Date`; es historial: impide eliminar). API `/asistencia`:
+  `GET /semana?lunes=`, `PUT` (marcar/corregir), `DELETE ?operarioId&fecha` (desmarcar),
+  `POST /presentes` (no pisa lo ya marcado). Reglas: solo ayudantes, lunes a sábado, dentro de
+  ingreso/baja (día de Bolivia, `lib/hoy.ts`), con sueldo vigente ese día (`SIN_SUELDO`), minutos ≤ 540
+  y en 0 con falta/feriado, nada en mes liquidado. Pantalla **Asistencia** (menú): grilla semanal, "✓
+  todos presentes" por día, modal con atajos de operaciones (mañana 4 h / tarde 5 h / día entero) y
+  vista previa del sueldo del día. Verificado en navegador: 66.67 + 66.66 + 29.63 = 162.96. El sueldo
+  **todavía no entra a la liquidación** (rebanada 4). Migración
+  `20261021130000_asistencia_ayudantes`. 314 tests en verde.

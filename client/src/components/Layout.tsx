@@ -109,6 +109,12 @@ export function Layout() {
             Anticipos
           </ItemMenu>
           <ItemMenu
+            a="/asistencia"
+            icono={<Icono d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8.5 15l2 2 4-4" />}
+          >
+            Asistencia
+          </ItemMenu>
+          <ItemMenu
             a="/liquidacion"
             icono={<Icono d="M9.5 6h10M9.5 12h10M9.5 18h10M4 5.6l1.3 1.3L7.6 4.6M4 11.6l1.3 1.3 2.3-2.3M4 17.6l1.3 1.3 2.3-2.3" />}
           >

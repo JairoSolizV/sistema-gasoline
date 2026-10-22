@@ -8,6 +8,7 @@ import { catalogoRouter } from './modules/catalogo/routes.js';
 import { plantillasRouter } from './modules/plantillas/routes.js';
 import { cortesRouter } from './modules/cortes/routes.js';
 import { anticiposRouter } from './modules/anticipos/routes.js';
+import { asistenciaRouter } from './modules/asistencia/routes.js';
 import { liquidacionRouter } from './modules/liquidacion/routes.js';
 import { rendicionRouter } from './modules/rendicion/routes.js';
 import { configuracionRouter } from './modules/configuracion/routes.js';
@@ -32,6 +33,7 @@ export function crearApp({ authObligatoria = false } = {}) {
   app.use('/api/v1/catalogo', catalogoRouter);
   app.use('/api/v1/cortes', cortesRouter);
   app.use('/api/v1/anticipos', anticiposRouter);
+  app.use('/api/v1/asistencia', asistenciaRouter);
   app.use('/api/v1/liquidacion', liquidacionRouter);
   app.use('/api/v1/rendicion', rendicionRouter);
   app.use('/api/v1/configuracion', configuracionRouter);

@@ -11,3 +11,9 @@ const formato = new Intl.DateTimeFormat('en-CA', {
 export function hoyEnBolivia(ahora = new Date()): string {
   return formato.format(ahora); // en-CA da 'aaaa-mm-dd'
 }
+
+/** Día del taller (hora de Bolivia) de un instante: 'aaaa-mm-dd'. Para fechas
+ *  con hora como fechaIngreso / fechaBaja, que no son @db.Date. */
+export function diaEnBolivia(instante: Date): string {
+  return formato.format(instante);
+}

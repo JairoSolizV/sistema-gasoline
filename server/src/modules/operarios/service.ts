@@ -29,6 +29,7 @@ function partesHistorial(c: OperarioConHistorial['_count']): string[] {
     c.trabajosCorte && `${c.trabajosCorte} trabajo(s) del servicio de corte`,
     c.modelosBuscados && `buscador de ${c.modelosBuscados} modelo(s)`,
     c.pagosMolde && `${c.pagosMolde} pago(s) de moldes`,
+    c.asistencias && `${c.asistencias} día(s) de asistencia`,
   ].filter((p): p is string => Boolean(p));
 }
 
@@ -58,7 +59,7 @@ function aDTO(o: OperarioConHistorial): OperarioDTO {
 }
 
 /** Sueldo semanal vigente en un día: el último con vigenteDesde ≤ ese día. */
-function sueldoVigenteEl(
+export function sueldoVigenteEl(
   sueldos: { montoSemanal: number; vigenteDesde: Date }[],
   dia: string,
 ): number | null {

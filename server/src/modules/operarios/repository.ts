@@ -12,6 +12,7 @@ const conHistorial = {
       trabajosCorte: true,
       modelosBuscados: true,
       pagosMolde: true,
+      asistencias: true,
     },
   },
   // ayudantes: historial de sueldo semanal, el más reciente primero

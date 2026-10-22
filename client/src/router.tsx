@@ -14,6 +14,7 @@ import { CortesPage } from './features/cortes/CortesPage';
 import { NuevoCortePage } from './features/cortes/NuevoCortePage';
 import { CorteDetallePage } from './features/cortes/CorteDetallePage';
 import { AnticiposPage } from './features/anticipos/AnticiposPage';
+import { AsistenciaPage } from './features/asistencia/AsistenciaPage';
 import { LiquidacionPage } from './features/liquidacion/LiquidacionPage';
 import { RendicionPage } from './features/rendicion/RendicionPage';
 import { ConfiguracionPage } from './features/configuracion/ConfiguracionPage';
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
           { path: '/cortes/nuevo', element: <NuevoCortePage /> },
           { path: '/cortes/:corteId', element: <CorteDetallePage /> },
           { path: '/anticipos', element: <AnticiposPage /> },
+          { path: '/asistencia', element: <AsistenciaPage /> },
           { path: '/liquidacion', element: <LiquidacionPage /> },
           { path: '/rendicion', element: <RendicionPage /> },
           { path: '/configuracion', element: <ConfiguracionPage /> },
