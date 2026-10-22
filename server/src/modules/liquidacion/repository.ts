@@ -60,6 +60,16 @@ export const liquidacionRepository = {
     });
   },
 
+  /** Envíos a lavandería/bordado DEVUELTOS en el mes: se ganan en la fecha de
+   *  devolución (PLAN_CUENTAS_SEPARADAS §5). */
+  enviosDevueltosDelMes(anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.envioServicio.findMany({
+      where: { fechaDevolucion: { gte: inicio, lt: fin } },
+      select: { operarioId: true, servicio: true, total: true, fechaDevolucion: true, corteId: true },
+    });
+  },
+
   anticiposDelMes(anio: number, mes: number) {
     const { inicio, fin } = rangoMesUTC(anio, mes);
     return prisma.anticipo.findMany({
@@ -107,7 +117,7 @@ export const liquidacionRepository = {
   },
 
   /** ¿Hay dinero (cortes cerrados, anticipos, trabajos del servicio de corte,
-   *  moldes o asistencia de ayudantes) en los meses ESTRICTAMENTE entre el
+   *  moldes, asistencia o envíos devueltos) en los meses ESTRICTAMENTE entre el
    *  último cierre y el mes dado? Si lo hay, cerrar el mes dado lo dejaría sin
    *  liquidar. */
   async hayMovimientosEntre(
@@ -127,6 +137,7 @@ export const liquidacionRepository = {
       prisma.trabajoCorte.findFirst({ where: { fecha: enRango }, select: { id: true } }),
       prisma.pagoMolde.findFirst({ where: { fecha: enRango }, select: { id: true } }),
       prisma.asistencia.findFirst({ where: { fecha: enRango }, select: { id: true } }),
+      prisma.envioServicio.findFirst({ where: { fechaDevolucion: enRango }, select: { id: true } }),
     ]);
     return hallazgos.some((h) => h !== null);
   },

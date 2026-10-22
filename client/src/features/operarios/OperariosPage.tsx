@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { standardSchemaResolver } from '@hookform/resolvers/standard-schema';
 import { z } from 'zod';
@@ -8,7 +8,10 @@ import {
   ciSchema,
   ETIQUETA_ROL,
   formatBs,
+  MENSAJE_ROLES_PROVEEDOR,
   ROLES_OPERARIO,
+  ROLES_PROVEEDOR,
+  rolesCoherentes,
   rolOperarioSchema,
   tipoOperarioSchema,
   type OperarioDTO,
@@ -47,6 +50,8 @@ function errorTarifa(v: string): string | null {
 const TARIFAS_POR_ROL = [
   ['tarifaCorte', 'cortador'],
   ['tarifaClasificacion', 'clasificador'],
+  ['tarifaLavanderia', 'lavanderia'],
+  ['tarifaBordado', 'bordado'],
 ] as const;
 
 function crearFormSchema(esAlta: boolean) {
@@ -58,11 +63,12 @@ function crearFormSchema(esAlta: boolean) {
       roles: z.array(rolOperarioSchema).min(1, 'Elegí al menos un rol'),
       tarifaCorte: z.string(),
       tarifaClasificacion: z.string(),
-      ci: vacioOk(ciSchema),
+      tarifaLavanderia: z.string(),
+      tarifaBordado: z.string(),
+      // CI y nacimiento: obligatorios en el alta salvo para un proveedor externo
+      ci: z.union([z.literal(''), ciSchema]),
       celular: vacioOk(celularSchema),
-      fechaNacimiento: esAlta
-        ? z.string().min(1, 'La fecha de nacimiento es obligatoria')
-        : z.string(),
+      fechaNacimiento: z.string(),
       fechaIngreso: z.string().min(1, 'La fecha de ingreso es obligatoria'),
       fechaSalida: z.string(),
       sueldoSemanal: z.string(), // solo alta de ayudante; luego se cambia con historial
@@ -76,6 +82,21 @@ function crearFormSchema(esAlta: boolean) {
       message: 'La salida no puede ser anterior al ingreso',
     })
     .superRefine((v, ctx) => {
+      if (esAlta && v.tipo !== 'proveedor_externo') {
+        if (v.ci === '') {
+          ctx.addIssue({ code: 'custom', path: ['ci'], message: 'La cédula de identidad es obligatoria' });
+        }
+        if (v.fechaNacimiento === '') {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['fechaNacimiento'],
+            message: 'La fecha de nacimiento es obligatoria',
+          });
+        }
+      }
+      if (!rolesCoherentes(v.tipo, v.roles)) {
+        ctx.addIssue({ code: 'custom', path: ['roles'], message: MENSAJE_ROLES_PROVEEDOR });
+      }
       for (const [campo, rol] of TARIFAS_POR_ROL) {
         const error = v.roles.includes(rol) ? errorTarifa(v[campo]) : null;
         if (error) ctx.addIssue({ code: 'custom', path: [campo], message: error });
@@ -129,6 +150,13 @@ function formatearFecha(iso: string | null): string {
 }
 
 function BadgeTipo({ tipo }: { tipo: TipoOperario }) {
+  if (tipo === 'proveedor_externo') {
+    return (
+      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-violet-700">
+        proveedor externo
+      </span>
+    );
+  }
   return tipo === 'maestro_externo' ? (
     <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-2 py-0.5 text-[11px] font-semibold text-acento">
       maestro externo
@@ -277,6 +305,8 @@ function FormOperario({
     handleSubmit,
     control,
     watch,
+    getValues,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValores, unknown, FormSalida>({
     resolver: standardSchemaResolver(formSchema),
@@ -288,6 +318,9 @@ function FormOperario({
           tarifaCorte: operario.tarifaCorte != null ? formatBs(operario.tarifaCorte) : '',
           tarifaClasificacion:
             operario.tarifaClasificacion != null ? formatBs(operario.tarifaClasificacion) : '',
+          tarifaLavanderia:
+            operario.tarifaLavanderia != null ? formatBs(operario.tarifaLavanderia) : '',
+          tarifaBordado: operario.tarifaBordado != null ? formatBs(operario.tarifaBordado) : '',
           ci: operario.ci ?? '',
           celular: operario.celular ?? '',
           fechaNacimiento: aFechaInput(operario.fechaNacimiento),
@@ -300,6 +333,8 @@ function FormOperario({
           roles: ['costurero'],
           tarifaCorte: '',
           tarifaClasificacion: '',
+          tarifaLavanderia: '',
+          tarifaBordado: '',
           ci: '',
           celular: '',
           fechaNacimiento: '',
@@ -310,9 +345,21 @@ function FormOperario({
   });
 
   const roles = watch('roles') ?? [];
+  const tipo = watch('tipo');
+  const esProveedor = tipo === 'proveedor_externo';
   const esCortador = roles.includes('cortador');
   const esClasificador = roles.includes('clasificador');
   const esAyudante = roles.includes('ayudante');
+  const esLavanderia = roles.includes('lavanderia');
+  const esBordado = roles.includes('bordado');
+  // un proveedor externo solo tiene roles de proveedor, y al revés: al cambiar
+  // el tipo se quitan los roles que ya no corresponden
+  const rolesDelTipo = ROLES_OPERARIO.filter((r) => ROLES_PROVEEDOR.includes(r) === esProveedor);
+  useEffect(() => {
+    const actuales = getValues('roles') ?? [];
+    const validos = actuales.filter((r) => ROLES_PROVEEDOR.includes(r) === esProveedor);
+    if (validos.length !== actuales.length) setValue('roles', validos, { shouldValidate: true });
+  }, [esProveedor, getValues, setValue]);
 
   const onSubmit = handleSubmit(async (v) => {
     const fechaSalida = v.fechaSalida ? deFechaInput(v.fechaSalida) : null;
@@ -321,6 +368,8 @@ function FormOperario({
       roles: v.roles,
       tarifaCorte: v.roles.includes('cortador') ? aTarifa(v.tarifaCorte) : null,
       tarifaClasificacion: v.roles.includes('clasificador') ? aTarifa(v.tarifaClasificacion) : null,
+      tarifaLavanderia: v.roles.includes('lavanderia') ? aTarifa(v.tarifaLavanderia) : null,
+      tarifaBordado: v.roles.includes('bordado') ? aTarifa(v.tarifaBordado) : null,
     };
     if (operario) {
       await editar.mutateAsync({
@@ -341,9 +390,10 @@ function FormOperario({
         nombre: v.nombre,
         tipo: v.tipo,
         ...oficio,
-        ci: v.ci,
+        // un proveedor externo puede venir sin CI ni nacimiento
+        ci: v.ci || undefined,
         celular: v.celular,
-        fechaNacimiento: deFechaInput(v.fechaNacimiento),
+        fechaNacimiento: v.fechaNacimiento ? deFechaInput(v.fechaNacimiento) : undefined,
         fechaIngreso: deFechaInput(v.fechaIngreso),
         fechaSalida,
         ...(v.roles.includes('ayudante')
@@ -365,6 +415,9 @@ function FormOperario({
           <select {...register('tipo')} className={`${claseInput} bg-white`}>
             <option value="regular">Regular (tarifa base)</option>
             <option value="maestro_externo">Maestro externo (tarifa base + diferencial)</option>
+            <option value="proveedor_externo">
+              Proveedor externo (lavandería o bordado, cobra por prenda)
+            </option>
           </select>
         </Campo>
         <Campo etiqueta="Roles" opcional="uno o varios oficios" error={errors.roles?.message}>
@@ -373,7 +426,7 @@ function FormOperario({
             name="roles"
             render={({ field }) => (
               <div className="flex flex-wrap gap-1.5">
-                {ROLES_OPERARIO.map((rol) => {
+                {rolesDelTipo.map((rol) => {
                   const marcado = field.value?.includes(rol) ?? false;
                   return (
                     <button
@@ -433,6 +486,38 @@ function FormOperario({
             )}
           </div>
         )}
+        {(esLavanderia || esBordado) && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {esLavanderia && (
+              <Campo
+                etiqueta="Precio de lavandería (Bs/prenda)"
+                opcional="se puede cambiar en cada envío"
+                error={errors.tarifaLavanderia?.message}
+              >
+                <input
+                  {...register('tarifaLavanderia')}
+                  inputMode="decimal"
+                  placeholder="ej. 1.50"
+                  className={`mono ${claseInput}`}
+                />
+              </Campo>
+            )}
+            {esBordado && (
+              <Campo
+                etiqueta="Precio de bordado (Bs/prenda)"
+                opcional="se puede cambiar en cada envío"
+                error={errors.tarifaBordado?.message}
+              >
+                <input
+                  {...register('tarifaBordado')}
+                  inputMode="decimal"
+                  placeholder="ej. 0.80"
+                  className={`mono ${claseInput}`}
+                />
+              </Campo>
+            )}
+          </div>
+        )}
         {esAyudante &&
           (!operario ? (
             <Campo
@@ -455,7 +540,11 @@ function FormOperario({
             </p>
           ))}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Campo etiqueta="Cédula de identidad" error={errors.ci?.message}>
+          <Campo
+            etiqueta="Cédula de identidad"
+            opcional={esProveedor ? 'opcional' : undefined}
+            error={errors.ci?.message}
+          >
             <input {...register('ci')} placeholder="ej. 6543210 LP" className={claseInput} />
           </Campo>
           <Campo etiqueta="Número de celular" error={errors.celular?.message}>
@@ -467,7 +556,11 @@ function FormOperario({
               className={claseInput}
             />
           </Campo>
-          <Campo etiqueta="Fecha de nacimiento" error={errors.fechaNacimiento?.message}>
+          <Campo
+            etiqueta="Fecha de nacimiento"
+            opcional={esProveedor ? 'opcional' : undefined}
+            error={errors.fechaNacimiento?.message}
+          >
             <input
               type="date"
               max={hoyLocalISO()}
@@ -705,6 +798,8 @@ export function OperariosPage() {
                             {r === 'clasificador' &&
                               o.tarifaClasificacion != null &&
                               ` · ${formatBs(o.tarifaClasificacion)}`}
+                            {r === 'lavanderia' && o.tarifaLavanderia != null && ` · ${formatBs(o.tarifaLavanderia)}`}
+                            {r === 'bordado' && o.tarifaBordado != null && ` · ${formatBs(o.tarifaBordado)}`}
                             {r === 'ayudante' &&
                               (o.sueldoVigente != null
                                 ? ` · ${formatBs(o.sueldoVigente)}/sem`

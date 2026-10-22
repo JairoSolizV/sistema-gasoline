@@ -4,7 +4,9 @@ import {
   asignarGrupoSchema,
   cerrarCorteSchema,
   crearCorteSchema,
+  crearEnvioSchema,
   editarCodigoSchema,
+  editarEnvioSchema,
   editarOperacionSchema,
   editarRollosSchema,
   editarServicioSchema,
@@ -48,6 +50,10 @@ cortesRouter.delete(
   cortesController.quitarProceso,
 );
 cortesRouter.post('/:id/cerrar', validar(cerrarCorteSchema), cortesController.cerrar);
+// Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5)
+cortesRouter.post('/:id/envios', validar(crearEnvioSchema), cortesController.crearEnvio);
+cortesRouter.patch('/:id/envios/:envioId', validar(editarEnvioSchema), cortesController.editarEnvio);
+cortesRouter.delete('/:id/envios/:envioId', cortesController.eliminarEnvio);
 cortesRouter.post('/:id/asignar-grupo', validar(asignarGrupoSchema), cortesController.asignarGrupo);
 // Cambios de último momento a las operaciones del corte (no tocan el modelo)
 cortesRouter.put(

@@ -158,7 +158,11 @@ export interface CorteDetalleDTO {
   costoTotalCorte: number; // costura: centavos = cantidadTotal × costoManoObraPrenda (CA-2.3)
   costoEmpaqueCorte: number; // la parte de empaque de costoTotalCorte (Σ ct empaque × cantidad)
   costoServicioCorte: number; // Σ trabajos del servicio de corte interno (0 si externo)
-  costoTotal: number; // costura + servicio de corte
+  // lavandería y bordado externos: Σ de todos los envíos (devueltos o no)
+  costoLavanderiaCorte: number;
+  costoBordadoCorte: number;
+  costoTotal: number; // costura + servicio de corte + lavandería + bordado
+  envios: EnvioServicioDTO[]; // a lavandería y bordado (PLAN_CUENTAS_SEPARADAS §5)
   operaciones: CorteOperacionDTO[];
   totalesPorOperario: TotalPorOperarioDTO[];
   cambios: CorteCambioDTO[]; // historial de cambios respecto del modelo, más reciente primero
@@ -173,4 +177,19 @@ export interface EstimadoDuracionDTO {
   operarioMasCargado: PersonaDTO | null;
   operacionesSinTiempo: string[]; // etiquetas: el catálogo no tenía tiempo al abrir
   operacionesSinAsignar: number; // sin asignar o con descuadre: su trabajo no está repartido
+}
+
+/** Envío de prendas del corte a un proveedor externo. Se gana (y entra a la
+ *  cuenta del servicio) en la fecha de devolución. */
+export interface EnvioServicioDTO {
+  id: string;
+  servicio: 'lavanderia' | 'bordado';
+  operario: { id: string; nombre: string }; // el proveedor
+  cantidad: number; // prendas enviadas
+  precioPrenda: number; // centavos
+  total: number; // centavos = cantidad × precioPrenda
+  fechaEnvio: string; // 'aaaa-mm-dd'
+  fechaDevolucion: string | null; // 'aaaa-mm-dd'; null = todavía no volvió
+  nota: string | null;
+  bloqueado: boolean; // devuelto en un mes ya liquidado: no se puede tocar
 }

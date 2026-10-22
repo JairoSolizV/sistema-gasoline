@@ -30,6 +30,7 @@ import { badgeEstadoCorte } from './estados';
 import { hoyLocalISO } from '../../lib/fechas';
 import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendido';
 import { ServicioCorte } from './ServicioCorte';
+import { EnviosServicio } from './EnviosServicio';
 import { DuracionEstimada } from './DuracionEstimada';
 import { CalculadoraTendido } from './CalculadoraTendido';
 
@@ -333,13 +334,38 @@ export function CorteDetallePage() {
               {corte.esInterno ? 'trazado, doblado, corte…' : 'corte externo'}
             </div>
           </div>
+          {corte.costoLavanderiaCorte + corte.costoBordadoCorte > 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
+              <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                Lavandería / bordado
+              </div>
+              <div className="mono text-lg font-semibold">
+                Bs {formatBs(corte.costoLavanderiaCorte + corte.costoBordadoCorte)}
+              </div>
+              <div className="text-[11px] text-gray-400">
+                {[
+                  corte.costoLavanderiaCorte > 0 && `lav. ${formatBs(corte.costoLavanderiaCorte)}`,
+                  corte.costoBordadoCorte > 0 && `bord. ${formatBs(corte.costoBordadoCorte)}`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            </div>
+          )}
           <div className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-right shadow-sm">
             <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
               Costo total del corte
             </div>
             <div className="mono text-2xl font-semibold">Bs {formatBs(corte.costoTotal)}</div>
             <div className="text-[11px] text-gray-400">
-              {corte.costoEmpaqueCorte > 0 ? 'costura + empaque + servicio' : 'costura + servicio'}
+              {[
+                'costura',
+                corte.costoEmpaqueCorte > 0 && 'empaque',
+                'servicio',
+                corte.costoLavanderiaCorte + corte.costoBordadoCorte > 0 && 'lavandería/bordado',
+              ]
+                .filter(Boolean)
+                .join(' + ')}
             </div>
           </div>
           {corte.estado === 'borrador' ? (
@@ -412,6 +438,7 @@ export function CorteDetallePage() {
       <CalculadoraTendido corte={corte} />
 
       <ServicioCorte corte={corte} />
+      <EnviosServicio corte={corte} />
 
       {corte.estado === 'borrador' ? (
         <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">

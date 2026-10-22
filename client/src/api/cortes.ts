@@ -5,7 +5,9 @@ import type {
   CorteDetalleDTO,
   CorteResumenDTO,
   CrearCorteInput,
+  CrearEnvioInput,
   EditarCodigoInput,
+  EditarEnvioInput,
   EditarOperacionInput,
   EditarRollosInput,
   EditarServicioInput,
@@ -256,6 +258,49 @@ export function useEditarRollos() {
         method: 'PUT',
         body: JSON.stringify(input),
       }),
+    onSuccess: aplicar,
+  });
+}
+
+// ── Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ──
+
+export function useCrearEnvio() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: CrearEnvioInput }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/envios`, {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useEditarEnvio() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({
+      corteId,
+      envioId,
+      cambios,
+    }: {
+      corteId: string;
+      envioId: string;
+      cambios: EditarEnvioInput;
+    }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/envios/${envioId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(cambios),
+      }),
+    onSuccess: aplicar,
+  });
+}
+
+export function useEliminarEnvio() {
+  const aplicar = usarDetalleActualizado();
+  return useMutation({
+    mutationFn: ({ corteId, envioId }: { corteId: string; envioId: string }) =>
+      api<CorteDetalleDTO>(`/cortes/${corteId}/envios/${envioId}`, { method: 'DELETE' }),
     onSuccess: aplicar,
   });
 }

@@ -3,7 +3,9 @@ import type {
   AsignarGrupoInput,
   CerrarCorteInput,
   CrearCorteInput,
+  CrearEnvioInput,
   EditarCodigoInput,
+  EditarEnvioInput,
   EditarOperacionInput,
   EditarRollosInput,
   EditarServicioInput,
@@ -128,6 +130,25 @@ export const cortesController = {
 
   async cerrar(req: Request, res: Response) {
     const dto = await cortesService.cerrar(String(req.params.id), req.body as CerrarCorteInput);
+    res.json({ data: dto });
+  },
+
+  async crearEnvio(req: Request, res: Response) {
+    const dto = await cortesService.crearEnvio(String(req.params.id), req.body as CrearEnvioInput);
+    res.status(201).json({ data: dto });
+  },
+
+  async editarEnvio(req: Request, res: Response) {
+    const dto = await cortesService.editarEnvio(
+      String(req.params.id),
+      String(req.params.envioId),
+      req.body as EditarEnvioInput,
+    );
+    res.json({ data: dto });
+  },
+
+  async eliminarEnvio(req: Request, res: Response) {
+    const dto = await cortesService.eliminarEnvio(String(req.params.id), String(req.params.envioId));
     res.json({ data: dto });
   },
 };

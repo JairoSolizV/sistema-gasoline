@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
 
-export const tipoOperarioSchema = z.enum(['regular', 'maestro_externo']);
+export const tipoOperarioSchema = z.enum(['regular', 'maestro_externo', 'proveedor_externo']);
 
 // Oficios (docs/PLAN_SERVICIO_CORTE.md §3). Un operario puede tener varios; en
 // cada selector solo aparecen los que tienen el rol que hace falta.
@@ -14,7 +14,18 @@ export const ROLES_OPERARIO = [
   'trazador',
   'clasificador',
   'ayudante',
+  'lavanderia', // proveedores externos (docs/PLAN_CUENTAS_SEPARADAS.md §5)
+  'bordado',
 ] as const;
+
+/** Un proveedor externo tiene solo roles de proveedor (lavandería/bordado), y
+ *  esos roles son solo de proveedores externos. */
+export function rolesCoherentes(tipo: string, roles: readonly string[]): boolean {
+  const deProveedor = roles.filter((r) => r === 'lavanderia' || r === 'bordado').length;
+  return tipo === 'proveedor_externo' ? deProveedor === roles.length : deProveedor === 0;
+}
+export const MENSAJE_ROLES_PROVEEDOR =
+  'Lavandería y Bordado son roles de proveedor externo, y un proveedor externo solo puede tener esos roles';
 export const rolOperarioSchema = z.enum(ROLES_OPERARIO);
 
 const rolesSchema = z
@@ -73,11 +84,15 @@ export const crearOperarioSchema = z
     roles: rolesSchema.default(['costurero']),
     tarifaCorte: tarifaPersonalSchema.optional(),
     tarifaClasificacion: tarifaPersonalSchema.optional(),
-    ci: ciSchema,
+    tarifaLavanderia: tarifaPersonalSchema.optional(),
+    tarifaBordado: tarifaPersonalSchema.optional(),
+    // CI y fecha de nacimiento: obligatorios salvo para un proveedor externo (refine abajo)
+    ci: ciSchema.optional(),
     celular: celularSchema,
     fechaNacimiento: z.coerce
       .date({ error: 'La fecha de nacimiento es obligatoria' })
-      .refine(noFutura, 'La fecha de nacimiento no puede ser futura'),
+      .refine(noFutura, 'La fecha de nacimiento no puede ser futura')
+      .optional(),
     fechaIngreso: z.coerce.date({ error: 'La fecha de ingreso es obligatoria' }),
     // salida prevista/pactada: opcional e informativa (no da de baja)
     fechaSalida: z.coerce.date().nullable().optional(),
@@ -91,6 +106,18 @@ export const crearOperarioSchema = z
   .refine((o) => !o.roles.includes('ayudante') || o.sueldoSemanal != null, {
     path: ['sueldoSemanal'],
     message: 'El sueldo semanal es obligatorio para un ayudante',
+  })
+  .refine((o) => o.tipo === 'proveedor_externo' || o.ci != null, {
+    path: ['ci'],
+    message: 'La cédula de identidad es obligatoria',
+  })
+  .refine((o) => o.tipo === 'proveedor_externo' || o.fechaNacimiento != null, {
+    path: ['fechaNacimiento'],
+    message: 'La fecha de nacimiento es obligatoria',
+  })
+  .refine((o) => rolesCoherentes(o.tipo, o.roles), {
+    path: ['roles'],
+    message: MENSAJE_ROLES_PROVEEDOR,
   });
 
 // Sueldo semanal de un ayudante a partir de una fecha (historial: "se ajusta
@@ -114,6 +141,8 @@ export const editarOperarioSchema = z
     roles: rolesSchema,
     tarifaCorte: tarifaPersonalSchema,
     tarifaClasificacion: tarifaPersonalSchema,
+    tarifaLavanderia: tarifaPersonalSchema,
+    tarifaBordado: tarifaPersonalSchema,
     ci: ciSchema.nullable(),
     celular: celularSchema.nullable(),
     fechaNacimiento: z.coerce

@@ -20,3 +20,12 @@ export async function exigirFechaSinLiquidar(fecha: Date, accion: string): Promi
     );
   }
 }
+
+/** Predicado para marcar en pantalla lo que ya no se puede tocar: ¿la fecha cae
+ *  en el mes del último cierre o antes? (misma regla que exigirFechaSinLiquidar) */
+export async function predicadoLiquidado(): Promise<(fecha: Date) => boolean> {
+  const ultimo = await liquidacionRepository.ultimoPeriodoCerrado();
+  return (fecha) =>
+    ultimo != null &&
+    !mesAnteriorA(ultimo.anio, ultimo.mes, fecha.getUTCFullYear(), fecha.getUTCMonth() + 1);
+}

@@ -8,6 +8,7 @@ import {
   type RendicionCorteDTO,
   type RendicionCuentaDTO,
   type RendicionDTO,
+  type RendicionEnvioDTO,
   type RendicionMoldeDTO,
   type RendicionOperacionDTO,
   type RendicionSueldoDTO,
@@ -24,7 +25,7 @@ export const rendicionService = {
     const operario = await rendicionRepository.operario(operarioId);
     if (!operario) throw new AppError('NO_ENCONTRADO', 'Operario no encontrado', 404);
 
-    const [asignaciones, trabajos, moldes, anticipos, saldosEntrada, periodo, sueldoDelOperario] =
+    const [asignaciones, trabajos, moldes, anticipos, saldosEntrada, periodo, sueldoDelOperario, envios] =
       await Promise.all([
         rendicionRepository.asignacionesDelOperario(operarioId, anio, mes),
         rendicionRepository.trabajosCorteDelOperario(operarioId, anio, mes),
@@ -33,6 +34,7 @@ export const rendicionService = {
         liquidacionRepository.saldosEntradaDesde(anio, mes),
         liquidacionRepository.periodo(anio, mes),
         sueldosDelMes(anio, mes, operarioId), // consulta filtrada por operario (CA-7)
+        rendicionRepository.enviosDelOperario(operarioId, anio, mes),
       ]);
 
     // servicio de corte y moldes: cada trabajo es una línea propia, separada de
@@ -56,6 +58,20 @@ export const rendicionService = {
       fecha: m.fecha.toISOString(),
       monto: m.monto,
     }));
+    const enviosDTO: RendicionEnvioDTO[] = envios.map((e) => ({
+      servicio: e.servicio,
+      corteId: e.corte.id,
+      codigo: e.corte.codigo,
+      modeloNombre: e.corte.version.modelo.nombre,
+      numeroVersion: e.corte.version.numeroVersion,
+      cantidad: e.cantidad,
+      precioPrenda: e.precioPrenda,
+      total: e.total,
+      fechaEnvio: dateADia(e.fechaEnvio),
+      fechaDevolucion: dateADia(e.fechaDevolucion!), // el repo filtra los devueltos
+    }));
+    const sumaEnvios = (servicio: 'lavanderia' | 'bordado') =>
+      enviosDTO.filter((e) => e.servicio === servicio).reduce((acc, e) => acc + e.total, 0);
 
     // agrupar las operaciones de este operario por corte, en dos secciones:
     // costura y empaque (PLAN_AYUDANTES §6) para que no se mezclen las pagas
@@ -154,8 +170,8 @@ export const rendicionService = {
         servicio_corte: servicioCorte.reduce((acc, t) => acc + t.total, 0),
         moldes: moldesDTO.reduce((acc, m) => acc + m.monto, 0),
         sueldo: sueldo?.total ?? 0,
-        lavanderia: 0, // rebanada 4 (envíos a proveedores externos)
-        bordado: 0,
+        lavanderia: sumaEnvios('lavanderia'), // por fecha de devolución
+        bordado: sumaEnvios('bordado'),
       };
       cuentas = CUENTAS.flatMap((cuenta) => {
         const saldoEntrada = saldosEntrada.get(claveSaldo(operarioId, cuenta)) ?? 0;
@@ -191,6 +207,7 @@ export const rendicionService = {
       empaque,
       servicioCorte,
       moldes: moldesDTO,
+      envios: enviosDTO,
       anticipos: anticipos.map((a) => ({
         cuenta: a.cuenta,
         fecha: a.fecha.toISOString(),

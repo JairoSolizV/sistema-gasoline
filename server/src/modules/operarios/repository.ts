@@ -13,6 +13,7 @@ const conHistorial = {
       modelosBuscados: true,
       pagosMolde: true,
       asistencias: true,
+      envios: true, // como proveedor de lavandería o bordado
     },
   },
   // ayudantes: historial de sueldo semanal, el más reciente primero

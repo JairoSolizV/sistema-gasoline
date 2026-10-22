@@ -5,6 +5,8 @@ import type { Prisma } from '@prisma/client';
 import {
   dateADia,
   diaADate,
+  MENSAJE_ROLES_PROVEEDOR,
+  rolesCoherentes,
   type CrearOperarioInput,
   type EditarOperarioInput,
   type OperarioDTO,
@@ -18,7 +20,8 @@ import { operariosRepository, type OperarioConHistorial } from './repository.js'
 
 const iso = (d: Date | null) => (d ? d.toISOString() : null);
 
-// Todo lo que lo ata al histórico: pagos (costura, servicio de corte, moldes),
+// Todo lo que lo ata al histórico: pagos (costura, servicio de corte, moldes,
+// envíos de lavandería/bordado, asistencia),
 // anticipos, liquidaciones o ser buscador de un modelo. Con cualquiera de esto
 // el operario no se puede eliminar.
 function partesHistorial(c: OperarioConHistorial['_count']): string[] {
@@ -30,6 +33,7 @@ function partesHistorial(c: OperarioConHistorial['_count']): string[] {
     c.modelosBuscados && `buscador de ${c.modelosBuscados} modelo(s)`,
     c.pagosMolde && `${c.pagosMolde} pago(s) de moldes`,
     c.asistencias && `${c.asistencias} día(s) de asistencia`,
+    c.envios && `${c.envios} envío(s) de lavandería/bordado`,
   ].filter((p): p is string => Boolean(p));
 }
 
@@ -41,6 +45,8 @@ function aDTO(o: OperarioConHistorial): OperarioDTO {
     roles: o.roles,
     tarifaCorte: o.tarifaCorte,
     tarifaClasificacion: o.tarifaClasificacion,
+    tarifaLavanderia: o.tarifaLavanderia,
+    tarifaBordado: o.tarifaBordado,
     activo: o.activo,
     ci: o.ci,
     celular: o.celular,
@@ -89,16 +95,18 @@ export const operariosService = {
   },
 
   async crear(input: CrearOperarioInput): Promise<OperarioDTO> {
-    await exigirCiLibre(input.ci);
+    if (input.ci) await exigirCiLibre(input.ci);
     const operario = await operariosRepository.crear({
       nombre: input.nombre,
       tipo: input.tipo,
       roles: input.roles,
       tarifaCorte: input.tarifaCorte ?? null,
       tarifaClasificacion: input.tarifaClasificacion ?? null,
-      ci: input.ci,
+      tarifaLavanderia: input.tarifaLavanderia ?? null,
+      tarifaBordado: input.tarifaBordado ?? null,
+      ci: input.ci ?? null, // un proveedor externo puede no tenerla
       celular: input.celular,
-      fechaNacimiento: input.fechaNacimiento,
+      fechaNacimiento: input.fechaNacimiento ?? null,
       fechaIngreso: input.fechaIngreso,
       fechaSalida: input.fechaSalida ?? null,
       // ayudante: el sueldo rige desde su día de ingreso
@@ -154,6 +162,11 @@ export const operariosService = {
 
     if (input.ci) await exigirCiLibre(input.ci, id);
 
+    // tipo y roles se validan juntos, contra lo ya guardado: puede cambiar uno solo
+    if (!rolesCoherentes(input.tipo ?? actual.tipo, input.roles ?? actual.roles)) {
+      throw new AppError('VALIDACION', `roles: ${MENSAJE_ROLES_PROVEEDOR}`, 400);
+    }
+
     // coherencia contra lo ya guardado: puede cambiar solo una de las dos fechas
     const ingreso = input.fechaIngreso ?? actual.fechaIngreso;
     const salida = input.fechaSalida !== undefined ? input.fechaSalida : actual.fechaSalida;
@@ -173,6 +186,8 @@ export const operariosService = {
       ...(input.tarifaClasificacion !== undefined
         ? { tarifaClasificacion: input.tarifaClasificacion }
         : {}),
+      ...(input.tarifaLavanderia !== undefined ? { tarifaLavanderia: input.tarifaLavanderia } : {}),
+      ...(input.tarifaBordado !== undefined ? { tarifaBordado: input.tarifaBordado } : {}),
       ...(input.ci !== undefined ? { ci: input.ci } : {}),
       ...(input.celular !== undefined ? { celular: input.celular } : {}),
       ...(input.fechaNacimiento !== undefined ? { fechaNacimiento: input.fechaNacimiento } : {}),

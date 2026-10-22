@@ -419,3 +419,59 @@ describe('ayudantes: sueldo semanal', () => {
     expect(await prisma.sueldoAyudante.count({ where: { operarioId: id } })).toBe(0);
   });
 });
+
+describe('proveedores externos (lavandería y bordado)', () => {
+  test('alta sin CI ni fecha de nacimiento, con su precio por prenda', async () => {
+    const res = await request(app).post('/api/v1/operarios').send({
+      nombre: 'TEST PROV LAVANDERIA',
+      tipo: 'proveedor_externo',
+      roles: ['lavanderia'],
+      tarifaLavanderia: 150,
+      celular: '71234567',
+      fechaIngreso: '2026-01-05T12:00:00.000Z',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      tipo: 'proveedor_externo',
+      roles: ['lavanderia'],
+      tarifaLavanderia: 150,
+      tarifaBordado: null,
+      ci: null,
+      fechaNacimiento: null,
+    });
+  });
+
+  test('un operario del taller sigue necesitando CI y fecha de nacimiento', async () => {
+    const res = await request(app).post('/api/v1/operarios').send({
+      nombre: 'TEST SIN CI',
+      celular: '71234567',
+      fechaIngreso: '2026-01-05T12:00:00.000Z',
+    });
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('cédula');
+  });
+
+  test('roles de proveedor solo para proveedores externos, y al revés', async () => {
+    const costureroLavanderia = await crearOperarioTest('TEST ROL MAL 1', { roles: ['costurero', 'lavanderia'] });
+    expect(costureroLavanderia.status).toBe(400);
+    const proveedorCosturero = await crearOperarioTest('TEST ROL MAL 2', {
+      tipo: 'proveedor_externo',
+      roles: ['costurero'],
+    });
+    expect(proveedorCosturero.status).toBe(400);
+  });
+
+  test('PATCH: pasar a proveedor exige cambiar los roles a la vez', async () => {
+    const alta = await crearOperarioTest('TEST PASA A PROVEEDOR');
+    const id = alta.body.data.id;
+    const soloTipo = await request(app).patch(`/api/v1/operarios/${id}`).send({ tipo: 'proveedor_externo' });
+    expect(soloTipo.status).toBe(400);
+    const ambos = await request(app)
+      .patch(`/api/v1/operarios/${id}`)
+      .send({ tipo: 'proveedor_externo', roles: ['bordado'], tarifaBordado: 80 });
+    expect(ambos.status).toBe(200);
+    expect(ambos.body.data).toMatchObject({ tipo: 'proveedor_externo', roles: ['bordado'], tarifaBordado: 80 });
+    const lista = await request(app).get('/api/v1/operarios?rol=bordado');
+    expect(lista.body.data.some((o: { id: string }) => o.id === id)).toBe(true);
+  });
+});

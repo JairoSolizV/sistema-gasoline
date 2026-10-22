@@ -86,6 +86,30 @@ export const rendicionRepository = {
     });
   },
 
+  /** Envíos de ESTE proveedor devueltos en el mes (lavandería o bordado). */
+  enviosDelOperario(operarioId: string, anio: number, mes: number) {
+    const { inicio, fin } = rangoMesUTC(anio, mes);
+    return prisma.envioServicio.findMany({
+      where: { operarioId, fechaDevolucion: { gte: inicio, lt: fin } },
+      orderBy: [{ fechaDevolucion: 'asc' }, { fechaEnvio: 'asc' }],
+      select: {
+        servicio: true,
+        cantidad: true,
+        precioPrenda: true,
+        total: true,
+        fechaEnvio: true,
+        fechaDevolucion: true,
+        corte: {
+          select: {
+            id: true,
+            codigo: true,
+            version: { select: { numeroVersion: true, modelo: { select: { nombre: true } } } },
+          },
+        },
+      },
+    });
+  },
+
   anticiposDelOperario(operarioId: string, anio: number, mes: number) {
     const { inicio, fin } = rangoMesUTC(anio, mes);
     return prisma.anticipo.findMany({

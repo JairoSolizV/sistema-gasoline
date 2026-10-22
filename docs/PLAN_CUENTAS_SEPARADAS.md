@@ -1,8 +1,7 @@
 # Cuentas separadas por tipo de trabajo (+ lavandería y bordado)
 
-> **Estado:** aprobado el 2026-10-22 (decisiones §2 y respuestas §8). Rebanadas 1 (saldo por cuenta) y 2
-> (pantallas) implementadas y verificadas; 3 (proveedores externos) y 4 (envíos a lavandería/bordado)
-> pendientes.
+> **Estado:** aprobado el 2026-10-22 (decisiones §2 y respuestas §8). **Completo:** las 4 rebanadas (saldo por
+> cuenta, pantallas, proveedores externos y envíos a lavandería/bordado) implementadas y verificadas.
 > **Cambia el alcance y la invariante 6** (CLAUDE.md): el saldo deja de ser uno por operario y pasa a
 > ser **uno por operario y por cuenta**. Al implementar se actualizan `CLAUDE.md`,
 > `CONTEXTO_NEGOCIO_TALLER.md` y `PLAN_SERVICIO_CORTE.md` §2.14 (lavado y bordado entran).
@@ -125,3 +124,19 @@ Confirmado por el dueño (§8):
   antes el inicio mostraba un solo saldo −2829.00 (721.00 de servicio de corte − 3550.00 de anticipos
   mezclados); ahora Operaciones −3550.00 y Servicio de corte 721.00 por separado. 336 tests en verde
   (`tests/cuentas.test.ts` nuevo).
+- **2026-10-22 — Rebanadas 3 y 4 (proveedores externos y envíos).** Tipo `proveedor_externo` y roles
+  `lavanderia`/`bordado` (coherentes en las dos direcciones: el proveedor solo tiene esos roles y esos
+  roles son solo de proveedores; validado en el alta y, en la edición, contra lo guardado), con
+  `tarifaLavanderia`/`tarifaBordado` (precio por prenda predeterminado) y sin CI ni nacimiento
+  obligatorios. `EnvioServicio` (corte, servicio, proveedor, prendas, precio, total = prendas × precio
+  en enteros, fecha de envío y de devolución `@db.Date`): `POST/PATCH/DELETE /cortes/:id/envios`.
+  Reglas: corte abierto o cerrado (no borrador); proveedor activo y con el rol; las prendas de un
+  servicio no pasan las del corte (varios envíos y proveedores); sin precio usa el de la ficha
+  (`SIN_PRECIO` si no tiene); devolución ≥ envío y fuera de un mes liquidado; un envío devuelto en un
+  mes cerrado queda `bloqueado`. Se gana en la fecha de devolución en la cuenta de su servicio; cuenta
+  para el orden de cierres y como historial del proveedor. El corte suma Lavandería / bordado a su
+  costo total; el inicio cuenta como "cortes activos" los que tienen envíos sin devolver; la
+  rendición del proveedor lista sus envíos devueltos. Migraciones `20261022170000_proveedores_externos`
+  y `20261022180000_envios_servicio_externo`. Verificado en navegador con un proveedor de prueba sobre
+  el COD 23: 721 × 1.50 = 1081.50, total del corte 6950.44, "1 corte activo" sin devolver y, al
+  devolver, fila en Lavandería sin tocar Operaciones. 348 tests en verde (`tests/envios.test.ts` nuevo).

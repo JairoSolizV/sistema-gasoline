@@ -213,6 +213,37 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         </>
       )}
 
+      {/* Lavandería y bordado (proveedor externo): envíos devueltos en el mes */}
+      {data.envios.length > 0 && (
+        <>
+          <h2 className="mt-6 mb-2 text-sm font-semibold text-gray-700">
+            Lavandería y bordado ({data.envios.length})
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <tbody>
+                {data.envios.map((e, i) => (
+                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                    <td className="px-5 py-2 text-gray-500">{fechaDia(e.fechaDevolucion)}</td>
+                    <td className="px-3 py-2 font-medium">{ETIQUETA_CUENTA[e.servicio]}</td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {e.modeloNombre}
+                      <span className="ml-1 text-[11px] font-semibold text-gray-400">
+                        v{e.numeroVersion}
+                        {` · COD ${e.codigo}`}
+                      </span>
+                    </td>
+                    <td className="mono px-3 py-2 text-right text-gray-500">{e.cantidad} prendas</td>
+                    <td className="mono px-3 py-2 text-right text-gray-500">Bs {formatBs(e.precioPrenda)}</td>
+                    <td className="mono w-24 px-5 py-2 text-right font-semibold">Bs {formatBs(e.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
       {/* Moldes / patronaje */}
       {data.moldes.length > 0 && (
         <>

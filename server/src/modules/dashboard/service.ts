@@ -16,10 +16,11 @@ const PROCESOS_OBLIGATORIOS = ['trazado', 'doblado', 'corte', 'clasificacion'] a
 
 export const dashboardService = {
   async panorama(anio: number, mes: number): Promise<DashboardDTO> {
-    const [consolidado, abiertos, pendientes, config] = await Promise.all([
+    const [consolidado, abiertos, pendientes, sinDevolver, config] = await Promise.all([
       liquidacionService.consolidado(anio, mes),
       cortesService.listar({ estado: 'abierto' }),
       cortesRepository.abiertosConPendientes(),
+      cortesRepository.enviosSinDevolver(),
       configuracionRepository.obtener(),
     ]);
 
@@ -39,8 +40,9 @@ export const dashboardService = {
       ).length,
       moldes: null,
       sueldo: null,
-      lavanderia: 0, // rebanada 4: envíos sin devolver
-      bordado: 0,
+      // lavandería y bordado: cortes (abiertos o cerrados) con envíos sin devolver
+      lavanderia: new Set(sinDevolver.filter((e) => e.servicio === 'lavanderia').map((e) => e.corteId)).size,
+      bordado: new Set(sinDevolver.filter((e) => e.servicio === 'bordado').map((e) => e.corteId)).size,
     };
 
     // Una fila por cuenta (reusa los totales del consolidado); sin total

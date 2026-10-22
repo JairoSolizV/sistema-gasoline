@@ -77,6 +77,20 @@ export interface RendicionSueldoDTO {
   total: number; // centavos
 }
 
+/** Un envío de ESTE proveedor devuelto en el mes (PLAN_CUENTAS_SEPARADAS §5). */
+export interface RendicionEnvioDTO {
+  servicio: 'lavanderia' | 'bordado';
+  corteId: string;
+  codigo: number;
+  modeloNombre: string;
+  numeroVersion: number;
+  cantidad: number; // prendas
+  precioPrenda: number; // centavos
+  total: number; // centavos
+  fechaEnvio: string; // 'aaaa-mm-dd'
+  fechaDevolucion: string; // 'aaaa-mm-dd' (define el mes en que se paga)
+}
+
 export interface RendicionAnticipoDTO {
   cuenta: Cuenta; // de qué cuenta se descontó
   fecha: string;
@@ -109,5 +123,6 @@ export interface RendicionDTO {
   empaque: RendicionCorteDTO[]; // solo operaciones de empaque
   servicioCorte: RendicionTrabajoCorteDTO[];
   moldes: RendicionMoldeDTO[];
+  envios: RendicionEnvioDTO[]; // lavandería y bordado (proveedores externos)
   anticipos: RendicionAnticipoDTO[];
 }

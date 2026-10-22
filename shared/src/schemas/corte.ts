@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { esDiaValido } from '../dias.js';
 import { PROCESOS_CORTE } from '../servicioCorte.js';
 
 // Datos del tendido (informativos; no afectan pagos). Los mismos campos se
@@ -118,3 +119,38 @@ export type AsignacionInput = z.infer<typeof asignacionInputSchema>;
 export type ReemplazarAsignacionesInput = z.infer<typeof reemplazarAsignacionesSchema>;
 export type AsignarGrupoInput = z.infer<typeof asignarGrupoSchema>;
 export type CerrarCorteInput = z.infer<typeof cerrarCorteSchema>;
+
+// ── Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────
+export const SERVICIOS_EXTERNOS = ['lavanderia', 'bordado'] as const;
+export type ServicioExterno = (typeof SERVICIOS_EXTERNOS)[number];
+
+const dia = (mensaje: string) => z.string({ error: mensaje }).refine(esDiaValido, 'Fecha inválida (aaaa-mm-dd)');
+const notaEnvio = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().trim().max(120).nullable(),
+);
+
+/** Envío de prendas a un proveedor. Sin precio, el server usa el del proveedor. */
+export const crearEnvioSchema = z.object({
+  servicio: z.enum(SERVICIOS_EXTERNOS),
+  operarioId: z.uuid('Elegí el proveedor'),
+  cantidad: z.number().int().min(1, 'Las prendas enviadas deben ser al menos 1'),
+  precioPrenda: centavos.optional(),
+  fechaEnvio: dia('La fecha de envío es obligatoria'),
+  nota: notaEnvio.optional(),
+});
+
+/** Edición parcial; `fechaDevolucion` registra (o con null, deshace) la devolución. */
+export const editarEnvioSchema = z
+  .object({
+    cantidad: z.number().int().min(1, 'Las prendas enviadas deben ser al menos 1'),
+    precioPrenda: centavos,
+    fechaEnvio: dia('La fecha de envío es obligatoria'),
+    fechaDevolucion: dia('Fecha de devolución inválida').nullable(),
+    nota: notaEnvio,
+  })
+  .partial()
+  .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
+
+export type CrearEnvioInput = z.infer<typeof crearEnvioSchema>;
+export type EditarEnvioInput = z.infer<typeof editarEnvioSchema>;

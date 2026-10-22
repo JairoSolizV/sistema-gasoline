@@ -72,7 +72,7 @@ export function HojaOperariosImprimible({
               <td>{texto(o.ci)}</td>
               <td>{texto(o.celular)}</td>
               <td>{fecha(o.fechaNacimiento)}</td>
-              <td>{o.tipo === 'maestro_externo' ? 'Maestro ext.' : 'Regular'}</td>
+              <td>{o.tipo === 'maestro_externo' ? 'Maestro ext.' : o.tipo === 'proveedor_externo' ? 'Proveedor ext.' : 'Regular'}</td>
               <td>{fecha(o.fechaIngreso)}</td>
               <td>{fecha(o.fechaSalida)}</td>
               {conBajas && (

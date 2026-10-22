@@ -56,8 +56,10 @@ seis procesos que también se pagan, cada uno con su tarifa y su gente:
     moldes, para que no se mezclen las pagas.
 13. **Clasificación/codificación:** por ahora solo se registra quién lo hizo y se le paga (sin
     etiquetas). **Trazado:** solo se registra el largo (ya existe `trazadoCm`).
-14. **Bordado y lavado** son proveedores de servicios: **fuera** por ahora. ~~Empaque~~: corregido
-    el 2026-10-21 — el empaque lo hacen ayudantes del taller y se paga por prenda como operación del
+14. ~~**Bordado y lavado** son proveedores de servicios: **fuera** por ahora.~~ Corregido el
+    2026-10-22: lavandería y bordado son proveedores externos que se pagan por prenda al devolver,
+    cada uno en su cuenta (`docs/PLAN_CUENTAS_SEPARADAS.md` §5). ~~Empaque~~: corregido el
+    2026-10-21 — el empaque lo hacen ayudantes del taller y se paga por prenda como operación del
     modelo (`docs/PLAN_AYUDANTES.md` §2.10).
 
 ## 3. Roles de operario

@@ -28,12 +28,22 @@ type Movimiento = { operarioId: string; total: number; fecha: Date; corteId?: st
 type MovimientosPorCuenta = Record<Cuenta, Movimiento[]>;
 
 async function movimientosDelMes(anio: number, mes: number): Promise<MovimientosPorCuenta> {
-  const [asignaciones, trabajos, moldes, sueldos] = await Promise.all([
+  const [asignaciones, trabajos, moldes, sueldos, envios] = await Promise.all([
     liquidacionRepository.asignacionesGanadoDelMes(anio, mes),
     liquidacionRepository.trabajosCorteDelMes(anio, mes),
     liquidacionRepository.pagosMoldeDelMes(anio, mes),
     sueldosDelMes(anio, mes),
+    liquidacionRepository.enviosDevueltosDelMes(anio, mes),
   ]);
+  const deEnvios = (servicio: 'lavanderia' | 'bordado') =>
+    envios
+      .filter((e) => e.servicio === servicio)
+      .map((e) => ({
+        operarioId: e.operarioId,
+        total: e.total,
+        fecha: e.fechaDevolucion!, // el repo filtra los devueltos
+        corteId: e.corteId,
+      }));
   const deCortes = asignaciones.map((a) => ({
     esEmpaque: a.corteOperacion.esEmpaque,
     operarioId: a.operarioId,
@@ -49,8 +59,8 @@ async function movimientosDelMes(anio: number, mes: number): Promise<Movimientos
     sueldo: [...sueldos.values()]
       .flat()
       .map((d) => ({ operarioId: d.operarioId, total: d.monto, fecha: d.fecha })),
-    lavanderia: [], // rebanada 4 (envíos a proveedores externos)
-    bordado: [],
+    lavanderia: deEnvios('lavanderia'), // por fecha de devolución
+    bordado: deEnvios('bordado'),
   };
 }
 
@@ -218,7 +228,7 @@ export const liquidacionService = {
       if (await liquidacionRepository.hayMovimientosEntre(ultimo, { anio, mes })) {
         throw new AppError(
           'CIERRE_FUERA_DE_ORDEN',
-          `Hay pagos (cortes cerrados, servicio de corte, moldes, asistencia de ayudantes) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
+          `Hay pagos (cortes cerrados, servicio de corte, moldes, asistencia de ayudantes, lavandería o bordado devueltos) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
           409,
         );
       }

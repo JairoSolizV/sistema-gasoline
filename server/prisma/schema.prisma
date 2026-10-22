@@ -16,6 +16,7 @@ datasource db {
 enum TipoOperario {
   regular
   maestro_externo
+  proveedor_externo // lavandería o bordado de afuera, cobra por prenda (docs/PLAN_CUENTAS_SEPARADAS.md §5)
 }
 
 enum EstadoCorte {
@@ -44,6 +45,8 @@ enum RolOperario {
   trazador
   clasificador // clasificador y codificador de piezas
   ayudante // sueldo semanal + asistencia; también recibe operaciones (docs/PLAN_AYUDANTES.md)
+  lavanderia // solo proveedores externos (docs/PLAN_CUENTAS_SEPARADAS.md §5)
+  bordado // solo proveedores externos
 }
 
 model Operario {
@@ -58,6 +61,10 @@ model Operario {
   // al elegirlo en un corte. null = usar el respaldo de Configuración.
   tarifaCorte         Int?
   tarifaClasificacion Int?
+  // Proveedor externo: precio por prenda predeterminado de cada servicio; se
+  // copia al envío del corte y ahí se puede cambiar.
+  tarifaLavanderia    Int?
+  tarifaBordado       Int?
   // Datos personales: obligatorios en el alta (validado en la API), opcionales
   // en BD porque el roster original del seed no los trae.
   ci              String?       @unique // cédula de identidad, normalizada a mayúsculas
@@ -74,6 +81,7 @@ model Operario {
   pagosMolde      PagoMolde[]
   sueldos         SueldoAyudante[]
   asistencias     Asistencia[]
+  envios          EnvioServicio[] // como proveedor externo de lavandería o bordado
 }
 
 model Modelo {
@@ -159,6 +167,7 @@ model Corte {
   tarifaClasificacionRespaldo Int?
   modalidadDoblado            ModalidadDoblado?
   trabajos                    TrabajoCorte[]
+  envios                      EnvioServicio[] // lavandería y bordado externos
   estado          EstadoCorte      @default(borrador)
   fechaInicio     DateTime         @default(now())
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
@@ -526,4 +535,32 @@ model Asistencia {
 
   @@unique([operarioId, fecha])
   @@index([fecha])
+}
+
+// ── Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────
+// Envío de prendas de un corte a un proveedor externo. Se paga por prenda y se
+// GANA en la fecha de devolución (un envío sin devolver no paga), en la cuenta
+// del servicio. Un corte puede tener varios envíos del mismo servicio.
+enum ServicioExterno {
+  lavanderia
+  bordado
+}
+
+model EnvioServicio {
+  id              String          @id @default(uuid())
+  corte           Corte           @relation(fields: [corteId], references: [id])
+  corteId         String
+  servicio        ServicioExterno
+  operario        Operario        @relation(fields: [operarioId], references: [id]) // el proveedor
+  operarioId      String
+  cantidad        Int // prendas enviadas
+  precioPrenda    Int // centavos; se copia del proveedor y se puede cambiar
+  total           Int // centavos = cantidad × precioPrenda
+  fechaEnvio      DateTime        @db.Date
+  fechaDevolucion DateTime?       @db.Date // null = todavía no volvió
+  nota            String?
+  creadoEn        DateTime        @default(now())
+
+  @@index([corteId])
+  @@index([fechaDevolucion])
 }

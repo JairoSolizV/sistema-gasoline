@@ -9,6 +9,8 @@ import type {
   CorteDetalleDTO,
   CorteOperacionDTO,
   CorteResumenDTO,
+  CrearEnvioInput,
+  EditarEnvioInput,
   EstimadoDuracionDTO,
   CrearCorteInput,
   EditarCodigoInput,
@@ -23,7 +25,7 @@ import type {
   ReordenarOperacionesInput,
   TotalPorOperarioDTO,
 } from '@taller/shared';
-import { ETIQUETA_PROCESO } from '@taller/shared';
+import { diaADate, ETIQUETA_PROCESO } from '@taller/shared';
 import { Prisma } from '@prisma/client';
 import { cantidadTotal, sumaCt, tarifaEfectiva, totalAsignacion } from '../../domain/calculo.js';
 import {
@@ -33,7 +35,7 @@ import {
   validarSumaExacta,
 } from '../../domain/validaciones.js';
 import { AppError } from '../../middleware/errors.js';
-import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
+import { exigirFechaSinLiquidar, predicadoLiquidado } from '../liquidacion/guards.js';
 import { exigirOperariosHabilitados } from '../operarios/habilitados.js';
 import { tiemposDeOperaciones } from '../catalogo/tiempos.js';
 import { estimarDuracion } from '../../domain/estimado.js';
@@ -44,6 +46,13 @@ import {
   type DatosOperacionCorte,
 } from './repository.js';
 import { aServicioDTO, faltantesServicio, prepararTrabajos, tarifasDeConfig } from './servicio.js';
+import {
+  aEnviosDTO,
+  costoEnvios,
+  exigirCantidadDisponible,
+  exigirProveedor,
+  precioDelEnvio,
+} from './envios.js';
 import {
   aCambiosDTO,
   camposCambiados,
@@ -76,7 +85,10 @@ function aEstimadoDTO(operaciones: CorteOperacionDTO[]): EstimadoDuracionDTO {
   };
 }
 
-function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
+function aDetalleDTO(
+  corte: CorteConDetalle,
+  liquidado: (fecha: Date) => boolean,
+): CorteDetalleDTO {
   const operaciones: CorteOperacionDTO[] = corte.operaciones.map((op) => {
     // mayor cantidad primero (como el mockup); nombre como desempate estable
     const ordenadas = [...op.asignaciones].sort(
@@ -142,6 +154,8 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     corte.cantidadTotal * sumaCt(corte.operaciones.filter((o) => o.esEmpaque));
   const servicio = aServicioDTO(corte);
   const costoServicioCorte = servicio?.total ?? 0;
+  const costoLavanderiaCorte = costoEnvios(corte, 'lavanderia');
+  const costoBordadoCorte = costoEnvios(corte, 'bordado');
   return {
     id: corte.id,
     codigo: corte.codigo,
@@ -172,7 +186,10 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     costoTotalCorte: costoCostura,
     costoEmpaqueCorte,
     costoServicioCorte,
-    costoTotal: costoCostura + costoServicioCorte,
+    costoLavanderiaCorte,
+    costoBordadoCorte,
+    costoTotal: costoCostura + costoServicioCorte + costoLavanderiaCorte + costoBordadoCorte,
+    envios: aEnviosDTO(corte, liquidado),
     operaciones,
     totalesPorOperario: [...porOperario.values()].sort((a, b) => b.total - a.total),
     cambios: aCambiosDTO(corte),
@@ -183,7 +200,7 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
 async function detalle(corteId: string): Promise<CorteDetalleDTO> {
   const corte = await cortesRepository.obtenerDetalle(corteId);
   if (!corte) throw new AppError('NO_ENCONTRADO', 'Corte no encontrado', 404);
-  return aDetalleDTO(corte);
+  return aDetalleDTO(corte, await predicadoLiquidado());
 }
 
 async function corteAbiertoOError(corteId: string): Promise<CorteConDetalle> {
@@ -543,7 +560,7 @@ export const cortesService = {
     }
     const porId = new Map(actuales.map((o) => [o.id, o]));
     const nuevas = input.operacionIds.map((id) => porId.get(id)!);
-    if (nuevas.every((o, i) => o.id === actuales[i].id)) return aDetalleDTO(corte); // sin cambios
+    if (nuevas.every((o, i) => o.id === actuales[i].id)) return detalle(corteId); // sin cambios
     await cortesRepository.reordenarOperaciones(
       corteId,
       input.operacionIds,
@@ -564,7 +581,7 @@ export const cortesService = {
     const op = corte.operaciones.find((o) => o.id === corteOperacionId);
     if (!op) throw new AppError('NO_ENCONTRADO', 'Operación del corte no encontrada', 404);
     const campos = camposCambiados(op, input);
-    if (campos.length === 0) return aDetalleDTO(corte);
+    if (campos.length === 0) return detalle(corteId);
 
     const ct = input.ct ?? op.ct;
     const asignaciones =
@@ -635,4 +652,90 @@ export const cortesService = {
     });
     return detalle(corteId);
   },
+
+  // ── Lavandería y bordado externos (PLAN_CUENTAS_SEPARADAS §5) ──
+  // Se mandan prendas de un corte ya abierto (o cerrado: lavado y bordado suelen
+  // venir después de la costura). El dinero cuenta en la fecha de devolución.
+
+  async crearEnvio(corteId: string, input: CrearEnvioInput): Promise<CorteDetalleDTO> {
+    const corte = await corteConPrendasOError(corteId);
+    const proveedor = exigirProveedor(
+      await cortesRepository.obtenerProveedor(input.operarioId),
+      input.servicio,
+    );
+    exigirCantidadDisponible(corte, input.servicio, input.cantidad);
+    const precioPrenda = precioDelEnvio(proveedor, input.servicio, input.precioPrenda);
+    await cortesRepository.crearEnvio({
+      corteId,
+      servicio: input.servicio,
+      operarioId: proveedor.id,
+      cantidad: input.cantidad,
+      precioPrenda,
+      total: input.cantidad * precioPrenda, // enteros: exacto, sin redondeo
+      fechaEnvio: diaADate(input.fechaEnvio),
+      nota: input.nota ?? null,
+    });
+    return detalle(corteId);
+  },
+
+  /** Corregir un envío o registrar (null: deshacer) su devolución. Un envío
+   *  devuelto en un mes liquidado ya no se toca. */
+  async editarEnvio(
+    corteId: string,
+    envioId: string,
+    input: EditarEnvioInput,
+  ): Promise<CorteDetalleDTO> {
+    const corte = await corteConPrendasOError(corteId);
+    const envio = corte.envios.find((e) => e.id === envioId);
+    if (!envio) throw new AppError('NO_ENCONTRADO', 'Envío no encontrado en este corte', 404);
+    if (envio.fechaDevolucion) {
+      await exigirFechaSinLiquidar(envio.fechaDevolucion, 'modificar un envío ya devuelto');
+    }
+    const devolucion =
+      input.fechaDevolucion !== undefined
+        ? input.fechaDevolucion && diaADate(input.fechaDevolucion)
+        : envio.fechaDevolucion;
+    const fechaEnvio = input.fechaEnvio ? diaADate(input.fechaEnvio) : envio.fechaEnvio;
+    if (devolucion) {
+      if (devolucion < fechaEnvio) {
+        throw new AppError('VALIDACION', 'La devolución no puede ser anterior al envío', 400);
+      }
+      await exigirFechaSinLiquidar(devolucion, 'registrar la devolución');
+    }
+    const cantidad = input.cantidad ?? envio.cantidad;
+    if (input.cantidad !== undefined) {
+      exigirCantidadDisponible(corte, envio.servicio, cantidad, envio.id);
+    }
+    const precioPrenda = input.precioPrenda ?? envio.precioPrenda;
+    await cortesRepository.actualizarEnvio(envioId, {
+      cantidad,
+      precioPrenda,
+      total: cantidad * precioPrenda,
+      fechaEnvio,
+      fechaDevolucion: devolucion ?? null,
+      ...(input.nota !== undefined ? { nota: input.nota } : {}),
+    });
+    return detalle(corteId);
+  },
+
+  async eliminarEnvio(corteId: string, envioId: string): Promise<CorteDetalleDTO> {
+    const corte = await corteConPrendasOError(corteId);
+    const envio = corte.envios.find((e) => e.id === envioId);
+    if (!envio) throw new AppError('NO_ENCONTRADO', 'Envío no encontrado en este corte', 404);
+    if (envio.fechaDevolucion) {
+      await exigirFechaSinLiquidar(envio.fechaDevolucion, 'quitar un envío ya devuelto');
+    }
+    await cortesRepository.eliminarEnvio(envioId);
+    return detalle(corteId);
+  },
 };
+
+/** Corte abierto o cerrado (un borrador todavía no tiene prendas cortadas). */
+async function corteConPrendasOError(corteId: string): Promise<CorteConDetalle> {
+  const corte = await cortesRepository.obtenerDetalle(corteId);
+  if (!corte) throw new AppError('NO_ENCONTRADO', 'Corte no encontrado', 404);
+  if (corte.estado === 'borrador') {
+    throw new AppError('ESTADO_INVALIDO', 'El corte está en borrador; abrilo primero', 409);
+  }
+  return corte;
+}

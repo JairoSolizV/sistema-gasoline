@@ -48,6 +48,11 @@ const incluirDetalle = {
   },
   // historial de cambios de último momento (más reciente primero)
   cambios: { orderBy: { fecha: 'desc' as const } },
+  // lavandería y bordado externos, en el orden en que se mandaron
+  envios: {
+    orderBy: [{ fechaEnvio: 'asc' as const }, { creadoEn: 'asc' as const }],
+    include: { operario: { select: { id: true, nombre: true } } },
+  },
 };
 
 /** Una fila del historial de cambios del corte, armada por el service. */
@@ -326,5 +331,31 @@ export const cortesRepository = {
 
   obtenerConfiguracion() {
     return prisma.configuracion.findUnique({ where: { id: 1 } });
+  },
+
+  // ── Envíos a lavandería y bordado externos (PLAN_CUENTAS_SEPARADAS §5) ──
+
+  obtenerProveedor(id: string) {
+    return prisma.operario.findUnique({ where: { id } });
+  },
+
+  crearEnvio(data: Prisma.EnvioServicioUncheckedCreateInput) {
+    return prisma.envioServicio.create({ data });
+  },
+
+  actualizarEnvio(id: string, data: Prisma.EnvioServicioUncheckedUpdateInput) {
+    return prisma.envioServicio.update({ where: { id }, data });
+  },
+
+  eliminarEnvio(id: string) {
+    return prisma.envioServicio.delete({ where: { id } });
+  },
+
+  /** Envíos sin devolver (corte y servicio), para los cortes activos del inicio. */
+  enviosSinDevolver() {
+    return prisma.envioServicio.findMany({
+      where: { fechaDevolucion: null },
+      select: { corteId: true, servicio: true },
+    });
   },
 };

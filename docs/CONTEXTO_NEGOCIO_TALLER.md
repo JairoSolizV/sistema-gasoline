@@ -280,6 +280,7 @@ Esto evita **comparaciones y roces** entre operarios (que uno vea que otro gana 
 - **Plantel administrable** (alta/baja de operarios; regular vs. maestro externo).
 - **Vista filtrada por operario** para rendición de cuentas (Sección 9).
 - **Ayudantes con sueldo semanal**, asistencia diaria y **operaciones de empaque** separadas de la costura (agregado 2026-10-21, `docs/PLAN_AYUDANTES.md`).
+- **Cuentas de pago separadas** (operaciones, empaque, servicio de corte, moldes, sueldo, lavandería, bordado): cada una con su saldo y arrastre, el anticipo se carga a una cuenta; y **lavandería/bordado externos** pagados por prenda al devolver (agregado 2026-10-22, `docs/PLAN_CUENTAS_SEPARADAS.md`).
 
 ### Fuera de Fase 1 (contexto, no se implementa ahora)
 - ~~Trazado de moldes y corte físico de tela (Sección 1.1).~~ Incorporado el 2026-10-01 como servicio de corte interno (`docs/PLAN_SERVICIO_CORTE.md`).
