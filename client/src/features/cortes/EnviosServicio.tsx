@@ -3,6 +3,8 @@ import {
   aCentavos,
   ETIQUETA_CUENTA,
   formatBs,
+  SERVICIOS_EXTERNOS,
+  TARIFA_SERVICIO,
   type CorteDetalleDTO,
   type EnvioServicioDTO,
   type ServicioExterno,
@@ -13,12 +15,11 @@ import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
 import { hoyLocalISO } from '../../lib/fechas';
 
-// Lavandería y bordado externos en el detalle del corte
+// Servicios externos (serigrafía, láser, bordado, lavandería) en el detalle del corte
 // (docs/PLAN_CUENTAS_SEPARADAS.md §5): envíos de prendas a proveedores, con el
 // precio por prenda del proveedor (editable). Cada envío se paga en su fecha
 // de devolución, en la cuenta de su servicio (nunca mezclado con la costura).
 
-const SERVICIOS: ServicioExterno[] = ['lavanderia', 'bordado'];
 const PATRON_BS = /^\d+([.,]\d{1,2})?$/;
 const aTexto = (c: number) => formatBs(c).replace(/ /g, '');
 const aCent = (s: string) => aCentavos(s.trim().replace(',', '.'));
@@ -47,14 +48,14 @@ export function EnviosServicio({ corte }: { corte: CorteDetalleDTO }) {
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 px-5 py-3">
-        <div className="text-sm font-semibold">Lavandería y bordado</div>
+        <div className="text-sm font-semibold">Servicios externos</div>
         <div className="text-xs text-gray-500">
           Proveedores externos · se paga por prenda en la fecha de devolución, cada servicio en su
           propia cuenta
         </div>
       </div>
       <div className="divide-y divide-gray-100">
-        {SERVICIOS.map((servicio) => {
+        {SERVICIOS_EXTERNOS.map((servicio) => {
           const lista = corte.envios.filter((e) => e.servicio === servicio);
           const total = lista.reduce((a, e) => a + e.total, 0);
           const yaEnviadas = enviadas(corte, servicio);
@@ -206,7 +207,7 @@ function ModalEnvio({
   const elegirProveedor = (id: string) => {
     setOperarioId(id);
     const p = proveedores?.find((o) => o.id === id);
-    const precio = servicio === 'lavanderia' ? p?.tarifaLavanderia : p?.tarifaBordado;
+    const precio = p?.[TARIFA_SERVICIO[servicio]];
     if (precio != null) setPrecioBs(aTexto(precio));
   };
 

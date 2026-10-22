@@ -213,11 +213,11 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         </>
       )}
 
-      {/* Lavandería y bordado (proveedor externo): envíos devueltos en el mes */}
+      {/* Servicios externos (proveedor externo): envíos devueltos en el mes */}
       {data.envios.length > 0 && (
         <>
           <h2 className="mt-6 mb-2 text-sm font-semibold text-gray-700">
-            Lavandería y bordado ({data.envios.length})
+            Servicios externos ({data.envios.length})
           </h2>
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="w-full text-sm">

@@ -1,6 +1,6 @@
 // Panorama del taller en el mes en curso. Reutiliza los servicios existentes:
 // no hay acceso a datos propio, solo composición (ARQUITECTURA §2).
-import type { Cuenta, DashboardAlertaDTO, DashboardDTO } from '@taller/shared';
+import { SERVICIOS_EXTERNOS, type Cuenta, type DashboardAlertaDTO, type DashboardDTO } from '@taller/shared';
 import { cortesRepository } from '../cortes/repository.js';
 import { cortesService } from '../cortes/service.js';
 import { liquidacionService } from '../liquidacion/service.js';
@@ -31,7 +31,14 @@ export const dashboardService = {
       pendientes.filter((c) =>
         c.operaciones.some((o) => o.esEmpaque === empaque && o.estado !== 'asignada'),
       ).length;
-    const cortesPorCuenta: Record<Cuenta, number | null> = {
+    // servicios externos: cortes (abiertos o cerrados) con envíos sin devolver
+    const conEnvios = Object.fromEntries(
+      SERVICIOS_EXTERNOS.map((s) => [
+        s,
+        new Set(sinDevolver.filter((e) => e.servicio === s).map((e) => e.corteId)).size,
+      ]),
+    );
+    const cortesPorCuenta = {
       operaciones: sinCuadrar(false),
       empaque: sinCuadrar(true),
       servicio_corte: pendientes.filter(
@@ -41,10 +48,8 @@ export const dashboardService = {
       ).length,
       moldes: null,
       sueldo: null,
-      // lavandería y bordado: cortes (abiertos o cerrados) con envíos sin devolver
-      lavanderia: new Set(sinDevolver.filter((e) => e.servicio === 'lavanderia').map((e) => e.corteId)).size,
-      bordado: new Set(sinDevolver.filter((e) => e.servicio === 'bordado').map((e) => e.corteId)).size,
-    };
+      ...conEnvios,
+    } as Record<Cuenta, number | null>;
 
     // Una fila por cuenta (reusa los totales del consolidado); sin total
     // general: las cuentas no se mezclan (PLAN_CUENTAS_SEPARADAS §6).

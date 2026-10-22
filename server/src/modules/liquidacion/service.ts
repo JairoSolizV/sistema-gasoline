@@ -17,6 +17,7 @@ import {
   type CuentaConsolidadoDTO,
   type LiquidacionFilaDTO,
   type SemanaConsolidadoDTO,
+  type ServicioExterno,
 } from '@taller/shared';
 import { calcularCierreMes, calcularSaldo, semanasDelMes } from '../../domain/saldo.js';
 import { AppError } from '../../middleware/errors.js';
@@ -35,7 +36,7 @@ async function movimientosDelMes(anio: number, mes: number): Promise<Movimientos
     sueldosDelMes(anio, mes),
     liquidacionRepository.enviosDevueltosDelMes(anio, mes),
   ]);
-  const deEnvios = (servicio: 'lavanderia' | 'bordado') =>
+  const deEnvios = (servicio: ServicioExterno) =>
     envios
       .filter((e) => e.servicio === servicio)
       .map((e) => ({
@@ -59,8 +60,11 @@ async function movimientosDelMes(anio: number, mes: number): Promise<Movimientos
     sueldo: [...sueldos.values()]
       .flat()
       .map((d) => ({ operarioId: d.operarioId, total: d.monto, fecha: d.fecha })),
-    lavanderia: deEnvios('lavanderia'), // por fecha de devolución
+    // servicios externos: por fecha de devolución
+    serigrafia: deEnvios('serigrafia'),
+    laser: deEnvios('laser'),
     bordado: deEnvios('bordado'),
+    lavanderia: deEnvios('lavanderia'),
   };
 }
 
@@ -228,7 +232,7 @@ export const liquidacionService = {
       if (await liquidacionRepository.hayMovimientosEntre(ultimo, { anio, mes })) {
         throw new AppError(
           'CIERRE_FUERA_DE_ORDEN',
-          `Hay pagos (cortes cerrados, servicio de corte, moldes, asistencia de ayudantes, lavandería o bordado devueltos) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
+          `Hay pagos (cortes cerrados, servicio de corte, moldes, asistencia de ayudantes, envíos a servicios externos devueltos) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
           409,
         );
       }

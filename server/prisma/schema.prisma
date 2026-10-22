@@ -16,7 +16,7 @@ datasource db {
 enum TipoOperario {
   regular
   maestro_externo
-  proveedor_externo // lavandería o bordado de afuera, cobra por prenda (docs/PLAN_CUENTAS_SEPARADAS.md §5)
+  proveedor_externo // serigrafía, láser, bordado o lavandería de afuera, cobra por prenda (docs/PLAN_CUENTAS_SEPARADAS.md §5)
 }
 
 enum EstadoCorte {
@@ -47,6 +47,8 @@ enum RolOperario {
   ayudante // sueldo semanal + asistencia; también recibe operaciones (docs/PLAN_AYUDANTES.md)
   lavanderia // solo proveedores externos (docs/PLAN_CUENTAS_SEPARADAS.md §5)
   bordado // solo proveedores externos
+  serigrafia // solo proveedores externos
+  laser // solo proveedores externos
 }
 
 model Operario {
@@ -65,6 +67,8 @@ model Operario {
   // copia al envío del corte y ahí se puede cambiar.
   tarifaLavanderia    Int?
   tarifaBordado       Int?
+  tarifaSerigrafia    Int?
+  tarifaLaser         Int?
   // Datos personales: obligatorios en el alta (validado en la API), opcionales
   // en BD porque el roster original del seed no los trae.
   ci              String?       @unique // cédula de identidad, normalizada a mayúsculas
@@ -302,6 +306,8 @@ enum Cuenta {
   sueldo // sueldo semanal de ayudantes
   lavanderia // proveedor externo, por prenda
   bordado // proveedor externo, por prenda
+  serigrafia // proveedor externo, por prenda
+  laser // proveedor externo, por prenda
 }
 
 model Configuracion {
@@ -546,13 +552,15 @@ model Asistencia {
   @@index([fecha])
 }
 
-// ── Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────
+// ── Servicios externos: lavandería, bordado, serigrafía y láser (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────
 // Envío de prendas de un corte a un proveedor externo. Se paga por prenda y se
 // GANA en la fecha de devolución (un envío sin devolver no paga), en la cuenta
 // del servicio. Un corte puede tener varios envíos del mismo servicio.
 enum ServicioExterno {
   lavanderia
   bordado
+  serigrafia
+  laser
 }
 
 model EnvioServicio {

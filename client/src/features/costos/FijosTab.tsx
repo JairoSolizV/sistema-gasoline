@@ -10,6 +10,7 @@ import {
 } from '@taller/shared';
 import { useCostosFijos, useMutacionFijos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
+import { HojaOficio } from '../../components/HojaOficio';
 import { Modal } from '../../components/Modal';
 import { hoyLocalISO } from '../../lib/fechas';
 import { MESES } from '../../lib/meses';
@@ -53,7 +54,8 @@ export function FijosTab() {
   };
 
   return (
-    <div>
+    <>
+    <div className="print:hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button onClick={() => irMes(-1)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50">
@@ -67,6 +69,14 @@ export function FijosTab() {
           </button>
         </div>
         <div className="flex gap-2">
+          {d && (
+            <button
+              onClick={() => window.print()}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Imprimir
+            </button>
+          )}
           <button
             onClick={() => setModal({ tipo: 'prestamo', prestamo: null })}
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
@@ -96,6 +106,124 @@ export function FijosTab() {
       {modal?.tipo === 'compra' && <ModalCompra gasto={modal.gasto} onCerrar={() => setModal(null)} />}
       {modal?.tipo === 'prestamo' && <ModalPrestamo prestamo={modal.prestamo} onCerrar={() => setModal(null)} />}
     </div>
+    {d && <HojaFijos d={d} />}
+    </>
+  );
+}
+
+/** El mes en oficio vertical (ver HojaOficio): gastos por grupo con la parte
+ *  del taller, préstamos, totales y el costo por prenda según la producción.
+ *  Los gastos y préstamos dados de baja no suman, así que no salen. */
+function HojaFijos({ d }: { d: CostosFijosMesDTO }) {
+  const prestamos = d.prestamos.filter((p) => p.activo);
+  return (
+    <HojaOficio
+      titulo={`Costos fijos del taller · ${MESES[d.mes - 1]} ${d.anio}`}
+      detalle="Parte del taller de cada gasto (lo compartido con la casa, según su %) + cuota completa de los préstamos"
+      resumen={`Total Bs ${formatBs(d.total)}`}
+      className="cebra"
+    >
+      <table>
+        <thead>
+          <tr>
+            <th>Gasto</th>
+            <th className="num">Del mes</th>
+            <th className="num">% taller</th>
+            <th className="num">Parte del taller</th>
+          </tr>
+        </thead>
+        {GRUPOS_GASTO_FIJO.map((grupo) => {
+          const lista = d.gastos.filter((g) => g.grupo === grupo && g.activo);
+          if (lista.length === 0) return null;
+          return (
+            <tbody key={grupo}>
+              <tr className="grupo">
+                <td colSpan={4}>{ETIQUETA_GRUPO[grupo]}</td>
+              </tr>
+              {lista.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    {g.nombre}
+                    {g.tipo === 'por_compras' && (
+                      <span className="tenue"> · {g.compras.length} compra(s)</span>
+                    )}
+                  </td>
+                  <td className="num">{formatBs(g.base)}</td>
+                  <td className="num">{pct(g.porcentajeTaller)}</td>
+                  <td className="num">{formatBs(g.parteTaller)}</td>
+                </tr>
+              ))}
+            </tbody>
+          );
+        })}
+        {prestamos.length > 0 && (
+          <tbody>
+            <tr className="grupo">
+              <td colSpan={4}>Préstamos · recuperación de deuda (cuota completa)</td>
+            </tr>
+            {prestamos.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  {p.banco}
+                  <span className="tenue">
+                    {' '}
+                    · vence {fechaCorta(p.vence)}
+                    {p.cuotasRestantes != null && ` · faltan ${p.cuotasRestantes}`}
+                    {p.pago ? ` · pagada ${fechaCorta(p.pago.fecha)}` : ' · sin pagar'}
+                  </span>
+                </td>
+                <td className="num">{formatBs(p.cuota)}</td>
+                <td className="num">100 %</td>
+                <td className="num">{formatBs(p.cuota)}</td>
+              </tr>
+            ))}
+          </tbody>
+        )}
+        <tfoot>
+          <tr>
+            <td colSpan={3}>Gastos del taller</td>
+            <td className="num">{formatBs(d.totalGastos)}</td>
+          </tr>
+          <tr>
+            <td colSpan={3}>Recuperación de deuda</td>
+            <td className="num">{formatBs(d.totalDeuda)}</td>
+          </tr>
+          <tr>
+            <td colSpan={3}>Costos fijos del mes</td>
+            <td className="num">{formatBs(d.total)}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style={{ marginTop: '14pt', fontWeight: 700 }}>Costo fijo por prenda según cuánto produzcan</div>
+      <div style={{ fontSize: '9pt' }}>
+        Presupuesto mensual Bs {formatBs(d.presupuestoMensual)} (montos de hoy; comida = promedio de los
+        últimos meses)
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Prendas por mes</th>
+            <th className="num">Por prenda</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {d.simulacion.map((s) => (
+            <tr key={s.prendas}>
+              <td>{s.prendas.toLocaleString('es-BO')}</td>
+              <td className="num">{formatBs(s.porPrenda)}</td>
+              <td className="tenue">{s.prendas === d.prendasReferencia ? 'se suma a las fichas' : ''}</td>
+            </tr>
+          ))}
+          <tr>
+            <td>Producción real del mes: {d.prendasReales.toLocaleString('es-BO')}</td>
+            <td className="num">{d.porPrendaReal != null ? formatBs(d.porPrendaReal) : '—'}</td>
+            <td className="tenue">cortes cerrados en el mes</td>
+          </tr>
+        </tbody>
+      </table>
+    </HojaOficio>
   );
 }
 

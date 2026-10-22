@@ -6,6 +6,7 @@ import {
   type DashboardCuentaDTO,
 } from '@taller/shared';
 import { useDashboard } from '../../api/dashboard';
+import { HojaOficio } from '../../components/HojaOficio';
 import { MESES } from '../../lib/meses';
 
 export function InicioPage() {
@@ -14,7 +15,8 @@ export function InicioPage() {
   const hoy = new Date();
 
   return (
-    <div className="p-8">
+    <>
+    <div className="p-8 print:hidden">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Inicio</h1>
@@ -24,6 +26,14 @@ export function InicioPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {data && (
+            <button
+              onClick={() => window.print()}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
+            >
+              Imprimir cuentas
+            </button>
+          )}
           <button
             onClick={() => navigate('/cortes/nuevo')}
             className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#265dc2]"
@@ -91,6 +101,8 @@ export function InicioPage() {
         </>
       )}
     </div>
+    {data && <HojaCuentas cuentas={data.kpis.cuentas} mes={data.kpis.mes} anio={data.kpis.anio} />}
+    </>
   );
 }
 
@@ -100,15 +112,15 @@ function CuentasDelMes({ cuentas, mes }: { cuentas: DashboardCuentaDTO[]; mes: n
   const navigate = useNavigate();
   const monto = (c: number) => (c !== 0 ? `Bs ${formatBs(c)}` : '—');
   return (
-    <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm">
+    <div className="mt-6 w-fit max-w-full overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+      <table className="text-sm">
         <thead>
           <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-            <th className="px-5 py-3">Cuenta · {MESES[mes - 1]}</th>
-            <th className="px-4 py-3 text-right">Total a pagar</th>
-            <th className="px-4 py-3 text-right">Anticipos entregados</th>
-            <th className="px-4 py-3 text-right">Saldo pendiente</th>
-            <th className="px-5 py-3 text-right">Cortes activos</th>
+            <th className="py-2.5 pr-6 pl-4">Cuenta · {MESES[mes - 1]}</th>
+            <th className="px-4 py-2.5 text-right">Total a pagar</th>
+            <th className="px-4 py-2.5 text-right">Anticipos</th>
+            <th className="px-4 py-2.5 text-right">Saldo pendiente</th>
+            <th className="py-2.5 pr-4 pl-4 text-right">Cortes activos</th>
           </tr>
         </thead>
         <tbody>
@@ -118,15 +130,15 @@ function CuentasDelMes({ cuentas, mes }: { cuentas: DashboardCuentaDTO[]; mes: n
               <tr
                 key={c.cuenta}
                 onClick={() => navigate(`/liquidacion?cuenta=${c.cuenta}`)}
-                className={`cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50/60 ${vacia ? 'text-gray-400' : ''}`}
+                className={`cursor-pointer border-b border-gray-200/70 last:border-0 even:bg-slate-100 hover:bg-blue-50 ${vacia ? 'text-gray-400' : ''}`}
               >
-                <td className="px-5 py-3 font-medium">{ETIQUETA_CUENTA[c.cuenta]}</td>
-                <td className="mono px-4 py-3 text-right">{monto(c.totalAPagar)}</td>
-                <td className="mono px-4 py-3 text-right">{monto(c.anticiposEntregados)}</td>
-                <td className={`mono px-4 py-3 text-right font-semibold ${c.saldoPendiente < 0 ? 'text-error' : vacia ? '' : 'text-acento'}`}>
+                <td className="py-2 pr-6 pl-4 font-medium whitespace-nowrap">{ETIQUETA_CUENTA[c.cuenta]}</td>
+                <td className="mono px-4 py-2 text-right whitespace-nowrap">{monto(c.totalAPagar)}</td>
+                <td className="mono px-4 py-2 text-right whitespace-nowrap">{monto(c.anticiposEntregados)}</td>
+                <td className={`mono px-4 py-2 text-right font-semibold whitespace-nowrap ${c.saldoPendiente < 0 ? 'text-error' : vacia ? '' : 'text-acento'}`}>
                   {monto(c.saldoPendiente)}
                 </td>
-                <td className="mono px-5 py-3 text-right">
+                <td className="mono py-2 pr-4 pl-4 text-right">
                   {c.cortesActivos == null ? '—' : c.cortesActivos}
                 </td>
               </tr>
@@ -135,6 +147,43 @@ function CuentasDelMes({ cuentas, mes }: { cuentas: DashboardCuentaDTO[]; mes: n
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Las cuentas del mes en oficio vertical (ver HojaOficio), con fondo alterno
+ *  por fila. Mismos números que la pantalla. */
+function HojaCuentas({ cuentas, mes, anio }: { cuentas: DashboardCuentaDTO[]; mes: number; anio: number }) {
+  const monto = (c: number) => (c !== 0 ? formatBs(c) : '—');
+  return (
+    <HojaOficio
+      titulo={`Cuentas del mes · ${MESES[mes - 1]} ${anio}`}
+      detalle="Cada cuenta se paga aparte: no se suman entre sí."
+      resumen={`${cuentas.length} cuentas`}
+      className="cebra"
+    >
+      <table>
+        <thead>
+          <tr>
+            <th>Cuenta</th>
+            <th className="num">Total a pagar</th>
+            <th className="num">Anticipos</th>
+            <th className="num">Saldo pendiente</th>
+            <th className="num">Cortes activos</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cuentas.map((c) => (
+            <tr key={c.cuenta}>
+              <td>{ETIQUETA_CUENTA[c.cuenta]}</td>
+              <td className="num">{monto(c.totalAPagar)}</td>
+              <td className="num">{monto(c.anticiposEntregados)}</td>
+              <td className="num">{monto(c.saldoPendiente)}</td>
+              <td className="num">{c.cortesActivos == null ? '—' : c.cortesActivos}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </HojaOficio>
   );
 }
 

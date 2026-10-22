@@ -25,6 +25,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Todo se imprime en papel OFICIO vertical (21.5 × 33 cm). Las hojas de
+   HojaOficio ajustan además sus márgenes. */
+@page {
+  size: 21.5cm 33cm;
+  margin: 1.2cm;
+}
+
 /* Vista imprimible de la planilla (Liquidación / Rendición): sin sidebar ni controles. */
 @media print {
   aside {

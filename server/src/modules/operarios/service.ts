@@ -33,7 +33,7 @@ function partesHistorial(c: OperarioConHistorial['_count']): string[] {
     c.modelosBuscados && `buscador de ${c.modelosBuscados} modelo(s)`,
     c.pagosMolde && `${c.pagosMolde} pago(s) de moldes`,
     c.asistencias && `${c.asistencias} día(s) de asistencia`,
-    c.envios && `${c.envios} envío(s) de lavandería/bordado`,
+    c.envios && `${c.envios} envío(s) a servicios externos`,
   ].filter((p): p is string => Boolean(p));
 }
 
@@ -47,6 +47,8 @@ function aDTO(o: OperarioConHistorial): OperarioDTO {
     tarifaClasificacion: o.tarifaClasificacion,
     tarifaLavanderia: o.tarifaLavanderia,
     tarifaBordado: o.tarifaBordado,
+    tarifaSerigrafia: o.tarifaSerigrafia,
+    tarifaLaser: o.tarifaLaser,
     activo: o.activo,
     ci: o.ci,
     celular: o.celular,
@@ -104,6 +106,8 @@ export const operariosService = {
       tarifaClasificacion: input.tarifaClasificacion ?? null,
       tarifaLavanderia: input.tarifaLavanderia ?? null,
       tarifaBordado: input.tarifaBordado ?? null,
+      tarifaSerigrafia: input.tarifaSerigrafia ?? null,
+      tarifaLaser: input.tarifaLaser ?? null,
       ci: input.ci ?? null, // un proveedor externo puede no tenerla
       celular: input.celular,
       fechaNacimiento: input.fechaNacimiento ?? null,
@@ -188,6 +192,8 @@ export const operariosService = {
         : {}),
       ...(input.tarifaLavanderia !== undefined ? { tarifaLavanderia: input.tarifaLavanderia } : {}),
       ...(input.tarifaBordado !== undefined ? { tarifaBordado: input.tarifaBordado } : {}),
+      ...(input.tarifaSerigrafia !== undefined ? { tarifaSerigrafia: input.tarifaSerigrafia } : {}),
+      ...(input.tarifaLaser !== undefined ? { tarifaLaser: input.tarifaLaser } : {}),
       ...(input.ci !== undefined ? { ci: input.ci } : {}),
       ...(input.celular !== undefined ? { celular: input.celular } : {}),
       ...(input.fechaNacimiento !== undefined ? { fechaNacimiento: input.fechaNacimiento } : {}),

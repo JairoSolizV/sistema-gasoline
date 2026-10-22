@@ -1,9 +1,17 @@
-// Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5): prendas de
+// Servicios externos — serigrafía, láser, bordado y lavandería
+// (docs/PLAN_CUENTAS_SEPARADAS.md §5): prendas de
 // un corte que se mandan a un proveedor. Se paga por prenda (precio copiado del
 // proveedor, editable) y se GANA en la fecha de devolución, en la cuenta del
 // servicio. Este archivo arma el DTO y valida; el service persiste.
 import type { Operario } from '@prisma/client';
-import { dateADia, ETIQUETA_CUENTA, type EnvioServicioDTO, type ServicioExterno } from '@taller/shared';
+import {
+  dateADia,
+  ETIQUETA_CUENTA,
+  SERVICIOS_EXTERNOS,
+  TARIFA_SERVICIO,
+  type EnvioServicioDTO,
+  type ServicioExterno,
+} from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
 import type { CorteConDetalle } from './repository.js';
 
@@ -28,6 +36,13 @@ export function aEnviosDTO(
 /** Σ de los envíos de un servicio (todos, devueltos o no). */
 export const costoEnvios = (corte: CorteConDetalle, servicio: ServicioExterno) =>
   corte.envios.filter((e) => e.servicio === servicio).reduce((a, e) => a + e.total, 0);
+
+/** Σ de los envíos de cada servicio externo. */
+export const costoExternos = (corte: CorteConDetalle) =>
+  Object.fromEntries(SERVICIOS_EXTERNOS.map((s) => [s, costoEnvios(corte, s)])) as Record<
+    ServicioExterno,
+    number
+  >;
 
 /** El proveedor existe, está activo y hace ese servicio. */
 export function exigirProveedor(p: Operario | null, servicio: ServicioExterno): Operario {
@@ -69,7 +84,7 @@ export function precioDelEnvio(
   servicio: ServicioExterno,
   indicado: number | undefined,
 ): number {
-  const predeterminado = servicio === 'lavanderia' ? p.tarifaLavanderia : p.tarifaBordado;
+  const predeterminado = p[TARIFA_SERVICIO[servicio]];
   const precio = indicado ?? predeterminado;
   if (precio == null) {
     throw new AppError(

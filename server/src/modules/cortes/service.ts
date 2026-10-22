@@ -48,7 +48,7 @@ import {
 import { aServicioDTO, faltantesServicio, prepararTrabajos, tarifasDeConfig } from './servicio.js';
 import {
   aEnviosDTO,
-  costoEnvios,
+  costoExternos,
   exigirCantidadDisponible,
   exigirProveedor,
   precioDelEnvio,
@@ -154,8 +154,7 @@ function aDetalleDTO(
     corte.cantidadTotal * sumaCt(corte.operaciones.filter((o) => o.esEmpaque));
   const servicio = aServicioDTO(corte);
   const costoServicioCorte = servicio?.total ?? 0;
-  const costoLavanderiaCorte = costoEnvios(corte, 'lavanderia');
-  const costoBordadoCorte = costoEnvios(corte, 'bordado');
+  const externos = costoExternos(corte);
   return {
     id: corte.id,
     codigo: corte.codigo,
@@ -187,9 +186,9 @@ function aDetalleDTO(
     costoTotalCorte: costoCostura,
     costoEmpaqueCorte,
     costoServicioCorte,
-    costoLavanderiaCorte,
-    costoBordadoCorte,
-    costoTotal: costoCostura + costoServicioCorte + costoLavanderiaCorte + costoBordadoCorte,
+    costoExternos: externos,
+    costoTotal:
+      costoCostura + costoServicioCorte + Object.values(externos).reduce((a, v) => a + v, 0),
     envios: aEnviosDTO(corte, liquidado),
     operaciones,
     totalesPorOperario: [...porOperario.values()].sort((a, b) => b.total - a.total),

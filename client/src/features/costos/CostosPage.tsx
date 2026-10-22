@@ -25,15 +25,18 @@ export function CostosPage() {
   const pedida = parametros.get('tab') as Pestana | null;
   const activa: Pestana = PESTANAS.some((p) => p.clave === pedida) ? pedida! : 'fichas';
 
+  // Costos fijos imprime su propia hoja oficio: el resto de la página no sale
+  const soloHoja = activa === 'fijos' ? 'print:hidden' : '';
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-semibold">Costos de producción</h1>
-      <p className="mt-1 text-sm text-gray-500">
+    <div className="p-8 print:p-0">
+      <h1 className={`text-2xl font-semibold ${soloHoja}`}>Costos de producción</h1>
+      <p className={`mt-1 text-sm text-gray-500 ${soloHoja}`}>
         Cuánto cuesta producir cada prenda hoy: materiales con el precio de la última compra, mano
         de obra, empaque y servicio de corte del sistema, y el precio de venta con el margen. Solo
         consulta: no cambia ningún pago.
       </p>
-      <div className="mt-5 flex gap-1 border-b border-gray-200">
+      <div className={`mt-5 flex gap-1 border-b border-gray-200 ${soloHoja}`}>
         {PESTANAS.map((p) => (
           <button
             key={p.clave}
@@ -48,7 +51,7 @@ export function CostosPage() {
           </button>
         ))}
       </div>
-      <div className="mt-4">
+      <div className="mt-4 print:mt-0">
         {activa === 'fichas' && <FichasTab />}
         {activa === 'insumos' && <InsumosTab />}
         {activa === 'compras' && <ComprasTab />}

@@ -1,10 +1,11 @@
-// Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5): envíos de
+// Servicios externos — serigrafía, láser, bordado y lavandería
+// (docs/PLAN_CUENTAS_SEPARADAS.md §5): envíos de
 // prendas de un corte a proveedores, precio por prenda del proveedor (editable),
 // varios envíos por corte sin pasar de sus prendas, ganado en la fecha de
 // devolución y en la cuenta de cada servicio. Usa febrero de 2034.
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import request from 'supertest';
-import type { ConsolidadoDTO, CorteDetalleDTO, RendicionDTO } from '@taller/shared';
+import type { ConsolidadoDTO, CorteDetalleDTO, RendicionDTO, ServicioExterno } from '@taller/shared';
 import { crearApp } from '../src/app.js';
 import { prisma } from './helpers/db.js';
 import { datosCorte } from './helpers/corte.js';
@@ -33,7 +34,7 @@ async function limpiar() {
   await prisma.operario.deleteMany({ where: { nombre: { startsWith: 'TEST ENV' } } });
 }
 
-async function proveedor(clave: string, rol: 'lavanderia' | 'bordado', extra: Record<string, unknown> = {}) {
+async function proveedor(clave: string, rol: ServicioExterno, extra: Record<string, unknown> = {}) {
   const res = await request(app)
     .post('/api/v1/operarios')
     .send({
@@ -58,6 +59,8 @@ beforeAll(async () => {
   await proveedor('LAVA', 'lavanderia', { tarifaLavanderia: 150 });
   await proveedor('LAVA2', 'lavanderia', { tarifaLavanderia: 140 });
   await proveedor('BORD', 'bordado'); // sin precio cargado
+  await proveedor('SERI', 'serigrafia', { tarifaSerigrafia: 100 });
+  await proveedor('LASE', 'laser', { tarifaLaser: 50 });
   const cos = await request(app)
     .post('/api/v1/operarios')
     .send({ nombre: 'TEST ENV COSTURA', ...datosOperario() });
@@ -106,7 +109,7 @@ describe('envíos del corte', () => {
       fechaDevolucion: null,
       bloqueado: false,
     });
-    expect(c.costoLavanderiaCorte).toBe(9000);
+    expect(c.costoExternos).toEqual({ serigrafia: 0, laser: 0, bordado: 0, lavanderia: 9000 });
     expect(c.costoTotal).toBe(2000 + 9000); // costura 100 × 0.20 + lavandería
   });
 
@@ -130,7 +133,7 @@ describe('envíos del corte', () => {
       fechaEnvio: dia(6),
     });
     expect(conPrecio.status).toBe(201);
-    expect(conPrecio.body.data.costoBordadoCorte).toBe(8000);
+    expect(conPrecio.body.data.costoExternos.bordado).toBe(8000);
     const costurero = await enviar({ servicio: 'bordado', operarioId: ids.COS, cantidad: 1, precioPrenda: 80, fechaEnvio: dia(6) });
     expect(costurero.status).toBe(409);
     expect(costurero.body.error.code).toBe('OPERARIO_SIN_ROL');
@@ -186,6 +189,40 @@ describe('se gana al devolver, en la cuenta del servicio', () => {
     expect(r.cuentas.map((x) => x.cuenta)).toEqual(['lavanderia']);
     expect(saldoDe(r, 'lavanderia').ganado).toBe(9000);
     expect(JSON.stringify(r)).not.toContain(ids.LAVA2);
+  });
+
+  test('serigrafía y láser: precio de su proveedor y cada uno en su propia cuenta', async () => {
+    const seri = await enviar({ servicio: 'serigrafia', operarioId: ids.SERI, cantidad: 100, fechaEnvio: dia(6) });
+    expect(seri.status).toBe(201);
+    const lase = await enviar({ servicio: 'laser', operarioId: ids.LASE, cantidad: 100, fechaEnvio: dia(6) });
+    expect(lase.status).toBe(201);
+    const c = lase.body.data as CorteDetalleDTO;
+    expect(c.costoExternos).toMatchObject({ serigrafia: 10_000, laser: 5000 }); // 100 × 1.00 y 100 × 0.50
+    // un proveedor de serigrafía no hace láser
+    const cruzado = await enviar({ servicio: 'laser', operarioId: ids.SERI, cantidad: 1, precioPrenda: 50, fechaEnvio: dia(6) });
+    expect(cruzado.body.error.code).toBe('OPERARIO_SIN_ROL');
+
+    for (const e of c.envios.filter((x) => x.servicio === 'serigrafia' || x.servicio === 'laser')) {
+      const res = await request(app).patch(`/api/v1/cortes/${corteId}/envios/${e.id}`).send({ fechaDevolucion: dia(21) });
+      expect(res.status).toBe(200);
+    }
+    const cons = await consolidado();
+    expect(filaDe(cons, ids.SERI, 'serigrafia')).toMatchObject({ ganado: 10_000 });
+    expect(filaDe(cons, ids.LASE, 'laser')).toMatchObject({ ganado: 5000 });
+    expect(filaDe(cons, ids.SERI, 'laser')).toBeUndefined();
+    expect(filaDe(cons, ids.LAVA, 'lavanderia').ganado).toBe(9000); // no se mezcla
+    // el orden de las cuentas es el del proceso de la prenda
+    expect(cons.cuentas.map((x) => x.cuenta)).toEqual([
+      'moldes',
+      'servicio_corte',
+      'operaciones',
+      'serigrafia',
+      'laser',
+      'bordado',
+      'lavanderia',
+      'empaque',
+      'sueldo',
+    ]);
   });
 });
 

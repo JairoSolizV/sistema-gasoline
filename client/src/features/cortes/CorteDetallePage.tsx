@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ETIQUETA_PROCESO,
+  ETIQUETA_ROL,
   formatBs,
   formatMetros,
   ROLES_COSTURA,
+  SERVICIOS_EXTERNOS,
   type CorteDetalleDTO,
   type CorteOperacionDTO,
 } from '@taller/shared';
@@ -248,6 +250,7 @@ export function CorteDetallePage() {
   const badge = badgeEstadoCorte(corte.estado);
   const totalAsignado = corte.totalesPorOperario.reduce((a, t) => a + t.total, 0);
   const maxPago = Math.max(1, ...corte.totalesPorOperario.map((t) => t.total));
+  const costoExternos = SERVICIOS_EXTERNOS.reduce((a, s) => a + corte.costoExternos[s], 0);
 
   return (
     <div className="p-8">
@@ -335,20 +338,15 @@ export function CorteDetallePage() {
               {corte.esInterno ? 'trazado, doblado, corte…' : 'corte externo'}
             </div>
           </div>
-          {corte.costoLavanderiaCorte + corte.costoBordadoCorte > 0 && (
+          {costoExternos > 0 && (
             <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
               <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-                Lavandería / bordado
+                Servicios externos
               </div>
-              <div className="mono text-lg font-semibold">
-                Bs {formatBs(corte.costoLavanderiaCorte + corte.costoBordadoCorte)}
-              </div>
+              <div className="mono text-lg font-semibold">Bs {formatBs(costoExternos)}</div>
               <div className="text-[11px] text-gray-400">
-                {[
-                  corte.costoLavanderiaCorte > 0 && `lav. ${formatBs(corte.costoLavanderiaCorte)}`,
-                  corte.costoBordadoCorte > 0 && `bord. ${formatBs(corte.costoBordadoCorte)}`,
-                ]
-                  .filter(Boolean)
+                {SERVICIOS_EXTERNOS.filter((s) => corte.costoExternos[s] > 0)
+                  .map((s) => `${ETIQUETA_ROL[s].toLowerCase()} ${formatBs(corte.costoExternos[s])}`)
                   .join(' · ')}
               </div>
             </div>
@@ -363,7 +361,7 @@ export function CorteDetallePage() {
                 'costura',
                 corte.costoEmpaqueCorte > 0 && 'empaque',
                 'servicio',
-                corte.costoLavanderiaCorte + corte.costoBordadoCorte > 0 && 'lavandería/bordado',
+                costoExternos > 0 && 'servicios externos',
               ]
                 .filter(Boolean)
                 .join(' + ')}

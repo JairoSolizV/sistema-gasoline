@@ -10,6 +10,7 @@ import {
   type RendicionDTO,
   type RendicionEnvioDTO,
   type RendicionMoldeDTO,
+  type ServicioExterno,
   type RendicionOperacionDTO,
   type RendicionSueldoDTO,
   type RendicionTrabajoCorteDTO,
@@ -70,7 +71,7 @@ export const rendicionService = {
       fechaEnvio: dateADia(e.fechaEnvio),
       fechaDevolucion: dateADia(e.fechaDevolucion!), // el repo filtra los devueltos
     }));
-    const sumaEnvios = (servicio: 'lavanderia' | 'bordado') =>
+    const sumaEnvios = (servicio: ServicioExterno) =>
       enviosDTO.filter((e) => e.servicio === servicio).reduce((acc, e) => acc + e.total, 0);
 
     // agrupar las operaciones de este operario por corte, en dos secciones:
@@ -170,8 +171,11 @@ export const rendicionService = {
         servicio_corte: servicioCorte.reduce((acc, t) => acc + t.total, 0),
         moldes: moldesDTO.reduce((acc, m) => acc + m.monto, 0),
         sueldo: sueldo?.total ?? 0,
-        lavanderia: sumaEnvios('lavanderia'), // por fecha de devolución
+        // servicios externos: por fecha de devolución
+        serigrafia: sumaEnvios('serigrafia'),
+        laser: sumaEnvios('laser'),
         bordado: sumaEnvios('bordado'),
+        lavanderia: sumaEnvios('lavanderia'),
       };
       cuentas = CUENTAS.flatMap((cuenta) => {
         const saldoEntrada = saldosEntrada.get(claveSaldo(operarioId, cuenta)) ?? 0;

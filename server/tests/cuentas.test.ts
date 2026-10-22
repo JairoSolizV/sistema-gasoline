@@ -104,7 +104,7 @@ describe('rendición por cuenta', () => {
   test('cada cuenta con su propio saldo; los anticipos dicen de qué cuenta salieron', async () => {
     const r = (await request(app).get(`/api/v1/rendicion/${opId}?anio=2033&mes=4`)).body
       .data as RendicionDTO;
-    expect(r.cuentas.map((x) => x.cuenta)).toEqual(['operaciones', 'moldes']);
+    expect(r.cuentas.map((x) => x.cuenta)).toEqual(['moldes', 'operaciones']);
     expect(saldoDe(r, 'operaciones').saldoPeriodo).toBe(-1000);
     expect(saldoDe(r, 'moldes').saldoPeriodo).toBe(15000);
     expect(r.anticipos.map((a) => [a.cuenta, a.monto]).sort()).toEqual(

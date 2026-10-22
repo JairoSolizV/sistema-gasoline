@@ -10,14 +10,16 @@ export type RolOperario =
   | 'clasificador'
   | 'ayudante'
   | 'lavanderia'
-  | 'bordado';
+  | 'bordado'
+  | 'serigrafia'
+  | 'laser';
 
 /** Quiénes pueden recibir operaciones de costura (y de empaque): costureros y
  *  ayudantes (docs/PLAN_AYUDANTES.md §2.11). */
 export const ROLES_COSTURA: readonly RolOperario[] = ['costurero', 'ayudante'];
 
 /** Roles de los proveedores externos, y solo de ellos (PLAN_CUENTAS_SEPARADAS §5). */
-export const ROLES_PROVEEDOR: readonly RolOperario[] = ['lavanderia', 'bordado'];
+export const ROLES_PROVEEDOR: readonly RolOperario[] = ['serigrafia', 'laser', 'bordado', 'lavanderia'];
 
 export const ETIQUETA_TIPO: Record<TipoOperario, string> = {
   regular: 'regular',
@@ -37,6 +39,8 @@ export const ETIQUETA_ROL: Record<RolOperario, string> = {
   ayudante: 'Ayudante',
   lavanderia: 'Lavandería',
   bordado: 'Bordado',
+  serigrafia: 'Serigrafía',
+  laser: 'Láser',
 };
 
 export interface OperarioDTO {
@@ -49,6 +53,8 @@ export interface OperarioDTO {
   tarifaClasificacion: number | null;
   tarifaLavanderia: number | null; // proveedor externo: centavos/prenda predeterminados
   tarifaBordado: number | null;
+  tarifaSerigrafia: number | null;
+  tarifaLaser: number | null;
   ci: string | null;
   celular: string | null;
   fechaNacimiento: string | null; // ISO 8601

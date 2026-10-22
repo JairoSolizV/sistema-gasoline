@@ -1,4 +1,5 @@
 import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
+import type { ServicioExterno } from '../schemas/corte.js';
 
 export type EstadoCorte = 'borrador' | 'abierto' | 'cerrado';
 export type EstadoCorteOperacion = 'sin_asignar' | 'parcial' | 'asignada';
@@ -159,11 +160,10 @@ export interface CorteDetalleDTO {
   costoTotalCorte: number; // costura: centavos = cantidadTotal × costoManoObraPrenda (CA-2.3)
   costoEmpaqueCorte: number; // la parte de empaque de costoTotalCorte (Σ ct empaque × cantidad)
   costoServicioCorte: number; // Σ trabajos del servicio de corte interno (0 si externo)
-  // lavandería y bordado externos: Σ de todos los envíos (devueltos o no)
-  costoLavanderiaCorte: number;
-  costoBordadoCorte: number;
-  costoTotal: number; // costura + servicio de corte + lavandería + bordado
-  envios: EnvioServicioDTO[]; // a lavandería y bordado (PLAN_CUENTAS_SEPARADAS §5)
+  // servicios externos: Σ de todos los envíos de cada uno (devueltos o no)
+  costoExternos: Record<ServicioExterno, number>;
+  costoTotal: number; // costura + servicio de corte + servicios externos
+  envios: EnvioServicioDTO[]; // a serigrafía, láser, bordado y lavandería (PLAN_CUENTAS_SEPARADAS §5)
   operaciones: CorteOperacionDTO[];
   totalesPorOperario: TotalPorOperarioDTO[];
   cambios: CorteCambioDTO[]; // historial de cambios respecto del modelo, más reciente primero
@@ -184,7 +184,7 @@ export interface EstimadoDuracionDTO {
  *  cuenta del servicio) en la fecha de devolución. */
 export interface EnvioServicioDTO {
   id: string;
-  servicio: 'lavanderia' | 'bordado';
+  servicio: ServicioExterno;
   operario: { id: string; nombre: string }; // el proveedor
   cantidad: number; // prendas enviadas
   precioPrenda: number; // centavos

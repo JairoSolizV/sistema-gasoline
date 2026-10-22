@@ -13,9 +13,12 @@ import {
   ROLES_PROVEEDOR,
   rolesCoherentes,
   rolOperarioSchema,
+  SERVICIOS_EXTERNOS,
+  TARIFA_SERVICIO,
   tipoOperarioSchema,
   type OperarioDTO,
   type RolOperario,
+  type ServicioExterno,
   type TipoOperario,
 } from '@taller/shared';
 import {
@@ -50,9 +53,22 @@ function errorTarifa(v: string): string | null {
 const TARIFAS_POR_ROL = [
   ['tarifaCorte', 'cortador'],
   ['tarifaClasificacion', 'clasificador'],
-  ['tarifaLavanderia', 'lavanderia'],
+  ['tarifaSerigrafia', 'serigrafia'],
+  ['tarifaLaser', 'laser'],
   ['tarifaBordado', 'bordado'],
+  ['tarifaLavanderia', 'lavanderia'],
 ] as const;
+
+const esServicioExterno = (r: string): r is ServicioExterno =>
+  (SERVICIOS_EXTERNOS as readonly string[]).includes(r);
+
+// precio por prenda de cada proveedor externo: ejemplo para el campo
+const EJEMPLO_PRECIO: Record<ServicioExterno, string> = {
+  serigrafia: 'ej. 1.00',
+  laser: 'ej. 0.50',
+  bordado: 'ej. 0.80',
+  lavanderia: 'ej. 1.50',
+};
 
 function crearFormSchema(esAlta: boolean) {
   const vacioOk = <T extends z.ZodType>(s: T) => (esAlta ? s : z.union([z.literal(''), s]));
@@ -65,6 +81,8 @@ function crearFormSchema(esAlta: boolean) {
       tarifaClasificacion: z.string(),
       tarifaLavanderia: z.string(),
       tarifaBordado: z.string(),
+      tarifaSerigrafia: z.string(),
+      tarifaLaser: z.string(),
       // CI y nacimiento: obligatorios en el alta salvo para un proveedor externo
       ci: z.union([z.literal(''), ciSchema]),
       celular: vacioOk(celularSchema),
@@ -140,25 +158,26 @@ function Campo({
   );
 }
 
+// dd/mm/aa: fechas cortas para que la tabla no se ensanche
 function formatearFecha(iso: string | null): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('es-BO', {
     day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+    month: '2-digit',
+    year: '2-digit',
   });
 }
 
 function BadgeTipo({ tipo }: { tipo: TipoOperario }) {
   if (tipo === 'proveedor_externo') {
     return (
-      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-violet-700">
+      <span className="inline-block rounded-xl bg-violet-50 px-2 py-0.5 text-[11px] leading-tight font-semibold text-violet-700">
         proveedor externo
       </span>
     );
   }
   return tipo === 'maestro_externo' ? (
-    <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-2 py-0.5 text-[11px] font-semibold text-acento">
+    <span className="inline-block rounded-xl bg-[rgba(47,111,224,0.1)] px-2 py-0.5 text-[11px] leading-tight font-semibold text-acento">
       maestro externo
     </span>
   ) : (
@@ -321,6 +340,9 @@ function FormOperario({
           tarifaLavanderia:
             operario.tarifaLavanderia != null ? formatBs(operario.tarifaLavanderia) : '',
           tarifaBordado: operario.tarifaBordado != null ? formatBs(operario.tarifaBordado) : '',
+          tarifaSerigrafia:
+            operario.tarifaSerigrafia != null ? formatBs(operario.tarifaSerigrafia) : '',
+          tarifaLaser: operario.tarifaLaser != null ? formatBs(operario.tarifaLaser) : '',
           ci: operario.ci ?? '',
           celular: operario.celular ?? '',
           fechaNacimiento: aFechaInput(operario.fechaNacimiento),
@@ -335,6 +357,8 @@ function FormOperario({
           tarifaClasificacion: '',
           tarifaLavanderia: '',
           tarifaBordado: '',
+          tarifaSerigrafia: '',
+          tarifaLaser: '',
           ci: '',
           celular: '',
           fechaNacimiento: '',
@@ -350,8 +374,7 @@ function FormOperario({
   const esCortador = roles.includes('cortador');
   const esClasificador = roles.includes('clasificador');
   const esAyudante = roles.includes('ayudante');
-  const esLavanderia = roles.includes('lavanderia');
-  const esBordado = roles.includes('bordado');
+  const serviciosDelProveedor = SERVICIOS_EXTERNOS.filter((s) => roles.includes(s));
   // un proveedor externo solo tiene roles de proveedor, y al revés: al cambiar
   // el tipo se quitan los roles que ya no corresponden
   const rolesDelTipo = ROLES_OPERARIO.filter((r) => ROLES_PROVEEDOR.includes(r) === esProveedor);
@@ -368,8 +391,12 @@ function FormOperario({
       roles: v.roles,
       tarifaCorte: v.roles.includes('cortador') ? aTarifa(v.tarifaCorte) : null,
       tarifaClasificacion: v.roles.includes('clasificador') ? aTarifa(v.tarifaClasificacion) : null,
-      tarifaLavanderia: v.roles.includes('lavanderia') ? aTarifa(v.tarifaLavanderia) : null,
-      tarifaBordado: v.roles.includes('bordado') ? aTarifa(v.tarifaBordado) : null,
+      ...(Object.fromEntries(
+        SERVICIOS_EXTERNOS.map((s) => [
+          TARIFA_SERVICIO[s],
+          v.roles.includes(s) ? aTarifa(v[TARIFA_SERVICIO[s]]) : null,
+        ]),
+      ) as Record<(typeof TARIFA_SERVICIO)[ServicioExterno], number | null>),
     };
     if (operario) {
       await editar.mutateAsync({
@@ -416,7 +443,7 @@ function FormOperario({
             <option value="regular">Regular (tarifa base)</option>
             <option value="maestro_externo">Maestro externo (tarifa base + diferencial)</option>
             <option value="proveedor_externo">
-              Proveedor externo (lavandería o bordado, cobra por prenda)
+              Proveedor externo (serigrafía, láser, bordado o lavandería; cobra por prenda)
             </option>
           </select>
         </Campo>
@@ -486,36 +513,23 @@ function FormOperario({
             )}
           </div>
         )}
-        {(esLavanderia || esBordado) && (
+        {serviciosDelProveedor.length > 0 && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {esLavanderia && (
+            {serviciosDelProveedor.map((s) => (
               <Campo
-                etiqueta="Precio de lavandería (Bs/prenda)"
+                key={s}
+                etiqueta={`Precio de ${ETIQUETA_ROL[s].toLowerCase()} (Bs/prenda)`}
                 opcional="se puede cambiar en cada envío"
-                error={errors.tarifaLavanderia?.message}
+                error={errors[TARIFA_SERVICIO[s]]?.message}
               >
                 <input
-                  {...register('tarifaLavanderia')}
+                  {...register(TARIFA_SERVICIO[s])}
                   inputMode="decimal"
-                  placeholder="ej. 1.50"
+                  placeholder={EJEMPLO_PRECIO[s]}
                   className={`mono ${claseInput}`}
                 />
               </Campo>
-            )}
-            {esBordado && (
-              <Campo
-                etiqueta="Precio de bordado (Bs/prenda)"
-                opcional="se puede cambiar en cada envío"
-                error={errors.tarifaBordado?.message}
-              >
-                <input
-                  {...register('tarifaBordado')}
-                  inputMode="decimal"
-                  placeholder="ej. 0.80"
-                  className={`mono ${claseInput}`}
-                />
-              </Campo>
-            )}
+            ))}
           </div>
         )}
         {esAyudante &&
@@ -744,7 +758,7 @@ export function OperariosPage() {
         </div>
 
         {/* la tabla se desplaza dentro de su caja: el encabezado queda fijo arriba */}
-        <div className="mt-4 max-h-[calc(100vh-15rem)] overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm print:max-h-none print:overflow-visible">
+        <div className="mt-4 w-fit max-w-full max-h-[calc(100vh-15rem)] overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm print:max-h-none print:overflow-visible">
           {isLoading && <div className="p-8 text-center text-sm text-gray-500">Cargando plantel…</div>}
           {error && (
             <div className="p-8 text-center text-sm text-error">
@@ -752,33 +766,32 @@ export function OperariosPage() {
             </div>
           )}
           {operarios && (
-            <table className="w-full text-sm">
+            <table className="text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase shadow-[inset_0_-1px_0_#e5e7eb]">
-                  <th className="px-5 py-3">Operario</th>
-                  <th className="px-5 py-3">Roles</th>
-                  <th className="px-5 py-3">Celular</th>
-                  <th className="px-5 py-3">Tipo</th>
-                  <th className="px-5 py-3">Estado</th>
-                  <th className="px-5 py-3">Ingreso</th>
-                  <th className="px-5 py-3">Salida</th>
-                  <th className="px-5 py-3">Baja</th>
-                  <th className="px-5 py-3 text-right">Acciones</th>
+                  <th className="px-2.5 py-2.5">Operario</th>
+                  <th className="px-2.5 py-2.5">Roles</th>
+                  <th className="px-2.5 py-2.5">Celular</th>
+                  <th className="px-2.5 py-2.5">Tipo</th>
+                  <th className="px-2.5 py-2.5">Estado</th>
+                  <th className="px-2.5 py-2.5">Ingreso</th>
+                  <th className="px-2.5 py-2.5">Salida</th>
+                  <th className="px-2.5 py-2.5 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {operarios.map((o) => (
                   <tr
                     key={o.id}
-                    className={`border-b border-gray-100 last:border-0 ${o.activo ? '' : 'opacity-60'}`}
+                    className={`border-b border-gray-200/70 last:border-0 even:bg-slate-100 hover:bg-blue-50 ${o.activo ? '' : 'opacity-60'}`}
                   >
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[#e8edf5] text-xs font-semibold text-[#41506b]">
+                    <td className="px-2.5 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-[#e8edf5] text-[11px] font-semibold text-[#41506b]">
                           {o.nombre.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div className="font-medium">{o.nombre}</div>
+                          <div className="font-medium whitespace-nowrap">{o.nombre}</div>
                           <div className="text-xs text-gray-500">
                             {o.ci ? `CI ${o.ci}` : 'sin CI'}
                             {o.fechaNacimiento && ` · nac. ${formatearFecha(o.fechaNacimiento)}`}
@@ -786,8 +799,8 @@ export function OperariosPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3">
-                      <div className="flex max-w-[260px] flex-wrap gap-1">
+                    <td className="px-2.5 py-2">
+                      <div className="flex max-w-[180px] flex-wrap gap-1">
                         {o.roles.map((r) => (
                           <span
                             key={r}
@@ -798,8 +811,9 @@ export function OperariosPage() {
                             {r === 'clasificador' &&
                               o.tarifaClasificacion != null &&
                               ` · ${formatBs(o.tarifaClasificacion)}`}
-                            {r === 'lavanderia' && o.tarifaLavanderia != null && ` · ${formatBs(o.tarifaLavanderia)}`}
-                            {r === 'bordado' && o.tarifaBordado != null && ` · ${formatBs(o.tarifaBordado)}`}
+                            {esServicioExterno(r) &&
+                              o[TARIFA_SERVICIO[r]] != null &&
+                              ` · ${formatBs(o[TARIFA_SERVICIO[r]]!)}`}
                             {r === 'ayudante' &&
                               (o.sueldoVigente != null
                                 ? ` · ${formatBs(o.sueldoVigente)}/sem`
@@ -808,18 +822,22 @@ export function OperariosPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-gray-600 tabular-nums">{o.celular ?? '—'}</td>
-                    <td className="px-5 py-3">
+                    <td className="px-2.5 py-2 whitespace-nowrap text-gray-600 tabular-nums">{o.celular ?? '—'}</td>
+                    <td className="px-2.5 py-2">
                       <BadgeTipo tipo={o.tipo} />
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-2.5 py-2">
                       <BadgeEstado activo={o.activo} />
+                      {o.fechaBaja && (
+                        <div className="mt-0.5 text-[11px] whitespace-nowrap text-gray-500">
+                          {formatearFecha(o.fechaBaja)}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">{formatearFecha(o.fechaIngreso)}</td>
-                    <td className="px-5 py-3 text-gray-600">{formatearFecha(o.fechaSalida)}</td>
-                    <td className="px-5 py-3 text-gray-600">{formatearFecha(o.fechaBaja)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex justify-end gap-3 text-[13px] font-medium">
+                    <td className="px-2.5 py-2 whitespace-nowrap text-gray-600">{formatearFecha(o.fechaIngreso)}</td>
+                    <td className="px-2.5 py-2 whitespace-nowrap text-gray-600">{formatearFecha(o.fechaSalida)}</td>
+                    <td className="px-2.5 py-2">
+                      <div className="flex justify-end gap-2.5 text-[13px] font-medium whitespace-nowrap">
                         <button
                           onClick={() => setModal({ tipo: 'editar', operario: o })}
                           className="text-acento hover:underline"
@@ -864,7 +882,7 @@ export function OperariosPage() {
                 ))}
                 {operarios.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-5 py-8 text-center text-gray-500">
+                    <td colSpan={8} className="px-5 py-8 text-center text-gray-500">
                       No hay operarios {estado === 'activos' ? 'activos' : ''} todavía.
                     </td>
                   </tr>

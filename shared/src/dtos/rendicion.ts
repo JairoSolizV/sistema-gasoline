@@ -5,6 +5,7 @@
 import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
 import type { EstadoAsistencia } from '../sueldo.js';
 import type { Cuenta } from '../cuentas.js';
+import type { ServicioExterno } from '../schemas/corte.js';
 import type { TipoMolde } from './modelo.js';
 
 export interface RendicionOperacionDTO {
@@ -79,7 +80,7 @@ export interface RendicionSueldoDTO {
 
 /** Un envío de ESTE proveedor devuelto en el mes (PLAN_CUENTAS_SEPARADAS §5). */
 export interface RendicionEnvioDTO {
-  servicio: 'lavanderia' | 'bordado';
+  servicio: ServicioExterno;
   corteId: string;
   codigo: number;
   modeloNombre: string;
@@ -123,6 +124,6 @@ export interface RendicionDTO {
   empaque: RendicionCorteDTO[]; // solo operaciones de empaque
   servicioCorte: RendicionTrabajoCorteDTO[];
   moldes: RendicionMoldeDTO[];
-  envios: RendicionEnvioDTO[]; // lavandería y bordado (proveedores externos)
+  envios: RendicionEnvioDTO[]; // serigrafía, láser, bordado y lavandería (proveedores externos)
   anticipos: RendicionAnticipoDTO[];
 }

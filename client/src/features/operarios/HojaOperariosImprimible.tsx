@@ -39,7 +39,7 @@ export function HojaOperariosImprimible({
 
   return (
     <HojaOficio
-      className="angosta"
+      className="angosta cebra"
       titulo="Operarios del taller"
       detalle={`${conBajas ? 'Todos (activos y de baja)' : 'Solo activos'}${rol ? ` · rol: ${ETIQUETA_ROL[rol]}` : ''}`}
       resumen={

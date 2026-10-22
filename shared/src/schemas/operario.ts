@@ -14,18 +14,24 @@ export const ROLES_OPERARIO = [
   'trazador',
   'clasificador',
   'ayudante',
-  'lavanderia', // proveedores externos (docs/PLAN_CUENTAS_SEPARADAS.md §5)
+  // proveedores externos (docs/PLAN_CUENTAS_SEPARADAS.md §5), en el orden del proceso
+  'serigrafia',
+  'laser',
   'bordado',
+  'lavanderia',
 ] as const;
 
-/** Un proveedor externo tiene solo roles de proveedor (lavandería/bordado), y
+const ROLES_DE_PROVEEDOR: readonly string[] = ['lavanderia', 'bordado', 'serigrafia', 'laser'];
+
+/** Un proveedor externo tiene solo roles de proveedor (serigrafía, láser,
+ *  bordado, lavandería), y
  *  esos roles son solo de proveedores externos. */
 export function rolesCoherentes(tipo: string, roles: readonly string[]): boolean {
-  const deProveedor = roles.filter((r) => r === 'lavanderia' || r === 'bordado').length;
+  const deProveedor = roles.filter((r) => ROLES_DE_PROVEEDOR.includes(r)).length;
   return tipo === 'proveedor_externo' ? deProveedor === roles.length : deProveedor === 0;
 }
 export const MENSAJE_ROLES_PROVEEDOR =
-  'Lavandería y Bordado son roles de proveedor externo, y un proveedor externo solo puede tener esos roles';
+  'Serigrafía, Láser, Bordado y Lavandería son roles de proveedor externo, y un proveedor externo solo puede tener esos roles';
 export const rolOperarioSchema = z.enum(ROLES_OPERARIO);
 
 const rolesSchema = z
@@ -86,6 +92,8 @@ export const crearOperarioSchema = z
     tarifaClasificacion: tarifaPersonalSchema.optional(),
     tarifaLavanderia: tarifaPersonalSchema.optional(),
     tarifaBordado: tarifaPersonalSchema.optional(),
+    tarifaSerigrafia: tarifaPersonalSchema.optional(),
+    tarifaLaser: tarifaPersonalSchema.optional(),
     // CI y fecha de nacimiento: obligatorios salvo para un proveedor externo (refine abajo)
     ci: ciSchema.optional(),
     celular: celularSchema,
@@ -143,6 +151,8 @@ export const editarOperarioSchema = z
     tarifaClasificacion: tarifaPersonalSchema,
     tarifaLavanderia: tarifaPersonalSchema,
     tarifaBordado: tarifaPersonalSchema,
+    tarifaSerigrafia: tarifaPersonalSchema,
+    tarifaLaser: tarifaPersonalSchema,
     ci: ciSchema.nullable(),
     celular: celularSchema.nullable(),
     fechaNacimiento: z.coerce

@@ -128,9 +128,19 @@ export type ReemplazarAsignacionesInput = z.infer<typeof reemplazarAsignacionesS
 export type AsignarGrupoInput = z.infer<typeof asignarGrupoSchema>;
 export type CerrarCorteInput = z.infer<typeof cerrarCorteSchema>;
 
-// ── Lavandería y bordado externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────
-export const SERVICIOS_EXTERNOS = ['lavanderia', 'bordado'] as const;
+// ── Servicios externos (docs/PLAN_CUENTAS_SEPARADAS.md §5) ─────────────────────
+// En el orden del proceso de la prenda. Cada uno es una cuenta de pago y un rol
+// de proveedor con el mismo nombre.
+export const SERVICIOS_EXTERNOS = ['serigrafia', 'laser', 'bordado', 'lavanderia'] as const;
 export type ServicioExterno = (typeof SERVICIOS_EXTERNOS)[number];
+
+/** Campo del proveedor con su precio por prenda predeterminado de cada servicio. */
+export const TARIFA_SERVICIO = {
+  serigrafia: 'tarifaSerigrafia',
+  laser: 'tarifaLaser',
+  bordado: 'tarifaBordado',
+  lavanderia: 'tarifaLavanderia',
+} as const satisfies Record<ServicioExterno, string>;
 
 const dia = (mensaje: string) => z.string({ error: mensaje }).refine(esDiaValido, 'Fecha inválida (aaaa-mm-dd)');
 const notaEnvio = z.preprocess(

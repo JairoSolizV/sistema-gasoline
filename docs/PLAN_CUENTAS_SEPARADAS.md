@@ -140,3 +140,12 @@ Confirmado por el dueño (§8):
   y `20261022180000_envios_servicio_externo`. Verificado en navegador con un proveedor de prueba sobre
   el COD 23: 721 × 1.50 = 1081.50, total del corte 6950.44, "1 corte activo" sin devolver y, al
   devolver, fila en Lavandería sin tocar Operaciones. 348 tests en verde (`tests/envios.test.ts` nuevo).
+- **2026-10-23 — Serigrafía y láser; orden de las cuentas.** Pedido del dueño: dos servicios externos
+  más, iguales a bordado y lavandería (proveedor externo en Operarios con su precio por prenda, envíos
+  por corte, se gana al devolver, cuenta propia). Enums `Cuenta`, `RolOperario` y `ServicioExterno` +
+  `Operario.tarifaSerigrafia|tarifaLaser` — migración `20261023100000_serigrafia_laser`. En código, los
+  servicios externos salen de una sola lista (`SERVICIOS_EXTERNOS` + `TARIFA_SERVICIO`); el corte informa
+  `costoExternos` por servicio. Orden de las cuentas en todo el sistema (el del proceso de la prenda):
+  moldes, servicio de corte, operaciones, serigrafía, láser, bordado, lavandería, empaque y sueldo de
+  ayudantes; etiquetas "Servicio de …". Inicio y Operarios con filas en franjas alternas y columnas
+  ajustadas; impresión en oficio de Inicio, Costos fijos, Liquidación y Rendición. 376 tests en verde.

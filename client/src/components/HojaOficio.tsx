@@ -9,8 +9,8 @@ import type { ReactNode } from 'react';
 // huecos entre columnas cortas. Filas compactas: a 10pt cada fila mide ~0.55 cm
 // y el alto útil es ~30.8 cm (≈ 50 filas por hoja).
 //
-// El @page va en un <style> que solo existe mientras la hoja está montada:
-// no cambia el tamaño de papel de otras impresiones (Liquidación, Rendición).
+// El papel oficio es el de todo el sistema (index.css); este @page solo
+// ajusta los márgenes mientras la hoja está montada.
 const CSS_HOJA = `
 @page { size: 21.5cm 33cm; margin: 1.2cm 1.2cm 1cm; }
 .hoja-oficio { color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -24,6 +24,8 @@ const CSS_HOJA = `
 .hoja-oficio tr.grupo td { background: #e9ecf1; font-weight: 600; border-top: 1pt solid #000; padding-top: 2.5pt; }
 .hoja-oficio tr { break-inside: avoid; }
 .hoja-oficio tfoot td { border-top: 1.5pt solid #000; border-bottom: none; font-weight: 700; padding-top: 3pt; }
+/* variante cebra: fondo alterno por fila, guía para leer de lado a lado */
+.hoja-oficio.cebra tbody tr:nth-child(even) td { background: #eef1f5; }
 /* variante para tablas anchas (muchas columnas): celdas más angostas */
 .hoja-oficio.angosta th, .hoja-oficio.angosta td { padding-left: 5pt; padding-right: 5pt; }
 .hoja-oficio td.envolver { white-space: normal; max-width: 4cm; }

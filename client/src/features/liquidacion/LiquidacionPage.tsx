@@ -19,8 +19,10 @@ const REGLA_CUENTA: Record<Cuenta, string> = {
   servicio_corte: 'búsqueda, trazado, doblado, corte y clasificación (por la fecha de cada trabajo)',
   moldes: 'moldes nuevos y modificaciones (por la fecha del pago)',
   sueldo: 'sueldo semanal de los ayudantes según la asistencia (por día)',
-  lavanderia: 'prendas devueltas por la lavandería (por fecha de devolución)',
+  serigrafia: 'prendas devueltas por la serigrafía (por fecha de devolución)',
+  laser: 'prendas devueltas por el servicio de láser (por fecha de devolución)',
   bordado: 'prendas devueltas por la bordadora (por fecha de devolución)',
+  lavanderia: 'prendas devueltas por la lavandería (por fecha de devolución)',
 };
 
 function SaldoBadge({ centavos }: { centavos: number }) {
