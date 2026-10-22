@@ -1,7 +1,7 @@
 # Costos de producción (insumos, ficha de costo por modelo, costo real del corte y proyección)
 
-> **Estado:** aprobado el 2026-10-22 (respuestas §7). **Etapas 1 y 2 implementadas** y datos del catálogo
-> importados; 3 (costo real del corte) y 4 (proyección y stock) pendientes; la 5 (costos fijos) a decidir.
+> **Estado:** aprobado el 2026-10-22 (respuestas §7). **Etapas 1 a 4 implementadas** (y datos del catálogo
+> importados); la 5 (costos fijos) queda a decidir.
 > **Amplía el alcance** (CLAUDE.md §2: hoy "otros costos del taller" está fuera). Al aprobar se
 > actualizan `CLAUDE.md` y `CONTEXTO_NEGOCIO_TALLER.md`. **No toca ningún pago**: es un módulo de
 > consulta; lee lo que ya existe (CT, servicio de corte, empaque, lavandería/bordado) sin modificarlo.
@@ -105,6 +105,27 @@ Respuestas del dueño (2026-10-22):
    están cargadas en Taller · Pagos. "CLASICO GSLN BJO RIGIDO" de Taller · Pagos es el modelo **23
    CLASICO GSLN FRONTERA** (no está en el catálogo), **no** el 31.
 
+## 7b. Decisiones de las etapas 3 y 4 (2026-10-22)
+
+1. **Stock = conteo físico + movimientos:** stock de un insumo = último conteo + compras posteriores −
+   consumo de los cortes posteriores (según la ficha del modelo). Sin conteo, parte de 0 con todas las
+   compras. Se corrige solo cada vez que se cuenta.
+2. **Tela real del corte:** el tendido del corte suma **prendas por capa**; tela usada = largo del
+   trazado × capas (capas = prendas del corte ÷ prendas por capa, hacia arriba), con el precio de la
+   última compra de la tela de la ficha.
+3. **Proyección del mes = plan manual + cortes abiertos:** el plan (fichas × prendas) da el material
+   necesario, lo que falta comprar según el stock y la plata para producirlo; cada corte abierto suma
+   la plata para terminarlo (costura y empaque que se pagan al cerrar + envíos sin devolver).
+
+Diseño:
+- **Qué ficha usa un corte:** la vinculada a su modelo (si hay varias, la última actualizada).
+- **Costo real del corte:** costura y empaque = lo asignado (con diferencial de maestro) y, en
+  operaciones sin asignar, prendas × CT; servicio de corte = lo registrado; lavandería/bordado = sus
+  envíos; materiales = líneas de la ficha × prendas, con la tela principal según el tizado real.
+  Se compara por prenda con la ficha.
+- **Consumo de un corte** (para el stock): se descuenta en su fecha de inicio: por prenda = cantidad
+  × prendas; tela = tizado (real si hay prendas por capa); hilo = prendas ÷ rendimiento (conos).
+
 ## 8. Bitácora
 
 - **2026-10-22 — Propuesta.** Base: respuestas del 2026-10-21 (tasa oficial del día, tabla de
@@ -127,3 +148,19 @@ Respuestas del dueño (2026-10-22):
   cierres repartidos por medida según la curva del corte principal. La tasa del catálogo es 11.85
   (no la oficial). Falta: mano de obra en las 8 fichas y precios de cierres 12 y 15 cm, placa y
   regulador.
+- **2026-10-22 — Etapas 3 y 4 (costo real, stock y proyección).** Decisiones §7b. `Corte.prendasPorCapa`
+  (en el tendido, opcional), `ConteoInsumo` y `PlanProduccion` — migración
+  `20261022220000_costos_stock_proyeccion`. `shared/costos.ts`: consumo de cada línea para N prendas
+  (milésimas exactas) y tela real = trazado × capas (hacia arriba). `costos/produccion.ts`: stock por
+  insumo (último conteo + compras − consumo de cortes posteriores; lo del mismo día del conteo ya está
+  incluido), costo real del corte por rubro frente a su ficha (la vinculada al modelo, la última
+  actualizada; costura y empaque = lo asignado + lo que falta a su CT; los avíos se toman de la ficha;
+  lavandería/bordado reales = envíos) y proyección (plan → material necesario, faltante según stock al
+  precio de la última compra, plata para producir; cortes abiertos → costura y empaque al cerrar +
+  envíos sin devolver). API `/costos/conteos`, `/costos/cortes[/:id]`, `/costos/proyeccion`,
+  `PUT /costos/plan`. Pantalla: pestañas **Costo real de cortes** (fila → detalle por rubro) y
+  **Proyección del mes**; columna **Stock** y botón **Contar** en Insumos; "Por capa" en el tendido del
+  corte. Verificado con los datos reales: COD 23 cuesta Bs 8.24 por prenda (costura 5220.04 con el
+  diferencial de maestro + servicio 721.00); plan de prueba 31 × 1000 → producir Bs 11 300.00 (luego
+  borrado). Ojo: hasta el primer conteo, el stock suma todo lo comprado para los cortes 25–32 (no están
+  en Taller · Pagos, su consumo no se descuenta). 369 tests en verde (`costos-produccion` nuevo).

@@ -144,6 +144,7 @@ export const cortesRepository = {
     tela: string;
     anchoCm: number;
     trazadoCm: number;
+    prendasPorCapa: number | null;
     esInterno: boolean;
     tarifas: TarifasServicioData | null; // snapshot de Configuración (null si externo)
   }) {
@@ -153,7 +154,7 @@ export const cortesRepository = {
 
   actualizarTendido(
     corteId: string,
-    data: { tela: string; anchoCm: number; trazadoCm: number },
+    data: { tela: string; anchoCm: number; trazadoCm: number; prendasPorCapa: number | null },
   ) {
     return prisma.corte.update({ where: { id: corteId }, data });
   },

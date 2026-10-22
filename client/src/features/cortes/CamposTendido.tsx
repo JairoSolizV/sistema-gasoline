@@ -13,10 +13,11 @@ export interface TendidoForm {
   tela: string;
   ancho: string; // metros, como se tipea
   trazado: string;
+  prendasPorCapa: string; // opcional (costos: tela real)
 }
 
 export function tendidoVacio(): TendidoForm {
-  return { tela: '', ancho: '', trazado: '' };
+  return { tela: '', ancho: '', trazado: '', prendasPorCapa: '' };
 }
 
 export function tendidoDesdeCorte(c: CorteDetalleDTO): TendidoForm {
@@ -24,6 +25,7 @@ export function tendidoDesdeCorte(c: CorteDetalleDTO): TendidoForm {
     tela: c.tela ?? '',
     ancho: c.anchoCm != null ? formatMetros(c.anchoCm) : '',
     trazado: c.trazadoCm != null ? formatMetros(c.trazadoCm) : '',
+    prendasPorCapa: c.prendasPorCapa != null ? String(c.prendasPorCapa) : '',
   };
 }
 
@@ -36,7 +38,11 @@ export function validarTendido(
   if (v.tela.trim() === '') return { ok: false, error: 'Ingresá el nombre de la tela' };
   if (!anchoCm) return { ok: false, error: 'Ancho de tela inválido (en metros, ej. 1.60)' };
   if (!trazadoCm) return { ok: false, error: 'Largo de trazado inválido (en metros, ej. 5.25)' };
-  return { ok: true, datos: { tela: v.tela.trim(), anchoCm, trazadoCm } };
+  const prendasPorCapa = v.prendasPorCapa.trim() === '' ? null : Number(v.prendasPorCapa);
+  if (prendasPorCapa != null && !(prendasPorCapa >= 1)) {
+    return { ok: false, error: 'Prendas por capa inválidas (ej. 10)' };
+  }
+  return { ok: true, datos: { tela: v.tela.trim(), anchoCm, trazadoCm, prendasPorCapa } };
 }
 
 const claseInput =
@@ -54,7 +60,7 @@ export function CamposTendido({
   const soloMetros = (s: string) => s.replace(/[^\d.,]/g, '');
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
       <div>
         <label className="mb-1 block text-sm font-medium">Tela</label>
         <input
@@ -86,6 +92,19 @@ export function CamposTendido({
           onChange={(e) => set('trazado', soloMetros(e.target.value))}
           inputMode="decimal"
           placeholder="ej. 5.25"
+          className={`mono ${claseInput}`}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium">
+          Prendas por capa <span className="font-normal text-gray-400">(opcional)</span>
+        </label>
+        <input
+          value={valor.prendasPorCapa}
+          onChange={(e) => set('prendasPorCapa', e.target.value.replace(/\D/g, ''))}
+          inputMode="numeric"
+          placeholder="ej. 10"
+          title="Para el costo real de la tela: largo del trazado × capas"
           className={`mono ${claseInput}`}
         />
       </div>

@@ -118,3 +118,55 @@ export function costoFicha(input: {
     incompleto: exactas.some((c) => c === null),
   };
 }
+
+// ── Etapas 3 y 4: consumo de material, tela real y montos por varias prendas ──
+
+/** Una línea de ficha tal como se guarda (para consumo y costo por corte). */
+export interface LineaGuardada {
+  tipo: LineaParaCosto['tipo'];
+  cantidad: number | null;
+  largoMm: number | null;
+  prendasPorCapa: number | null;
+  rendimiento: number | null; // ya resuelto: el de la ficha o el del insumo
+}
+
+/** Material que gasta una línea para `prendas` prendas, en milésimas de la
+ *  unidad del insumo (fracción exacta). null = la línea no gasta un insumo
+ *  (precio por prenda, prorrateo) o no se puede calcular (hilo sin rendimiento). */
+export function consumoLinea(l: LineaGuardada, prendas: number): Fraccion | null {
+  switch (l.tipo) {
+    case 'por_prenda':
+      return l.cantidad == null ? null : fr(l.cantidad * prendas);
+    case 'tela_tizado':
+      // largo en mm = milésimas de metro
+      return l.largoMm == null || !l.prendasPorCapa ? null : fr(l.largoMm * prendas, l.prendasPorCapa);
+    case 'hilo':
+      // conos = prendas ÷ rendimiento → en milésimas de cono
+      return l.rendimiento ? fr(CANTIDAD_ESCALA * prendas, l.rendimiento) : null;
+    default:
+      return null;
+  }
+}
+
+/** Capas del tendido: las prendas del corte ÷ prendas por capa, hacia arriba. */
+export const capasDelTendido = (prendas: number, prendasPorCapa: number) =>
+  Math.ceil(prendas / prendasPorCapa);
+
+/** Tela real de un corte en milésimas de metro: largo del trazado (cm) × capas. */
+export function telaRealCorte(trazadoCm: number, prendas: number, prendasPorCapa: number): number {
+  return trazadoCm * 10 * capasDelTendido(prendas, prendasPorCapa);
+}
+
+/** Costo (centavos, exacto) de una cantidad en milésimas a un precio unitario. */
+export function costoDeCantidad(cantidadMilesimas: Fraccion, precio: Fraccion): Fraccion {
+  return multiplicar(cantidadMilesimas, multiplicar(precio, fr(1, CANTIDAD_ESCALA)));
+}
+
+/** Un monto exacto por prenda × prendas. */
+export const porPrendas = (f: Fraccion, prendas: number): Fraccion => multiplicar(f, fr(prendas));
+
+export const sumarFracciones = (fs: (Fraccion | null)[]): Fraccion =>
+  fs.reduce<Fraccion>((a, f) => (f ? sumar(a, f) : a), CERO);
+
+/** Milésimas redondeadas half-up (para mostrar cantidades de material). */
+export const redondearCantidad = redondear;

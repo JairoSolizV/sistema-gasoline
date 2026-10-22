@@ -118,3 +118,31 @@ export type EditarInsumoInput = z.infer<typeof editarInsumoSchema>;
 export type CompraInput = z.infer<typeof compraInputSchema>;
 export type LineaCostoInput = z.infer<typeof lineaCostoInputSchema>;
 export type FichaCostoInput = z.infer<typeof fichaCostoInputSchema>;
+
+// ── Etapas 3 y 4: stock (conteos), plan de producción y proyección ──
+
+/** Conteo físico: cuánto hay hoy en el depósito (milésimas de la unidad). */
+export const conteoInputSchema = z.object({
+  insumoId: z.uuid('Elegí el insumo'),
+  fecha: dia,
+  cantidad: z.number().int().min(0, 'La cantidad no puede ser negativa').max(1_000_000_000),
+  notas: texto(200).optional(),
+});
+
+export const mesQuerySchema = z.object({
+  anio: z.coerce.number().int().min(2000).max(2100),
+  mes: z.coerce.number().int().min(1).max(12),
+});
+
+/** Plan del mes completo (reemplaza al anterior): prendas de cada ficha. */
+export const planInputSchema = z.object({
+  anio: z.number().int().min(2000).max(2100),
+  mes: z.number().int().min(1).max(12),
+  items: z
+    .array(z.object({ fichaId: z.uuid(), prendas: entero(1, 'Las prendas deben ser al menos 1') }))
+    .max(100)
+    .refine((xs) => new Set(xs.map((x) => x.fichaId)).size === xs.length, 'Hay modelos repetidos en el plan'),
+});
+
+export type ConteoInput = z.infer<typeof conteoInputSchema>;
+export type PlanInput = z.infer<typeof planInputSchema>;

@@ -169,6 +169,7 @@ function aDetalleDTO(
     tela: corte.tela,
     anchoCm: corte.anchoCm,
     trazadoCm: corte.trazadoCm,
+    prendasPorCapa: corte.prendasPorCapa,
     rollos:
       corte.rollosCm != null
         ? {
@@ -312,6 +313,7 @@ export const cortesService = {
         tela: input.tela,
         anchoCm: input.anchoCm,
         trazadoCm: input.trazadoCm,
+        prendasPorCapa: input.prendasPorCapa ?? null,
         esInterno: input.esInterno,
         tarifas,
       })
@@ -345,6 +347,7 @@ export const cortesService = {
       tela: input.tela,
       anchoCm: input.anchoCm,
       trazadoCm: input.trazadoCm,
+      prendasPorCapa: input.prendasPorCapa ?? null,
     });
     return detalle(corteId);
   },

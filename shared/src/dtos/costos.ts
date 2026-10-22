@@ -29,6 +29,7 @@ export interface InsumoDTO {
   /** Bs por unidad de la última compra, SOLO para mostrar (el cálculo usa la fracción exacta). */
   precioUnitarioBs: number | null;
   usadoEnFichas: number;
+  stock: StockDTO; // milésimas (etapa 4)
 }
 
 export interface CompraDTO {
@@ -89,4 +90,96 @@ export interface FichaCostoDetalleDTO extends FichaCostoResumenDTO {
   empaque: number;
   servicioCorte: number;
   origenManoDeObra: 'modelo' | 'manual'; // del modelo vinculado (CT) o escrita a mano
+}
+
+// ── Etapas 3 y 4 ──
+
+/** Stock de un insumo (milésimas): último conteo + compras − consumo de cortes posteriores. */
+export interface StockDTO {
+  conteo: { id: string; fecha: string; cantidad: number } | null;
+  compras: number; // milésimas compradas después del conteo (o todas, sin conteo)
+  consumo: number; // milésimas gastadas por cortes después del conteo
+  stock: number; // puede ser negativo si faltan compras o conteos
+}
+
+export interface ConteoDTO {
+  id: string;
+  insumo: { id: string; nombre: string; unidad: string };
+  fecha: string;
+  cantidad: number;
+  notas: string | null;
+}
+
+/** Un rubro del costo de un corte: lo que decía la ficha y lo que pasó. */
+export interface RubroCostoDTO {
+  rubro:
+    | 'tela'
+    | 'materiales'
+    | 'externos' // lavandería, bordado y otros precios por prenda
+    | 'logistica'
+    | 'costura'
+    | 'empaque'
+    | 'servicio_corte';
+  ficha: number | null; // centavos para todas las prendas (null = sin ficha)
+  real: number | null; // centavos (null = sin dato real)
+  nota: string | null; // ej. "tela según tizado real: 61.20 m"
+}
+
+export interface CorteCostoResumenDTO {
+  corteId: string;
+  codigo: number;
+  modeloNombre: string;
+  estado: 'abierto' | 'cerrado';
+  prendas: number;
+  ficha: { id: string; nombre: string } | null;
+  realPorPrenda: number; // centavos
+  fichaPorPrenda: number | null;
+}
+
+export interface CorteCostoDetalleDTO extends CorteCostoResumenDTO {
+  rubros: RubroCostoDTO[];
+  realTotal: number;
+  fichaTotal: number | null;
+  telaReal: { metros: number; capas: number } | null; // tizado real (milésimas de m)
+  avisos: string[]; // ej. "sin prendas por capa: la tela se calcula con la ficha"
+}
+
+export interface PlanItemDTO {
+  ficha: { id: string; codigo: string | null; nombre: string };
+  prendas: number;
+  costoPorPrenda: number;
+  incompleto: boolean;
+}
+
+/** Lo que necesita el plan de un insumo, frente a lo que hay. */
+export interface NecesidadInsumoDTO {
+  insumo: { id: string; nombre: string; unidad: string };
+  necesario: number; // milésimas
+  stock: number; // milésimas
+  faltante: number; // milésimas (0 si alcanza)
+  costoFaltante: number | null; // centavos al precio de la última compra (null = sin precio)
+}
+
+export interface CortePendienteDTO {
+  corteId: string;
+  codigo: number;
+  modeloNombre: string;
+  prendas: number;
+  costuraYEmpaque: number; // centavos que se pagan al cerrar
+  enviosSinDevolver: number; // centavos de lavandería/bordado por devolver
+}
+
+export interface ProyeccionDTO {
+  anio: number;
+  mes: number;
+  plan: PlanItemDTO[];
+  necesidades: NecesidadInsumoDTO[];
+  cortesAbiertos: CortePendienteDTO[];
+  totales: {
+    comprarMateriales: number; // centavos
+    producirPlan: number; // mano de obra, empaque, servicio de corte, externos y logística del plan
+    terminarCortes: number;
+    total: number;
+  };
+  avisos: string[];
 }

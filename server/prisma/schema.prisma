@@ -149,6 +149,7 @@ model Corte {
   tela            String?
   anchoCm         Int? // ancho de la tela, en cm (se ingresa en metros con 2 decimales)
   trazadoCm       Int? // largo del trazado, en cm
+  prendasPorCapa  Int? // prendas que salen por capa del trazado (costos: tela real = largo × capas)
   // Calculadora de tendido (informativa): metros de cada rollo (cm, en orden),
   // traslape de cada empalme y retazo mínimo útil. Las hojas y retazos que
   // sobran se calculan al vuelo (shared/src/tendido.ts). null = sin cargar.
@@ -622,6 +623,7 @@ model Insumo {
   activo      Boolean         @default(true)
   creadoEn    DateTime        @default(now())
   compras     CompraInsumo[]
+  conteos     ConteoInsumo[]
   lineas      LineaCosto[]
 }
 
@@ -662,6 +664,7 @@ model FichaCosto {
   creadoEn             DateTime     @default(now())
   actualizadoEn        DateTime     @updatedAt
   lineas               LineaCosto[]
+  planes               PlanProduccion[]
 }
 
 model LineaCosto {
@@ -682,4 +685,30 @@ model LineaCosto {
   precio         Int? // precio_prenda: centavos
 
   @@index([fichaId, orden])
+}
+
+// Conteo físico de un insumo (docs/PLAN_COSTOS.md §7b): el stock parte del
+// último conteo y suma compras y resta consumo de cortes posteriores.
+model ConteoInsumo {
+  id       String   @id @default(uuid())
+  insumo   Insumo   @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  insumoId String
+  fecha    DateTime @db.Date
+  cantidad Int // milésimas de la unidad del insumo
+  notas    String?
+  creadoEn DateTime @default(now())
+
+  @@index([insumoId, fecha])
+}
+
+// Plan de producción del mes: cuántas prendas de cada ficha (proyección).
+model PlanProduccion {
+  id      String     @id @default(uuid())
+  anio    Int
+  mes     Int
+  ficha   FichaCosto @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  fichaId String
+  prendas Int
+
+  @@unique([anio, mes, fichaId])
 }

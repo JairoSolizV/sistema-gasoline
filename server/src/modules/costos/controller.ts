@@ -1,6 +1,13 @@
 // HTTP puro: lee lo validado, llama al service, responde { data } (ARQUITECTURA §2.1).
 import type { Request, Response } from 'express';
-import type { CompraInput, EditarInsumoInput, FichaCostoInput, InsumoInput } from '@taller/shared';
+import type {
+  CompraInput,
+  ConteoInput,
+  EditarInsumoInput,
+  FichaCostoInput,
+  InsumoInput,
+  PlanInput,
+} from '@taller/shared';
 import { costosService } from './service.js';
 
 const id = (req: Request) => String(req.params.id);
@@ -47,5 +54,32 @@ export const costosController = {
   async eliminarFicha(req: Request, res: Response) {
     await costosService.eliminarFicha(id(req));
     res.json({ data: { eliminado: true } });
+  },
+
+  async listarConteos(_req: Request, res: Response) {
+    const { insumoId } = res.locals.query as { insumoId?: string };
+    res.json({ data: await costosService.listarConteos(insumoId) });
+  },
+  async crearConteo(req: Request, res: Response) {
+    res.status(201).json({ data: await costosService.crearConteo(req.body as ConteoInput) });
+  },
+  async eliminarConteo(req: Request, res: Response) {
+    await costosService.eliminarConteo(id(req));
+    res.json({ data: { eliminado: true } });
+  },
+
+  async listarCostosCortes(_req: Request, res: Response) {
+    res.json({ data: await costosService.listarCostosCortes() });
+  },
+  async costoCorte(req: Request, res: Response) {
+    res.json({ data: await costosService.costoCorte(id(req)) });
+  },
+
+  async proyeccion(_req: Request, res: Response) {
+    const { anio, mes } = res.locals.query as { anio: number; mes: number };
+    res.json({ data: await costosService.proyeccion(anio, mes) });
+  },
+  async guardarPlan(req: Request, res: Response) {
+    res.json({ data: await costosService.guardarPlan(req.body as PlanInput) });
   },
 };

@@ -67,6 +67,7 @@ function TarjetaTendido({
     ['Tela', corte.tela ?? '—'],
     ['Ancho', corte.anchoCm != null ? `${formatMetros(corte.anchoCm)} m` : '—'],
     ['Trazado', corte.trazadoCm != null ? `${formatMetros(corte.trazadoCm)} m` : '—'],
+    ['Por capa', corte.prendasPorCapa != null ? `${corte.prendasPorCapa} prendas` : '—'],
   ];
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 shadow-sm">

@@ -146,6 +146,7 @@ export interface CorteDetalleDTO {
   tela: string | null;
   anchoCm: number | null;
   trazadoCm: number | null;
+  prendasPorCapa: number | null; // costos: tela real = trazado × capas
   // calculadora de tendido (null = sin cargar); el resultado se calcula con
   // calcularTendido() de shared
   rollos: { rollosCm: number[]; traslapeCm: number; retazoMinimoCm: number } | null;

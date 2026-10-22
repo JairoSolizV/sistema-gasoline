@@ -9,6 +9,14 @@ const camposTendido = {
   tela: z.string().trim().min(1, 'El nombre de la tela es obligatorio').max(60),
   anchoCm: z.number().int().min(1, 'El ancho de la tela debe ser mayor a 0').max(1000),
   trazadoCm: z.number().int().min(1, 'El largo del trazado debe ser mayor a 0').max(100000),
+  // costos: prendas por capa del trazado (tela real = largo × capas); opcional
+  prendasPorCapa: z
+    .number()
+    .int()
+    .min(1, 'Las prendas por capa deben ser al menos 1')
+    .max(10000)
+    .nullable()
+    .optional(),
 };
 
 export const editarTendidoSchema = z.object(camposTendido);

@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { CATEGORIAS_INSUMO, type CategoriaInsumo, type InsumoDTO, type InsumoInput } from '@taller/shared';
-import { useEliminarInsumo, useGuardarInsumo, useInsumos } from '../../api/costos';
+import { useCrearConteo, useEliminarInsumo, useGuardarInsumo, useInsumos } from '../../api/costos';
+import { hoyLocalISO } from '../../lib/fechas';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
-import { bsUnitario, ETIQUETA_CATEGORIA, fechaCorta, UNIDAD_SUGERIDA } from './formato';
+import {
+  aMilesimas,
+  bsUnitario,
+  deMilesimas,
+  ETIQUETA_CATEGORIA,
+  fechaCorta,
+  PATRON_DECIMAL,
+  UNIDAD_SUGERIDA,
+} from './formato';
 
 const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
@@ -29,6 +38,7 @@ export function InsumosTab() {
   const { data: insumos, isLoading } = useInsumos();
   const eliminar = useEliminarInsumo();
   const [modal, setModal] = useState<InsumoDTO | 'nuevo' | null>(null);
+  const [contar, setContar] = useState<InsumoDTO | null>(null);
   const [filtro, setFiltro] = useState<CategoriaInsumo | ''>('');
   const lista = (insumos ?? []).filter((i) => !filtro || i.categoria === filtro);
 
@@ -65,13 +75,14 @@ export function InsumosTab() {
               <th className="px-3 py-3">Categoría</th>
               <th className="px-3 py-3 text-right">Precio actual</th>
               <th className="px-3 py-3">Última compra</th>
+              <th className="px-3 py-3 text-right">Stock</th>
               <th className="px-5 py-3 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
@@ -96,7 +107,18 @@ export function InsumosTab() {
                 <td className="px-3 py-2.5 text-xs text-gray-500">
                   {i.ultimaCompra ? `${fechaCorta(i.ultimaCompra.fecha)} · ${i.ultimaCompra.tienda}` : '—'}
                 </td>
+                <td className="mono px-3 py-2.5 text-right">
+                  <span className={i.stock.stock < 0 ? 'text-error' : ''}>
+                    {deMilesimas(i.stock.stock)} {i.unidad}
+                  </span>
+                  <div className="text-[11px] font-normal text-gray-400">
+                    {i.stock.conteo ? `contado el ${fechaCorta(i.stock.conteo.fecha)}` : 'sin conteo'}
+                  </div>
+                </td>
                 <td className="px-5 py-2.5 text-right text-[13px] font-medium whitespace-nowrap">
+                  <button onClick={() => setContar(i)} className="mr-3 text-acento hover:underline">
+                    Contar
+                  </button>
                   <button onClick={() => setModal(i)} className="text-acento hover:underline">
                     Editar
                   </button>
@@ -113,7 +135,7 @@ export function InsumosTab() {
             ))}
             {!isLoading && lista.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-5 py-10 text-center text-gray-500">
                   No hay insumos {filtro ? 'en esta categoría' : 'cargados'}.
                 </td>
               </tr>
@@ -122,6 +144,7 @@ export function InsumosTab() {
         </table>
       </div>
       {modal && <ModalInsumo insumo={modal === 'nuevo' ? null : modal} onCerrar={() => setModal(null)} />}
+      {contar && <ModalConteo insumo={contar} onCerrar={() => setContar(null)} />}
     </>
   );
 }
@@ -247,6 +270,56 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
         >
           Guardar
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Conteo físico: lo que hay hoy en el depósito. Desde acá el stock suma las
+ *  compras y resta el consumo de los cortes posteriores (PLAN_COSTOS §7b). */
+function ModalConteo({ insumo, onCerrar }: { insumo: InsumoDTO; onCerrar: () => void }) {
+  const crear = useCrearConteo();
+  const [fecha, setFecha] = useState(hoyLocalISO());
+  const [cantidad, setCantidad] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const onGuardar = async () => {
+    setError(null);
+    if (!PATRON_DECIMAL.test(cantidad.trim())) return setError('Cantidad inválida (ej. 350 o 12.5)');
+    await crear.mutateAsync({ insumoId: insumo.id, fecha, cantidad: aMilesimas(cantidad) });
+    onCerrar();
+  };
+  return (
+    <Modal onCerrar={onCerrar}>
+      <h2 className="text-lg font-semibold">Contar {insumo.nombre}</h2>
+      <p className="mt-2 text-sm text-gray-600">
+        El sistema calcula hoy <span className="mono font-semibold">{deMilesimas(insumo.stock.stock)} {insumo.unidad}</span>.
+        Anotá lo que hay de verdad: desde esa fecha el stock suma las compras y resta lo que gasten los
+        cortes.
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Fecha del conteo</label>
+          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={claseInput} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Cantidad ({insumo.unidad})</label>
+          <input value={cantidad} onChange={(e) => setCantidad(e.target.value)} inputMode="decimal" className={`mono ${claseInput}`} />
+        </div>
+      </div>
+      {(error || crear.error != null) && (
+        <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{error ?? mensaje(crear.error)}</p>
+      )}
+      <div className="mt-5 flex justify-end gap-2">
+        <button onClick={onCerrar} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button
+          onClick={() => void onGuardar().catch(() => undefined)}
+          disabled={crear.isPending}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Guardar conteo
         </button>
       </div>
     </Modal>

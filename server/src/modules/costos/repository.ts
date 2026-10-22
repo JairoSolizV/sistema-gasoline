@@ -110,6 +110,80 @@ export const costosRepository = {
     return prisma.fichaCosto.delete({ where: { id } }); // líneas en cascada
   },
 
+  // ── Etapas 3 y 4: stock, costo real del corte y plan ──
+
+  /** Todas las compras (solo lo que mueve stock). */
+  movimientosCompra() {
+    return prisma.compraInsumo.findMany({ select: { insumoId: true, fecha: true, cantidad: true } });
+  },
+
+  /** El conteo más reciente de cada insumo. */
+  ultimosConteos() {
+    return prisma.conteoInsumo.findMany({
+      orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+      distinct: ['insumoId'],
+    });
+  },
+  listarConteos(insumoId?: string) {
+    return prisma.conteoInsumo.findMany({
+      where: insumoId ? { insumoId } : {},
+      orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
+      include: { insumo: { select: { id: true, nombre: true, unidad: true } } },
+    });
+  },
+  crearConteo(data: Prisma.ConteoInsumoUncheckedCreateInput) {
+    return prisma.conteoInsumo.create({
+      data,
+      include: { insumo: { select: { id: true, nombre: true, unidad: true } } },
+    });
+  },
+  obtenerConteo(id: string) {
+    return prisma.conteoInsumo.findUnique({ where: { id } });
+  },
+  eliminarConteo(id: string) {
+    return prisma.conteoInsumo.delete({ where: { id } });
+  },
+
+  /** Cortes ya cortados (abiertos o cerrados) con lo necesario para su costo
+   *  real y su consumo de material. Con corteId, solo ese. */
+  cortesParaCosto(corteId?: string) {
+    return prisma.corte.findMany({
+      where: { estado: { in: ['abierto', 'cerrado'] }, ...(corteId ? { id: corteId } : {}) },
+      orderBy: { codigo: 'desc' },
+      select: {
+        id: true,
+        codigo: true,
+        estado: true,
+        fechaInicio: true,
+        cantidadTotal: true,
+        trazadoCm: true,
+        prendasPorCapa: true,
+        version: { select: { modeloId: true, modelo: { select: { nombre: true } } } },
+        operaciones: {
+          select: {
+            ct: true,
+            esEmpaque: true,
+            cantidadObjetivo: true,
+            asignaciones: { select: { cantidad: true, total: true } },
+          },
+        },
+        trabajos: { select: { total: true } },
+        envios: { select: { total: true, fechaDevolucion: true } },
+      },
+    });
+  },
+
+  obtenerPlan(anio: number, mes: number) {
+    return prisma.planProduccion.findMany({ where: { anio, mes }, select: { fichaId: true, prendas: true } });
+  },
+  /** Reemplaza el plan del mes completo, atómico. */
+  reemplazarPlan(anio: number, mes: number, items: { fichaId: string; prendas: number }[]) {
+    return prisma.$transaction([
+      prisma.planProduccion.deleteMany({ where: { anio, mes } }),
+      prisma.planProduccion.createMany({ data: items.map((i) => ({ ...i, anio, mes })) }),
+    ]);
+  },
+
   existeModelo(id: string) {
     return prisma.modelo.findUnique({ where: { id }, select: { id: true } });
   },};

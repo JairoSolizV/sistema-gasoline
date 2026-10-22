@@ -2,6 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CompraDTO,
   CompraInput,
+  ConteoDTO,
+  ConteoInput,
+  CorteCostoDetalleDTO,
+  CorteCostoResumenDTO,
+  PlanInput,
+  ProyeccionDTO,
   EditarInsumoInput,
   FichaCostoDetalleDTO,
   FichaCostoInput,
@@ -97,5 +103,47 @@ export function useEliminarFichaCosto() {
   return useMutation({
     mutationFn: (id: string) => api(`/costos/fichas/${id}`, { method: 'DELETE' }),
     onSuccess,
+  });
+}
+
+// ── Etapas 3 y 4: conteos (stock), costo real de cortes y proyección ──
+
+export function useCrearConteo() {
+  const onSuccess = useInvalidarCostos();
+  return useMutation({
+    mutationFn: (input: ConteoInput) =>
+      api<ConteoDTO>('/costos/conteos', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess,
+  });
+}
+
+export function useCostosCortes() {
+  return useQuery({
+    queryKey: ['costos', 'cortes'],
+    queryFn: () => api<CorteCostoResumenDTO[]>('/costos/cortes'),
+  });
+}
+
+export function useCostoCorte(corteId: string | null) {
+  return useQuery({
+    queryKey: ['costos', 'corte', corteId],
+    queryFn: () => api<CorteCostoDetalleDTO>(`/costos/cortes/${corteId}`),
+    enabled: Boolean(corteId),
+  });
+}
+
+export function useProyeccion(anio: number, mes: number) {
+  return useQuery({
+    queryKey: ['costos', 'proyeccion', anio, mes],
+    queryFn: () => api<ProyeccionDTO>(`/costos/proyeccion?anio=${anio}&mes=${mes}`),
+  });
+}
+
+export function useGuardarPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PlanInput) =>
+      api<ProyeccionDTO>('/costos/plan', { method: 'PUT', body: JSON.stringify(input) }),
+    onSuccess: (dto) => qc.setQueryData(['costos', 'proyeccion', dto.anio, dto.mes], dto),
   });
 }

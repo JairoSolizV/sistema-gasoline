@@ -2,7 +2,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatBs } from '@taller/shared';
 import { useFichasCosto } from '../../api/costos';
 import { ComprasTab } from './ComprasTab';
+import { CortesCostoTab } from './CortesCostoTab';
 import { InsumosTab } from './InsumosTab';
+import { ProyeccionTab } from './ProyeccionTab';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Solo consulta: nada de esto toca
 // los pagos. Pestañas: fichas de costo por modelo, insumos y compras.
@@ -11,6 +13,8 @@ const PESTANAS = [
   { clave: 'fichas', etiqueta: 'Fichas de costo' },
   { clave: 'insumos', etiqueta: 'Insumos' },
   { clave: 'compras', etiqueta: 'Compras' },
+  { clave: 'cortes', etiqueta: 'Costo real de cortes' },
+  { clave: 'proyeccion', etiqueta: 'Proyección del mes' },
 ] as const;
 type Pestana = (typeof PESTANAS)[number]['clave'];
 
@@ -46,6 +50,8 @@ export function CostosPage() {
         {activa === 'fichas' && <FichasTab />}
         {activa === 'insumos' && <InsumosTab />}
         {activa === 'compras' && <ComprasTab />}
+        {activa === 'cortes' && <CortesCostoTab />}
+        {activa === 'proyeccion' && <ProyeccionTab />}
       </div>
     </div>
   );

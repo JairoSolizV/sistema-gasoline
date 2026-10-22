@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import {
   compraInputSchema,
+  conteoInputSchema,
   editarInsumoSchema,
   fichaCostoInputSchema,
   insumoInputSchema,
   listarComprasQuerySchema,
+  mesQuerySchema,
+  planInputSchema,
 } from '@taller/shared';
 import { validar } from '../../middleware/validate.js';
 import { costosController } from './controller.js';
@@ -26,3 +29,14 @@ costosRouter.get('/fichas/:id', costosController.obtenerFicha);
 costosRouter.post('/fichas', validar(fichaCostoInputSchema), costosController.crearFicha);
 costosRouter.put('/fichas/:id', validar(fichaCostoInputSchema), costosController.reemplazarFicha);
 costosRouter.delete('/fichas/:id', costosController.eliminarFicha);
+
+// etapa 4: conteos físicos (stock), plan del mes y proyección
+costosRouter.get('/conteos', validar(listarComprasQuerySchema, 'query'), costosController.listarConteos);
+costosRouter.post('/conteos', validar(conteoInputSchema), costosController.crearConteo);
+costosRouter.delete('/conteos/:id', costosController.eliminarConteo);
+costosRouter.get('/proyeccion', validar(mesQuerySchema, 'query'), costosController.proyeccion);
+costosRouter.put('/plan', validar(planInputSchema), costosController.guardarPlan);
+
+// etapa 3: costo real de cada corte frente a su ficha
+costosRouter.get('/cortes', costosController.listarCostosCortes);
+costosRouter.get('/cortes/:id', costosController.costoCorte);

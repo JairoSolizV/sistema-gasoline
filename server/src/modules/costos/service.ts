@@ -22,16 +22,31 @@ import {
   type InsumoInput,
   type LineaCostoDTO,
   type LineaParaCosto,
+  type ConteoDTO,
+  type ConteoInput,
+  type CorteCostoDetalleDTO,
+  type CorteCostoResumenDTO,
+  type PlanInput,
+  type ProyeccionDTO,
+  type StockDTO,
 } from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
 import { configuracionRepository } from '../configuracion/repository.js';
 import { costosRepository, type FichaConDatos, type InsumoConCompra } from './repository.js';
+import {
+  aResumenCorte,
+  costoRealCorte,
+  fichaDeCorte,
+  proyeccion,
+  STOCK_VACIO,
+  stockPorInsumo,
+} from './produccion.js';
 
 /** Bs por unidad, solo para MOSTRAR (el cálculo usa la fracción exacta). */
 const bsPorUnidad = (c: { precioTotal: number; cantidad: number }) =>
   (c.precioTotal / 100) * (CANTIDAD_ESCALA / c.cantidad);
 
-function aInsumoDTO(i: InsumoConCompra): InsumoDTO {
+function aInsumoDTO(i: InsumoConCompra, stock: StockDTO = STOCK_VACIO): InsumoDTO {
   const ultima = i.compras[0] ?? null;
   return {
     id: i.id,
@@ -57,6 +72,7 @@ function aInsumoDTO(i: InsumoConCompra): InsumoDTO {
     },
     precioUnitarioBs: ultima ? bsPorUnidad(ultima) : null,
     usadoEnFichas: i._count.lineas,
+    stock,
   };
 }
 
@@ -81,48 +97,52 @@ function aCompraDTO(c: CompraConInsumo): CompraDTO {
 }
 
 /** Servicio de corte por prenda con las tarifas vigentes de Configuración. */
-const servicioCortePorPrenda = (c: Configuracion) =>
+export const servicioCortePorPrenda = (c: Configuracion) =>
   c.tarifaBusqueda +
   c.tarifaTrazado +
   c.tarifaDobladoHoja +
   c.tarifaCorteRespaldo +
   c.tarifaClasificacionRespaldo;
 
+type LineaFicha = FichaConDatos['lineas'][number];
+
+/** Precio exacto de la última compra del insumo de una línea (null = sin compras). */
+export const precioDeLinea = (l: LineaFicha): Fraccion | null => {
+  const compra = l.insumo?.compras[0] ?? null;
+  return compra ? precioUnitario(compra) : null;
+};
+
+/** Rendimiento del hilo: el de la ficha o, si no, el del insumo. */
+export const rendimientoDeLinea = (l: LineaFicha) =>
+  l.tipo === 'hilo' ? (l.rendimiento ?? l.insumo?.rendimiento ?? null) : null;
+
+/** Una línea guardada, lista para el cálculo de costo por prenda. */
+export function aLineaParaCosto(l: LineaFicha): LineaParaCosto {
+  const precio = precioDeLinea(l);
+  switch (l.tipo) {
+    case 'por_prenda':
+      return { tipo: 'por_prenda', cantidad: l.cantidad!, precio };
+    case 'tela_tizado':
+      return { tipo: 'tela_tizado', largoMm: l.largoMm!, prendasPorCapa: l.prendasPorCapa!, precio };
+    case 'hilo': {
+      // sin rendimiento no se puede costear: queda como "sin precio"
+      const rendimiento = rendimientoDeLinea(l);
+      return { tipo: 'hilo', rendimiento: rendimiento ?? 1, precio: rendimiento ? precio : null };
+    }
+    case 'prorrateo':
+      return { tipo: 'prorrateo', monto: l.monto!, prendas: l.prendas! };
+    case 'precio_prenda':
+      return { tipo: 'precio_prenda', precio: l.precio! };
+  }
+}
+
 /** Calcula la ficha: cada línea, mano de obra, empaque, servicio, total y venta. */
-function calcularFicha(f: FichaConDatos, config: Configuracion): FichaCostoDetalleDTO {
-  const lineasCalculo: LineaParaCosto[] = [];
+export function calcularFicha(f: FichaConDatos, config: Configuracion): FichaCostoDetalleDTO {
+  const lineasCalculo = f.lineas.map(aLineaParaCosto);
   const lineasDTO: Omit<LineaCostoDTO, 'costo'>[] = [];
   for (const l of f.lineas) {
     const compra = l.insumo?.compras[0] ?? null;
-    const precio: Fraccion | null = compra ? precioUnitario(compra) : null;
-    const rendimientoUsado = l.tipo === 'hilo' ? (l.rendimiento ?? l.insumo?.rendimiento ?? null) : null;
-    switch (l.tipo) {
-      case 'por_prenda':
-        lineasCalculo.push({ tipo: 'por_prenda', cantidad: l.cantidad!, precio });
-        break;
-      case 'tela_tizado':
-        lineasCalculo.push({
-          tipo: 'tela_tizado',
-          largoMm: l.largoMm!,
-          prendasPorCapa: l.prendasPorCapa!,
-          precio,
-        });
-        break;
-      case 'hilo':
-        // sin rendimiento no se puede costear: queda como "sin precio"
-        lineasCalculo.push({
-          tipo: 'hilo',
-          rendimiento: rendimientoUsado ?? 1,
-          precio: rendimientoUsado ? precio : null,
-        });
-        break;
-      case 'prorrateo':
-        lineasCalculo.push({ tipo: 'prorrateo', monto: l.monto!, prendas: l.prendas! });
-        break;
-      case 'precio_prenda':
-        lineasCalculo.push({ tipo: 'precio_prenda', precio: l.precio! });
-        break;
-    }
+    const rendimientoUsado = rendimientoDeLinea(l);
     lineasDTO.push({
       orden: l.orden,
       tipo: l.tipo,
@@ -207,7 +227,8 @@ async function insumoOError(id: string): Promise<InsumoConCompra> {
 export const costosService = {
   // ── Insumos ──
   async listarInsumos(): Promise<InsumoDTO[]> {
-    return (await costosRepository.listarInsumos()).map(aInsumoDTO);
+    const [insumos, stock] = await Promise.all([costosRepository.listarInsumos(), stockPorInsumo()]);
+    return insumos.map((i) => aInsumoDTO(i, stock.get(i.id)));
   },
 
   async crearInsumo(input: InsumoInput): Promise<InsumoDTO> {
@@ -216,7 +237,8 @@ export const costosService = {
 
   async editarInsumo(id: string, input: EditarInsumoInput): Promise<InsumoDTO> {
     await insumoOError(id);
-    return aInsumoDTO(await costosRepository.actualizarInsumo(id, input));
+    const insumo = await costosRepository.actualizarInsumo(id, input);
+    return aInsumoDTO(insumo, (await stockPorInsumo()).get(id));
   },
 
   /** Solo sin compras ni fichas que lo usen; si no, se desactiva. */
@@ -299,7 +321,78 @@ export const costosService = {
     }
     await costosRepository.eliminarFicha(id);
   },
+
+  // ── Stock: conteos físicos (etapa 4) ──
+  async listarConteos(insumoId?: string): Promise<ConteoDTO[]> {
+    return (await costosRepository.listarConteos(insumoId)).map(aConteoDTO);
+  },
+
+  async crearConteo(input: ConteoInput): Promise<ConteoDTO> {
+    await insumoOError(input.insumoId);
+    const conteo = await costosRepository.crearConteo({
+      insumoId: input.insumoId,
+      fecha: diaADate(input.fecha),
+      cantidad: input.cantidad,
+      notas: input.notas ?? null,
+    });
+    return aConteoDTO(conteo);
+  },
+
+  async eliminarConteo(id: string): Promise<void> {
+    if (!(await costosRepository.obtenerConteo(id))) {
+      throw new AppError('NO_ENCONTRADO', 'Conteo no encontrado', 404);
+    }
+    await costosRepository.eliminarConteo(id);
+  },
+
+  // ── Costo real de los cortes (etapa 3) ──
+  async listarCostosCortes(): Promise<CorteCostoResumenDTO[]> {
+    const [cortes, fichas, config] = await Promise.all([
+      costosRepository.cortesParaCosto(),
+      costosRepository.listarFichas(),
+      configuracionRepository.obtener(),
+    ]);
+    return cortes.map((c) => aResumenCorte(costoRealCorte(c, fichaDeCorte(c, fichas), config)));
+  },
+
+  async costoCorte(corteId: string): Promise<CorteCostoDetalleDTO> {
+    const [cortes, fichas, config] = await Promise.all([
+      costosRepository.cortesParaCosto(corteId),
+      costosRepository.listarFichas(),
+      configuracionRepository.obtener(),
+    ]);
+    const corte = cortes[0];
+    if (!corte) {
+      throw new AppError('NO_ENCONTRADO', 'Corte no encontrado (o todavía en borrador)', 404);
+    }
+    return costoRealCorte(corte, fichaDeCorte(corte, fichas), config);
+  },
+
+  // ── Plan del mes y proyección (etapa 4) ──
+  async guardarPlan(input: PlanInput): Promise<ProyeccionDTO> {
+    const fichas = new Set((await costosRepository.listarFichas()).map((f) => f.id));
+    if (input.items.some((i) => !fichas.has(i.fichaId))) {
+      throw new AppError('NO_ENCONTRADO', 'Hay una ficha de costo que no existe en el plan', 404);
+    }
+    await costosRepository.reemplazarPlan(input.anio, input.mes, input.items);
+    return this.proyeccion(input.anio, input.mes);
+  },
+
+  async proyeccion(anio: number, mes: number): Promise<ProyeccionDTO> {
+    return proyeccion(anio, mes, await configuracionRepository.obtener());
+  },
 };
+
+type ConteoConInsumo = Awaited<ReturnType<typeof costosRepository.listarConteos>>[number];
+function aConteoDTO(c: ConteoConInsumo): ConteoDTO {
+  return {
+    id: c.id,
+    insumo: c.insumo,
+    fecha: dateADia(c.fecha),
+    cantidad: c.cantidad,
+    notas: c.notas,
+  };
+}
 
 /** Valida nombre único, modelo e insumos, y guarda la ficha con sus líneas. */
 async function guardar(id: string | null, input: FichaCostoInput): Promise<string> {
