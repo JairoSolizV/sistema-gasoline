@@ -31,7 +31,9 @@ export const liquidacionRepository = {
       select: {
         operarioId: true,
         total: true,
-        corteOperacion: { select: { corteId: true, corte: { select: { fechaCierre: true } } } },
+        corteOperacion: {
+          select: { corteId: true, esEmpaque: true, corte: { select: { fechaCierre: true } } },
+        },
       },
     });
   },
@@ -96,9 +98,10 @@ export const liquidacionRepository = {
     });
   },
 
-  /** ¿Hay dinero (cortes cerrados, anticipos, trabajos del servicio de corte o
-   *  moldes) en los meses ESTRICTAMENTE entre el último cierre y el mes dado? Si
-   *  lo hay, cerrar el mes dado lo dejaría sin liquidar. */
+  /** ¿Hay dinero (cortes cerrados, anticipos, trabajos del servicio de corte,
+   *  moldes o asistencia de ayudantes) en los meses ESTRICTAMENTE entre el
+   *  último cierre y el mes dado? Si lo hay, cerrar el mes dado lo dejaría sin
+   *  liquidar. */
   async hayMovimientosEntre(
     despuesDe: { anio: number; mes: number },
     antesDe: { anio: number; mes: number },
@@ -115,6 +118,7 @@ export const liquidacionRepository = {
       prisma.anticipo.findFirst({ where: { fecha: enRango }, select: { id: true } }),
       prisma.trabajoCorte.findFirst({ where: { fecha: enRango }, select: { id: true } }),
       prisma.pagoMolde.findFirst({ where: { fecha: enRango }, select: { id: true } }),
+      prisma.asistencia.findFirst({ where: { fecha: enRango }, select: { id: true } }),
     ]);
     return hallazgos.some((h) => h !== null);
   },

@@ -110,7 +110,7 @@ describe('consolidado del mes con servicio de corte y moldes', () => {
     };
     for (const [clave, [costura, servicioCorte, moldes]] of Object.entries(esperado)) {
       const fl = fila(c, clave);
-      expect(fl.desglose, clave).toEqual({ costura, servicioCorte, moldes });
+      expect(fl.desglose, clave).toEqual({ sueldo: 0, costura, empaque: 0, servicioCorte, moldes });
       expect(fl.ganado, clave).toBe(costura + servicioCorte + moldes);
       expect(fl.saldoPeriodo, clave).toBe(fl.ganado); // sin anticipos ni arrastre
     }
@@ -118,10 +118,12 @@ describe('consolidado del mes con servicio de corte y moldes', () => {
 
   test('totales y semanas cuadran con las filas', async () => {
     const c = await consolidado();
-    const suma = (k: 'costura' | 'servicioCorte' | 'moldes') =>
+    const suma = (k: keyof typeof c.totales.desglose) =>
       c.filas.reduce((a, x) => a + x.desglose[k], 0);
     expect(c.totales.desglose).toEqual({
+      sueldo: suma('sueldo'),
       costura: suma('costura'),
+      empaque: suma('empaque'),
       servicioCorte: suma('servicioCorte'),
       moldes: suma('moldes'),
     });
@@ -152,7 +154,7 @@ describe('rendición: separada por tipo y sin datos de compañeros', () => {
       fecha: f(4),
       modeloNombre: 'TEST MODELO LS',
     });
-    expect(r.desglose).toEqual({ costura: 0, servicioCorte: 5408, moldes: 0 });
+    expect(r.desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 5408, moldes: 0 });
     expect(r.totalGanado).toBe(5408);
     const json = JSON.stringify(r);
     expect(json).not.toContain('TEST LS DOB2');
@@ -201,9 +203,9 @@ describe('cierre del mes', () => {
     expect(res.status).toBe(200);
     const c = res.body.data as ConsolidadoDTO;
     expect(c.cerrado).toBe(true);
-    expect(fila(c, 'DOB2').desglose).toEqual({ costura: 0, servicioCorte: 5407, moldes: 0 });
-    expect(fila(c, 'MOLD').desglose).toEqual({ costura: 0, servicioCorte: 0, moldes: 20000 });
-    expect(fila(c, 'COSTURA').desglose).toEqual({ costura: 14420, servicioCorte: 0, moldes: 0 });
+    expect(fila(c, 'DOB2').desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 5407, moldes: 0 });
+    expect(fila(c, 'MOLD').desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 0, moldes: 20000 });
+    expect(fila(c, 'COSTURA').desglose).toEqual({ sueldo: 0, costura: 14420, empaque: 0, servicioCorte: 0, moldes: 0 });
 
     const guardada = await prisma.liquidacion.findFirstOrThrow({
       where: { operarioId: ids.TRAZ, periodo: { anio: 2031, mes: 3 } },
@@ -212,7 +214,7 @@ describe('cierre del mes', () => {
 
     const r = (await request(app).get(`/api/v1/rendicion/${ids.TRAZ}?anio=2031&mes=3`)).body.data;
     expect(r.cerrado).toBe(true);
-    expect(r.desglose).toEqual({ costura: 0, servicioCorte: 21630, moldes: 0 });
+    expect(r.desglose).toEqual({ sueldo: 0, costura: 0, empaque: 0, servicioCorte: 21630, moldes: 0 });
 
     // mes liquidado: ya no se puede tocar un trabajo de ese mes
     const corte = await prisma.trabajoCorte.findFirstOrThrow({ where: { operarioId: ids.TRAZ } });

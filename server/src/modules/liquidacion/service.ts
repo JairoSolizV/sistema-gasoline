@@ -1,7 +1,9 @@
 // Consolidado y cierre de mes. Invariantes 5 y 6 (CLAUDE.md §6):
-//  - ganado = costura + servicio de corte + moldes. La costura sale SOLO de
-//    cortes cerrados agrupados por fechaCierre; el servicio de corte y los
-//    moldes, por la fecha del trabajo (docs/PLAN_SERVICIO_CORTE.md §2.5);
+//  - ganado = sueldo + costura + empaque + servicio de corte + moldes. Costura
+//    y empaque salen SOLO de cortes cerrados agrupados por fechaCierre; el
+//    servicio de corte y los moldes, por la fecha del trabajo
+//    (docs/PLAN_SERVICIO_CORTE.md §2.5); el sueldo de los ayudantes, por la
+//    fecha de asistencia (docs/PLAN_AYUDANTES.md §7);
 //  - saldo = entrada + ganado − anticipos; el saldoSalida persistido es la ÚNICA
 //    fuente del saldoEntrada del mes siguiente (arrastre auditable, negativo incluido).
 import type { Operario } from '@prisma/client';
@@ -14,6 +16,7 @@ import type {
 } from '@taller/shared';
 import { calcularCierreMes, calcularSaldo, semanasDelMes } from '../../domain/saldo.js';
 import { AppError } from '../../middleware/errors.js';
+import { asistenciaFaltante, sueldosDelMes } from '../asistencia/sueldoMes.js';
 import { liquidacionRepository, mesAnteriorA } from './repository.js';
 
 interface DatosOperario {
@@ -26,32 +29,71 @@ interface DatosOperario {
 }
 
 /** Todo lo que se gana en el mes, con la fecha que lo ubica en una semana. */
+type Movimiento = { operarioId: string; total: number; fecha: Date };
+type MovimientoCorte = Movimiento & { corteId: string };
+
 interface MovimientosGanado {
-  costura: { operarioId: string; total: number; fecha: Date; corteId: string }[];
-  servicioCorte: { operarioId: string; total: number; fecha: Date }[];
-  moldes: { operarioId: string; total: number; fecha: Date }[];
+  sueldo: Movimiento[]; // un movimiento por día de asistencia (Σ = sueldo del mes)
+  costura: MovimientoCorte[];
+  empaque: MovimientoCorte[];
+  servicioCorte: Movimiento[];
+  moldes: Movimiento[];
 }
 
+const TIPOS = ['sueldo', 'costura', 'empaque', 'servicioCorte', 'moldes'] as const;
+
 async function movimientosGanado(anio: number, mes: number): Promise<MovimientosGanado> {
-  const [asignaciones, trabajos, moldes] = await Promise.all([
+  const [asignaciones, trabajos, moldes, sueldos] = await Promise.all([
     liquidacionRepository.asignacionesGanadoDelMes(anio, mes),
     liquidacionRepository.trabajosCorteDelMes(anio, mes),
     liquidacionRepository.pagosMoldeDelMes(anio, mes),
+    sueldosDelMes(anio, mes),
   ]);
+  const deCortes = asignaciones.map((a) => ({
+    esEmpaque: a.corteOperacion.esEmpaque,
+    operarioId: a.operarioId,
+    total: a.total,
+    fecha: a.corteOperacion.corte.fechaCierre!, // el repo filtra cortes cerrados
+    corteId: a.corteOperacion.corteId,
+  }));
   return {
-    costura: asignaciones.map((a) => ({
-      operarioId: a.operarioId,
-      total: a.total,
-      fecha: a.corteOperacion.corte.fechaCierre!, // el repo filtra cortes cerrados
-      corteId: a.corteOperacion.corteId,
-    })),
+    sueldo: [...sueldos.values()]
+      .flat()
+      .map((d) => ({ operarioId: d.operarioId, total: d.monto, fecha: d.fecha })),
+    costura: deCortes.filter((m) => !m.esEmpaque),
+    empaque: deCortes.filter((m) => m.esEmpaque),
     servicioCorte: trabajos,
     moldes: moldes.map((m) => ({ operarioId: m.operarioId, total: m.monto, fecha: m.fecha })),
   };
 }
 
-const desgloseVacio = (): GanadoDesgloseDTO => ({ costura: 0, servicioCorte: 0, moldes: 0 });
-const totalDesglose = (d: GanadoDesgloseDTO) => d.costura + d.servicioCorte + d.moldes;
+const desgloseVacio = (): GanadoDesgloseDTO => ({
+  sueldo: 0,
+  costura: 0,
+  empaque: 0,
+  servicioCorte: 0,
+  moldes: 0,
+});
+const totalDesglose = (d: GanadoDesgloseDTO) => TIPOS.reduce((acc, tipo) => acc + d[tipo], 0);
+
+/** Desglose de un mes ya cerrado, desde lo persistido en Liquidacion: la
+ *  costura es lo que queda del total. */
+export function desglosePersistido(l: {
+  totalGanado: number;
+  ganadoSueldo: number;
+  ganadoEmpaque: number;
+  ganadoServicioCorte: number;
+  ganadoMoldes: number;
+}): GanadoDesgloseDTO {
+  return {
+    sueldo: l.ganadoSueldo,
+    costura:
+      l.totalGanado - l.ganadoSueldo - l.ganadoEmpaque - l.ganadoServicioCorte - l.ganadoMoldes,
+    empaque: l.ganadoEmpaque,
+    servicioCorte: l.ganadoServicioCorte,
+    moldes: l.ganadoMoldes,
+  };
+}
 
 /** Suma por tipo los movimientos que cumplan el filtro (por operario o semana). */
 function desglosar(
@@ -59,7 +101,7 @@ function desglosar(
   incluir: (m: { operarioId: string; fecha: Date }) => boolean,
 ): GanadoDesgloseDTO {
   const d = desgloseVacio();
-  for (const tipo of ['costura', 'servicioCorte', 'moldes'] as const) {
+  for (const tipo of TIPOS) {
     for (const m of mov[tipo]) if (incluir(m)) d[tipo] += m.total;
   }
   return d;
@@ -107,8 +149,10 @@ function semanasConGanado(anio: number, mes: number, mov: MovimientosGanado): Se
       f.getTime() >= s.inicio.getTime() && f.getTime() < s.finExclusivo.getTime();
     const desglose = desglosar(mov, (m) => enSemana(m.fecha));
     const ganado = totalDesglose(desglose);
-    // "cortes cerrados" sigue contando solo los cierres de costura de la semana
-    const cortes = new Set(mov.costura.filter((m) => enSemana(m.fecha)).map((m) => m.corteId));
+    // "cortes cerrados" cuenta los cierres de la semana (costura o empaque)
+    const cortes = new Set(
+      [...mov.costura, ...mov.empaque].filter((m) => enSemana(m.fecha)).map((m) => m.corteId),
+    );
     const sabado = new Date(s.inicio);
     sabado.setUTCDate(sabado.getUTCDate() + 5);
     const dia = (d: Date) => String(d.getUTCDate()).padStart(2, '0');
@@ -139,11 +183,7 @@ export const liquidacionService = {
           esMaestro: l.operario.tipo === 'maestro_externo',
           saldoEntrada: l.saldoEntrada,
           ganado: l.totalGanado,
-          desglose: {
-            costura: l.totalGanado - l.ganadoServicioCorte - l.ganadoMoldes,
-            servicioCorte: l.ganadoServicioCorte,
-            moldes: l.ganadoMoldes,
-          },
+          desglose: desglosePersistido(l),
           anticipos: l.totalAnticipos,
           saldoPeriodo: l.saldoPeriodo,
           pagado: l.pagado,
@@ -215,10 +255,24 @@ export const liquidacionService = {
       if (await liquidacionRepository.hayMovimientosEntre(ultimo, { anio, mes })) {
         throw new AppError(
           'CIERRE_FUERA_DE_ORDEN',
-          `Hay pagos (cortes cerrados, servicio de corte, moldes) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
+          `Hay pagos (cortes cerrados, servicio de corte, moldes, asistencia de ayudantes) o anticipos en meses sin liquidar entre ${ultimo.mes}/${ultimo.anio} y ${mes}/${anio}; cerrá esos meses primero, en orden`,
           409,
         );
       }
+    }
+
+    // El sueldo del mes sale de la asistencia: con días sin marcar el cierre
+    // pagaría de menos (PLAN_AYUDANTES §5). Se dice quién y qué días faltan.
+    const faltantes = await asistenciaFaltante(anio, mes);
+    if (faltantes.length > 0) {
+      const detalle = faltantes
+        .map((f) => `${f.nombre} (${f.dias.map((d) => d.slice(8, 10)).join(', ')})`)
+        .join('; ');
+      throw new AppError(
+        'ASISTENCIA_INCOMPLETA',
+        `Falta marcar la asistencia de ${mes}/${anio}: ${detalle}`,
+        409,
+      );
     }
 
     const datos = await reunirDatos(anio, mes);
@@ -237,6 +291,8 @@ export const liquidacionService = {
         totalGanado: d.ganado,
         ganadoServicioCorte: d.desglose.servicioCorte,
         ganadoMoldes: d.desglose.moldes,
+        ganadoEmpaque: d.desglose.empaque,
+        ganadoSueldo: d.desglose.sueldo,
         totalAnticipos: d.anticipos,
         saldoPeriodo: d.saldoPeriodo,
         pagado,
@@ -264,9 +320,7 @@ function sumarTotales(filas: LiquidacionFilaDTO[], cerrado: boolean) {
   );
   const desglose = desgloseVacio();
   for (const f of filas) {
-    desglose.costura += f.desglose.costura;
-    desglose.servicioCorte += f.desglose.servicioCorte;
-    desglose.moldes += f.desglose.moldes;
+    for (const tipo of TIPOS) desglose[tipo] += f.desglose[tipo];
   }
   return {
     saldoEntrada: t.saldoEntrada,

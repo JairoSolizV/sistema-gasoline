@@ -1,6 +1,9 @@
-/** Ganado separado por tipo de trabajo (docs/PLAN_SERVICIO_CORTE.md §2.12). */
+/** Ganado separado por tipo de trabajo (docs/PLAN_SERVICIO_CORTE.md §2.12 y
+ *  PLAN_AYUDANTES.md §6). */
 export interface GanadoDesgloseDTO {
-  costura: number; // centavos, de cortes cerrados (por fechaCierre)
+  sueldo: number; // centavos, sueldo de ayudantes (por fecha de asistencia)
+  costura: number; // centavos, operaciones de costura de cortes cerrados (por fechaCierre)
+  empaque: number; // centavos, operaciones de empaque de cortes cerrados (por fechaCierre)
   servicioCorte: number; // centavos, trabajos del servicio de corte (por fecha del trabajo)
   moldes: number; // centavos, pagos de moldes (por su fecha)
 }
@@ -11,7 +14,7 @@ export interface LiquidacionFilaDTO {
   activo: boolean;
   esMaestro: boolean;
   saldoEntrada: number; // centavos, arrastre del mes anterior (puede ser negativo)
-  ganado: number; // centavos = costura + servicio de corte + moldes del mes
+  ganado: number; // centavos = suma del desglose del mes
   desglose: GanadoDesgloseDTO;
   anticipos: number; // centavos, del período
   saldoPeriodo: number; // = saldoEntrada + ganado − anticipos
@@ -26,7 +29,7 @@ export interface SemanaConsolidadoDTO {
   finISO: string; // sábado
   label: string; // ej. "01–06 jun"
   cortesCerrados: number;
-  ganado: number; // centavos ganados esa semana (costura + servicio + moldes)
+  ganado: number; // centavos ganados esa semana (suma del desglose)
   desglose: GanadoDesgloseDTO;
 }
 

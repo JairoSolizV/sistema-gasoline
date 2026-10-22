@@ -3,6 +3,7 @@
 // serializa un modelo Prisma crudo (ARQUITECTURA §5.3, CA-7.1/7.2).
 
 import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
+import type { EstadoAsistencia } from '../sueldo.js';
 import type { GanadoDesgloseDTO } from './liquidacion.js';
 import type { TipoMolde } from './modelo.js';
 
@@ -14,6 +15,7 @@ export interface RendicionOperacionDTO {
   pieza: string | null;
   ct: number; // centavos
   cantidad: number; // piezas que hizo este operario en esta operación
+  esEmpaque: boolean; // va en la sección Empaque, no en Costura
   esMaestroExterno: boolean;
   tarifaEfectiva: number; // centavos
   total: number; // centavos = cantidad × tarifaEfectiva
@@ -52,6 +54,29 @@ export interface RendicionMoldeDTO {
   monto: number; // centavos
 }
 
+/** Un día de asistencia de ESTE ayudante (docs/PLAN_AYUDANTES.md §3). */
+export interface RendicionDiaSueldoDTO {
+  fecha: string; // 'aaaa-mm-dd'
+  estado: EstadoAsistencia;
+  minutosDescontados: number;
+  minutosOperaciones: number;
+  minutosPagados: number; // 0..540
+  sueldoSemanal: number; // centavos, vigente ese día
+  monto: number; // centavos (reparto del total del mes por mayor resto)
+}
+
+/** Sueldo del mes de un ayudante: el total se redondea una vez y los días
+ *  suman exactamente ese total. */
+export interface RendicionSueldoDTO {
+  dias: RendicionDiaSueldoDTO[];
+  diasTrabajados: number;
+  faltas: number;
+  feriados: number;
+  minutosDescontados: number; // atrasos y salidas antes de hora
+  minutosOperaciones: number; // horas de horario en operaciones (se cobran aparte)
+  total: number; // centavos
+}
+
 export interface RendicionAnticipoDTO {
   fecha: string;
   monto: number; // centavos
@@ -67,13 +92,15 @@ export interface RendicionDTO {
   mes: number;
   cerrado: boolean;
   saldoEntrada: number; // centavos (puede ser negativo)
-  totalGanado: number; // centavos = costura + servicio de corte + moldes
+  totalGanado: number; // centavos = suma del desglose
   desglose: GanadoDesgloseDTO;
   totalAnticipos: number; // centavos
   saldoPeriodo: number; // = saldoEntrada + totalGanado − totalAnticipos
   pagado: number | null; // solo si el mes está cerrado
   saldoSalida: number | null; // solo si el mes está cerrado
-  cortes: RendicionCorteDTO[]; // costura
+  sueldo: RendicionSueldoDTO | null; // solo si tuvo asistencia en el mes (ayudantes)
+  cortes: RendicionCorteDTO[]; // costura (sin las operaciones de empaque)
+  empaque: RendicionCorteDTO[]; // solo operaciones de empaque
   servicioCorte: RendicionTrabajoCorteDTO[];
   moldes: RendicionMoldeDTO[];
   anticipos: RendicionAnticipoDTO[];

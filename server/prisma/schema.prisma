@@ -267,11 +267,13 @@ model Liquidacion {
   operario       Operario @relation(fields: [operarioId], references: [id])
   operarioId     String
   saldoEntrada   Int      @default(0) // centavos; arrastre del mes anterior (puede ser negativo)
-  totalGanado    Int      @default(0) // = costura + servicio de corte + moldes
-  // desglose persistido del ganado (docs/PLAN_SERVICIO_CORTE.md §2.12); la
-  // costura es totalGanado − estos dos
+  totalGanado    Int      @default(0) // = sueldo + costura + empaque + servicio de corte + moldes
+  // desglose persistido del ganado (PLAN_SERVICIO_CORTE.md §2.12 y
+  // PLAN_AYUDANTES.md §4); la costura es totalGanado − estos cuatro
   ganadoServicioCorte Int  @default(0)
   ganadoMoldes        Int  @default(0)
+  ganadoEmpaque       Int  @default(0)
+  ganadoSueldo        Int  @default(0)
   totalAnticipos Int      @default(0)
   saldoPeriodo   Int      @default(0) // = saldoEntrada + totalGanado − totalAnticipos
   pagado         Int      @default(0)

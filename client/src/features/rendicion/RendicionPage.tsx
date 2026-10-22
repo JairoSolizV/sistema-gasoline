@@ -3,7 +3,9 @@ import {
   ETIQUETA_MODALIDAD,
   ETIQUETA_PROCESO,
   formatBs,
+  type RendicionCorteDTO,
   type RendicionDTO,
+  type RendicionSueldoDTO,
 } from '@taller/shared';
 import { useOperarios } from '../../api/operarios';
 import { useRendicion } from '../../api/rendicion';
@@ -137,7 +139,9 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
           titulo="Ganado"
           valor={data.totalGanado}
           detalle={[
+            data.desglose.sueldo > 0 && `sueldo ${formatBs(data.desglose.sueldo)}`,
             data.desglose.costura > 0 && `costura ${formatBs(data.desglose.costura)}`,
+            data.desglose.empaque > 0 && `empaque ${formatBs(data.desglose.empaque)}`,
             data.desglose.servicioCorte > 0 && `corte ${formatBs(data.desglose.servicioCorte)}`,
             data.desglose.moldes > 0 && `moldes ${formatBs(data.desglose.moldes)}`,
           ]
@@ -152,6 +156,9 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         )}
       </div>
 
+      {/* Sueldo (ayudantes): días del mes según la asistencia */}
+      {data.sueldo && <SeccionSueldo sueldo={data.sueldo} />}
+
       {/* Costura: cortes cerrados en el mes */}
       <h2 className="mb-2 flex justify-between text-sm font-semibold text-gray-700">
         <span>
@@ -159,54 +166,19 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
         </span>
         <span className="mono">Bs {formatBs(data.desglose.costura)}</span>
       </h2>
-      {data.cortes.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          Sin costura en cortes cerrados este mes.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {data.cortes.map((c) => (
-            <div key={c.corteId} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-                <div className="text-sm">
-                  <span className="font-semibold">{c.modeloNombre}</span>
-                  <span className="ml-1 text-[11px] font-semibold text-gray-400">
-                    v{c.numeroVersion}
-                    {` · COD ${c.codigo}`}
-                  </span>
-                  {c.fechaCierre && (
-                    <span className="ml-2 text-xs text-gray-500">
-                      cerrado {new Date(c.fechaCierre).toLocaleDateString('es-BO')}
-                    </span>
-                  )}
-                </div>
-                <span className="mono text-sm font-semibold">Bs {formatBs(c.totalCorte)}</span>
-              </div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {c.operaciones.map((op, i) => (
-                    <tr key={i} className="border-b border-gray-100 last:border-0">
-                      <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
-                      <td className="px-3 py-2 text-gray-600">{op.grupo}</td>
-                      <td className="px-3 py-2 font-medium">
-                        {op.proceso}
-                        {op.pieza && <span className="font-normal text-gray-500"> · {op.pieza}</span>}
-                      </td>
-                      <td className="mono px-3 py-2 text-right text-gray-500">{op.cantidad} pzs</td>
-                      <td className="mono px-3 py-2 text-right text-gray-500">
-                        Bs {formatBs(op.tarifaEfectiva)}
-                        {op.esMaestroExterno && <span className="ml-1 text-[10px] text-acento">✦</span>}
-                      </td>
-                      <td className="mono w-24 px-5 py-2 text-right font-semibold">
-                        Bs {formatBs(op.total)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
+      <ListaCortes cortes={data.cortes} vacio="Sin costura en cortes cerrados este mes." />
+
+      {/* Empaque: por prenda como la costura, pero aparte (PLAN_AYUDANTES §6) */}
+      {data.empaque.length > 0 && (
+        <>
+          <h2 className="mt-6 mb-2 flex justify-between text-sm font-semibold text-gray-700">
+            <span>
+              Empaque ({data.empaque.length} corte{data.empaque.length === 1 ? '' : 's'})
+            </span>
+            <span className="mono">Bs {formatBs(data.desglose.empaque)}</span>
+          </h2>
+          <ListaCortes cortes={data.empaque} vacio="" />
+        </>
       )}
 
       {/* Servicio de corte interno: cada trabajo en su línea */}
@@ -316,6 +288,133 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+const ESTADO_DIA: Record<RendicionSueldoDTO['dias'][number]['estado'], string> = {
+  trabajo: 'Trabajó',
+  falta: 'Faltó',
+  feriado: 'Feriado',
+};
+
+/** Sueldo del mes: cada día con lo que se descontó y su parte del total (los
+ *  días suman exacto el sueldo del mes, PLAN_AYUDANTES §3). */
+function SeccionSueldo({ sueldo }: { sueldo: RendicionSueldoDTO }) {
+  const resumen = [
+    `${sueldo.diasTrabajados} trabajado${sueldo.diasTrabajados === 1 ? '' : 's'}`,
+    sueldo.faltas > 0 && `${sueldo.faltas} falta${sueldo.faltas === 1 ? '' : 's'}`,
+    sueldo.feriados > 0 && `${sueldo.feriados} feriado${sueldo.feriados === 1 ? '' : 's'}`,
+    sueldo.minutosDescontados > 0 && `${horasMin(sueldo.minutosDescontados)} de atrasos`,
+    sueldo.minutosOperaciones > 0 && `${horasMin(sueldo.minutosOperaciones)} en operaciones`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <>
+      <h2 className="mb-2 flex justify-between text-sm font-semibold text-gray-700">
+        <span>
+          Sueldo <span className="font-normal text-gray-500">({resumen})</span>
+        </span>
+        <span className="mono">Bs {formatBs(sueldo.total)}</span>
+      </h2>
+      <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-sm">
+          <tbody>
+            {sueldo.dias.map((d) => (
+              <tr key={d.fecha} className="border-b border-gray-100 last:border-0">
+                <td className="w-36 px-5 py-1.5 text-gray-500 capitalize">{fechaDia(d.fecha)}</td>
+                <td className={`px-3 py-1.5 ${d.estado === 'falta' ? 'text-error' : ''}`}>
+                  {ESTADO_DIA[d.estado]}
+                </td>
+                <td className="px-3 py-1.5 text-xs text-gray-500">
+                  {[
+                    d.minutosDescontados > 0 && `−${horasMin(d.minutosDescontados)} atraso`,
+                    d.minutosOperaciones > 0 && `−${horasMin(d.minutosOperaciones)} en operaciones`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </td>
+                <td className="mono px-3 py-1.5 text-right text-xs text-gray-400">
+                  {formatBs(d.sueldoSemanal)}/sem
+                </td>
+                <td className="mono w-28 px-5 py-1.5 text-right font-semibold whitespace-nowrap">
+                  {d.monto > 0 ? `Bs ${formatBs(d.monto)}` : <span className="text-gray-300">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/** 80 → "1 h 20 min"; 20 → "20 min". */
+function horasMin(minutos: number): string {
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return [h > 0 && `${h} h`, m > 0 && `${m} min`].filter(Boolean).join(' ');
+}
+
+/** 'aaaa-mm-dd' sin hora: se formatea en UTC para que no corra un día atrás. */
+const fechaDia = (dia: string) =>
+  new Date(`${dia}T00:00:00.000Z`).toLocaleDateString('es-BO', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+
+/** Cortes de la sección (costura o empaque) con las operaciones de ESTE operario. */
+function ListaCortes({ cortes, vacio }: { cortes: RendicionCorteDTO[]; vacio: string }) {
+  return cortes.length === 0 ? (
+    <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+      {vacio}
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {cortes.map((c) => (
+        <div key={c.corteId} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+            <div className="text-sm">
+              <span className="font-semibold">{c.modeloNombre}</span>
+              <span className="ml-1 text-[11px] font-semibold text-gray-400">
+                v{c.numeroVersion}
+                {` · COD ${c.codigo}`}
+              </span>
+              {c.fechaCierre && (
+                <span className="ml-2 text-xs text-gray-500">
+                  cerrado {new Date(c.fechaCierre).toLocaleDateString('es-BO')}
+                </span>
+              )}
+            </div>
+            <span className="mono text-sm font-semibold">Bs {formatBs(c.totalCorte)}</span>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {c.operaciones.map((op, i) => (
+                <tr key={i} className="border-b border-gray-100 last:border-0">
+                  <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
+                  <td className="px-3 py-2 text-gray-600">{op.grupo}</td>
+                  <td className="px-3 py-2 font-medium">
+                    {op.proceso}
+                    {op.pieza && <span className="font-normal text-gray-500"> · {op.pieza}</span>}
+                  </td>
+                  <td className="mono px-3 py-2 text-right text-gray-500">{op.cantidad} pzs</td>
+                  <td className="mono px-3 py-2 text-right text-gray-500">
+                    Bs {formatBs(op.tarifaEfectiva)}
+                    {op.esMaestroExterno && <span className="ml-1 text-[10px] text-acento">✦</span>}
+                  </td>
+                  <td className="mono w-24 px-5 py-2 text-right font-semibold">
+                    Bs {formatBs(op.total)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </div>
   );
 }

@@ -21,6 +21,29 @@ export const asistenciaRepository = {
     });
   },
 
+  /** Días marcados en [inicio, fin), con el historial de sueldo de su ayudante.
+   *  Con operarioId trae SOLO los de ese operario (rendición, CA-7). */
+  asistenciasDelRango(inicio: Date, fin: Date, operarioId?: string) {
+    return prisma.asistencia.findMany({
+      where: { fecha: { gte: inicio, lt: fin }, ...(operarioId ? { operarioId } : {}) },
+      orderBy: { fecha: 'asc' },
+      include: { operario: { select: { sueldos: true } } },
+    });
+  },
+
+  /** Todos los ayudantes (también los de baja: su baja pudo caer en el rango)
+   *  con su sueldo y los días ya marcados en [inicio, fin). */
+  ayudantesConAsistencia(inicio: Date, fin: Date) {
+    return prisma.operario.findMany({
+      where: { roles: { has: 'ayudante' } },
+      orderBy: { nombre: 'asc' },
+      include: {
+        sueldos: true,
+        asistencias: { where: { fecha: { gte: inicio, lt: fin } }, select: { fecha: true } },
+      },
+    });
+  },
+
   operarioConSueldos(id: string) {
     return prisma.operario.findUnique({ where: { id }, include: { sueldos: true } });
   },

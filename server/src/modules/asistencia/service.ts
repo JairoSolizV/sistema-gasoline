@@ -19,6 +19,7 @@ import { exigirFechaSinLiquidar } from '../liquidacion/guards.js';
 import { liquidacionRepository, mesAnteriorA } from '../liquidacion/repository.js';
 import { sueldoVigenteEl } from '../operarios/service.js';
 import { asistenciaRepository } from './repository.js';
+import { habil } from './sueldoMes.js';
 
 type Ayudante = {
   id: string;
@@ -43,13 +44,6 @@ export function lunesDe(dia: string): string {
   const d = diaADate(dia);
   const desdeLunes = (d.getUTCDay() + 6) % 7; // lunes = 0 … domingo = 6
   return dateADia(new Date(d.getTime() - desdeLunes * 86_400_000));
-}
-
-/** ¿El ayudante puede tener ese día marcado? (ingreso, baja y sueldo) */
-function habil(a: Ayudante, dia: string): boolean {
-  if (dia < diaEnBolivia(a.fechaIngreso)) return false;
-  if (a.fechaBaja && dia > diaEnBolivia(a.fechaBaja)) return false;
-  return sueldoVigenteEl(a.sueldos, dia) != null;
 }
 
 async function mesesBloqueados(): Promise<(dia: string) => boolean> {

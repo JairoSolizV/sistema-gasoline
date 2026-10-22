@@ -650,7 +650,8 @@ export function OperariosPage() {
           </select>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        {/* la tabla se desplaza dentro de su caja: el encabezado queda fijo arriba */}
+        <div className="mt-4 max-h-[calc(100vh-15rem)] overflow-auto rounded-xl border border-gray-200 bg-white shadow-sm print:max-h-none print:overflow-visible">
           {isLoading && <div className="p-8 text-center text-sm text-gray-500">Cargando plantel…</div>}
           {error && (
             <div className="p-8 text-center text-sm text-error">
@@ -659,8 +660,8 @@ export function OperariosPage() {
           )}
           {operarios && (
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase shadow-[inset_0_-1px_0_#e5e7eb]">
                   <th className="px-5 py-3">Operario</th>
                   <th className="px-5 py-3">Roles</th>
                   <th className="px-5 py-3">Celular</th>

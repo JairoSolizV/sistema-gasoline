@@ -6,6 +6,8 @@ import { liquidacionService } from '../liquidacion/service.js';
 import { anticiposRepository } from '../anticipos/repository.js';
 import { configuracionRepository } from '../configuracion/repository.js';
 import { rangoMesUTC } from '../liquidacion/repository.js';
+import { asistenciaFaltante } from '../asistencia/sueldoMes.js';
+import { hoyEnBolivia } from '../../lib/hoy.js';
 
 export const dashboardService = {
   async panorama(anio: number, mes: number): Promise<DashboardDTO> {
@@ -59,7 +61,24 @@ export const dashboardService = {
       });
     }
 
-    // 3) fin de mes cercano con liquidación pendiente
+    // 3) asistencia de ayudantes sin marcar hasta hoy: sin ella el sueldo sale
+    //    de menos y el mes no se puede cerrar (PLAN_AYUDANTES §5)
+    if (!consolidado.cerrado) {
+      const hoyDia = hoyEnBolivia();
+      const delMes = hoyDia.startsWith(`${anio}-${String(mes).padStart(2, '0')}`);
+      const mesPasado = `${anio}-${String(mes).padStart(2, '0')}` < hoyDia.slice(0, 7);
+      if (delMes || mesPasado) {
+        const faltantes = await asistenciaFaltante(anio, mes, delMes ? hoyDia : undefined);
+        for (const f of faltantes) {
+          alertas.push({
+            tipo: 'warn',
+            texto: `Asistencia de ${f.nombre}: ${f.dias.length} ${f.dias.length > 1 ? 'días' : 'día'} sin marcar.`,
+          });
+        }
+      }
+    }
+
+    // 4) fin de mes cercano con liquidación pendiente
     const hoy = new Date();
     if (!consolidado.cerrado && hoy.getUTCFullYear() === anio && hoy.getUTCMonth() + 1 === mes) {
       const ultimoDia = new Date(Date.UTC(anio, mes, 0)).getUTCDate();

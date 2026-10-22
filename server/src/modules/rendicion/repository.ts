@@ -31,6 +31,7 @@ export const rendicionRepository = {
             proceso: true,
             pieza: true,
             ct: true,
+            esEmpaque: true,
             corte: {
               select: {
                 id: true,

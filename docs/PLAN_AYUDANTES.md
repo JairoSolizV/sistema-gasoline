@@ -1,9 +1,9 @@
 # Ayudantes con sueldo semanal, asistencia y operaciones de empaque
 
-> **Estado:** aprobado el 2026-10-01. Rebanadas 1 (**rol ayudante + sueldo**), 2 (**asistencia**) y 3
-> (**empaque**) implementadas y verificadas; rebanada 4 pendiente.
-> **Amplía el alcance** (CLAUDE.md §2): hasta ahora solo se pagaba por operación. Al implementar se
-> actualizan `CLAUDE.md` (alcance e invariantes 5 y 10) y `CONTEXTO_NEGOCIO_TALLER.md`.
+> **Estado:** aprobado el 2026-10-01. **Completo:** las 4 rebanadas (rol + sueldo, asistencia, empaque,
+> liquidación) implementadas y verificadas el 2026-10-22.
+> **Amplía el alcance** (CLAUDE.md §2): hasta ahora solo se pagaba por operación. Ya actualizados
+> `CLAUDE.md` (alcance e invariantes 5 y 10) y `CONTEXTO_NEGOCIO_TALLER.md`.
 > Corrige `PLAN_SERVICIO_CORTE.md` §2.14: el **empaque** no es un proveedor externo; lo hacen
 > ayudantes del taller.
 
@@ -166,3 +166,18 @@ Liquidacion      + ganadoEmpaque Int, + ganadoSueldo Int   // desglose persistid
   el corte; la hoja impresa la indica. Los ayudantes ya podían recibir cualquier operación (R1). El
   ganado de empaque **todavía no se separa en la liquidación** (rebanada 4). Migración
   `20261021140000_operacion_empaque`. 322 tests en verde.
+- **2026-10-22 — Rebanada 4 (liquidación, rendición e inicio).** El desglose del ganado suma
+  `sueldo` (por fecha de asistencia) y `empaque` (asignaciones de operaciones con `esEmpaque`, por
+  `fechaCierre`) a costura, servicio de corte y moldes; se persisten en `Liquidacion.ganadoSueldo` y
+  `ganadoEmpaque` (la costura sigue siendo el resto). `asistencia/sueldoMes.ts`: el sueldo de cada
+  ayudante se redondea **una vez por mes** y se reparte con `repartirSueldoPorSemana` (mayor resto
+  primero entre semanas y luego entre días): una semana completa paga exacto Bs 400 (con el reparto
+  directo por día salía 400.02) y los centavos del redondeo caen en semanas incompletas, por lo que una
+  semana incompleta puede diferir 1 centavo de la vista semanal de Asistencia. **Cierre de mes**:
+  `ASISTENCIA_INCOMPLETA` (409) si a un ayudante le falta marcar un lunes–sábado hábil del mes, con
+  nombre y días; la asistencia cuenta como movimiento para el orden de cierres. **Rendición**:
+  secciones Sueldo (días, faltas, feriados, atrasos, horas en operaciones y monto por día) y Empaque,
+  aparte de la costura; consultas filtradas por operario (CA-7). **Inicio**: aviso por ayudante con
+  días sin marcar hasta hoy. **Liquidación**: columnas Sueldo · Costura · Empaque · Servicio de corte ·
+  Moldes. Verificado en navegador: 16 días completos + 1 falta + 1 día con 5 h 20 min descontados →
+  Bs 1093.83. Migración `20261022120000_liquidacion_sueldo_empaque`. 331 tests en verde.

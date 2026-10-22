@@ -26,6 +26,8 @@ Antes de costurar, ocurre el proceso de corte de tela:
 > ~~Este flujo se documenta solo como contexto. El sistema **no** modela el trazado ni el corte físico de tela; empieza a operar en la etapa de **costura y pago**.~~
 > **Actualización 2026-10-01 (decisión del dueño):** el servicio de corte interno —búsqueda del modelo, moldes/patronaje, trazado, doblado de tela, corte y clasificación/codificación de piezas— ahora **sí se modela y se paga**, con roles de operario y tarifas configurables. Reglas completas en `docs/PLAN_SERVICIO_CORTE.md`.
 
+> **Actualización 2026-10-21 (decisión del dueño):** además de los que cobran por operación, hay **ayudantes** con **sueldo semanal fijo** (lunes a sábado; se descuenta por minutos lo no trabajado y las horas de horario dedicadas a operaciones; feriados pagados) que se registra con la **asistencia diaria**. Las **operaciones de empaque** (deshilachado, botón/remache, etiquetado, embolsado, embalado…) están en el modelo y se pagan por prenda como la costura, pero se muestran **aparte**. Reglas completas en `docs/PLAN_AYUDANTES.md`.
+
 ---
 
 ## 2. Vocabulario del dominio
@@ -277,6 +279,7 @@ Esto evita **comparaciones y roces** entre operarios (que uno vea que otro gana 
 - **Consolidado semanal y mensual** por operario (agrupado por fecha de cierre), cruzando **anticipos** (con tope como advertencia), calculando **saldo**, con **arrastre** y **cierre de mes a 0** (y excepción de arrastre entre meses).
 - **Plantel administrable** (alta/baja de operarios; regular vs. maestro externo).
 - **Vista filtrada por operario** para rendición de cuentas (Sección 9).
+- **Ayudantes con sueldo semanal**, asistencia diaria y **operaciones de empaque** separadas de la costura (agregado 2026-10-21, `docs/PLAN_AYUDANTES.md`).
 
 ### Fuera de Fase 1 (contexto, no se implementa ahora)
 - ~~Trazado de moldes y corte físico de tela (Sección 1.1).~~ Incorporado el 2026-10-01 como servicio de corte interno (`docs/PLAN_SERVICIO_CORTE.md`).

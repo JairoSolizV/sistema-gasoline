@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   minutosPagados,
   repartirSueldo,
+  repartirSueldoPorSemana,
   sueldoDelPeriodo,
   type DiaParaSueldo,
 } from '@taller/shared';
@@ -76,5 +77,31 @@ describe('reparto por día (mayor resto): suma exacta', () => {
     const r = repartirSueldo(dias);
     expect(r[2]).toBe(0);
     expect(r.reduce((a, b) => a + b, 0)).toBe(sueldoDelPeriodo(dias));
+  });
+});
+
+describe('reparto del mes por semana y día (liquidación)', () => {
+  // marzo 2032 de lunes a sábado: semana 1 con atraso de 20 min y una falta,
+  // semanas 2 a 4 completas y 3 días sueltos al final (29 a 31)
+  const mes = [
+    ...[520, 540, 0, 540, 540, 540].map((m) => ({ ...dia(m), semana: 'S1' })),
+    ...Array.from({ length: 18 }, (_, i) => ({ ...dia(), semana: `S${2 + Math.floor(i / 6)}` })),
+    ...[540, 540, 540].map((m) => ({ ...dia(m), semana: 'S5' })),
+  ];
+  const r = repartirSueldoPorSemana(mes);
+  const deSemana = (s: string) => r.filter((_, i) => mes[i].semana === s).reduce((a, b) => a + b, 0);
+
+  test('el mes suma exacto su total, redondeado una sola vez', () => {
+    expect(r.reduce((a, b) => a + b, 0)).toBe(sueldoDelPeriodo(mes));
+    expect(sueldoDelPeriodo(mes)).toBe(173086); // 40000 × 14020 ÷ 3240 = 1730.864…
+  });
+
+  test('cada semana completa paga exactamente Bs 400 (nunca 400.02)', () => {
+    expect([deSemana('S2'), deSemana('S3'), deSemana('S4')]).toEqual([40000, 40000, 40000]);
+  });
+
+  test('el día de falta queda en 0 y los centavos del redondeo van a semanas incompletas', () => {
+    expect(r[2]).toBe(0);
+    expect(deSemana('S1') + deSemana('S5')).toBe(173086 - 120000);
   });
 });

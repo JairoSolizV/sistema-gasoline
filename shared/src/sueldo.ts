@@ -42,8 +42,34 @@ export function sueldoDelPeriodo(dias: DiaParaSueldo[]): number {
  *  centavos que sobran van a los de mayor fracción (empate: el primero). La
  *  suma es EXACTAMENTE sueldoDelPeriodo(dias). */
 export function repartirSueldo(dias: DiaParaSueldo[]): number[] {
-  const total = sueldoDelPeriodo(dias);
-  const exactos = dias.map((d) => d.montoSemanal * d.minutosPagados); // en 1/3240 de centavo
+  return mayorResto(sueldoDelPeriodo(dias), dias.map(exacto));
+}
+
+/** Como repartirSueldo, pero en dos niveles: el total del período se reparte
+ *  primero entre las SEMANAS (clave `semana`, ej. el lunes) y cada semana entre
+ *  sus días. Así una semana completa recibe exactamente su sueldo (no tiene
+ *  fracción) y los centavos del redondeo del mes caen en semanas incompletas.
+ *  La suma sigue siendo EXACTAMENTE sueldoDelPeriodo(dias). */
+export function repartirSueldoPorSemana(dias: (DiaParaSueldo & { semana: string })[]): number[] {
+  const semanas = [...new Set(dias.map((d) => d.semana))];
+  const indices = semanas.map((s) => dias.flatMap((d, i) => (d.semana === s ? [i] : [])));
+  const exactosSemana = indices.map((ids) => ids.reduce((a, i) => a + exacto(dias[i]), 0));
+  const porSemana = mayorResto(sueldoDelPeriodo(dias), exactosSemana);
+  const montos = new Array<number>(dias.length).fill(0);
+  indices.forEach((ids, s) => {
+    const partes = mayorResto(porSemana[s], ids.map((i) => exacto(dias[i])));
+    ids.forEach((i, k) => (montos[i] = partes[k]));
+  });
+  return montos;
+}
+
+/** Valor exacto de un día en 1/3240 de centavo (entero). */
+const exacto = (d: DiaParaSueldo) => d.montoSemanal * d.minutosPagados;
+
+/** Reparte `total` centavos en partes proporcionales a `exactos` (en 1/3240 de
+ *  centavo): cada una recibe su parte entera y los centavos que sobran van a las
+ *  de mayor fracción (empate: la primera). */
+function mayorResto(total: number, exactos: number[]): number[] {
   const base = exactos.map((n) => Math.floor(n / DIVISOR));
   let sobran = total - base.reduce((a, b) => a + b, 0);
   const porResto = exactos
