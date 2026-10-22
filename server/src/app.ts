@@ -13,6 +13,7 @@ import { liquidacionRouter } from './modules/liquidacion/routes.js';
 import { rendicionRouter } from './modules/rendicion/routes.js';
 import { configuracionRouter } from './modules/configuracion/routes.js';
 import { dashboardRouter } from './modules/dashboard/routes.js';
+import { costosRouter } from './modules/costos/routes.js';
 
 // authObligatoria: el server real (server.ts) lo activa; los tests de módulos
 // llaman crearApp() sin auth (la prueban aparte en auth.test.ts con tokens).
@@ -38,6 +39,7 @@ export function crearApp({ authObligatoria = false } = {}) {
   app.use('/api/v1/rendicion', rendicionRouter);
   app.use('/api/v1/configuracion', configuracionRouter);
   app.use('/api/v1/dashboard', dashboardRouter);
+  app.use('/api/v1/costos', costosRouter);
   app.use('/api/v1', modelosRouter);
   app.use('/api/v1', plantillasRouter);
 

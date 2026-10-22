@@ -80,6 +80,7 @@ export function ConfiguracionPage() {
   const [nombre, setNombre] = useState('');
   const [topeBs, setTopeBs] = useState('');
   const [difBs, setDifBs] = useState('');
+  const [margenPct, setMargenPct] = useState('');
   const [tarifas, setTarifas] = useState<TextosTarifa | null>(null);
   const [guardado, setGuardado] = useState(false);
 
@@ -88,14 +89,16 @@ export function ConfiguracionPage() {
       setNombre(data.nombreTaller ?? '');
       setTopeBs(aTexto(data.topeAnticipoAdvertencia));
       setDifBs(aTexto(data.diferencialMaestroExterno));
+      setMargenPct(String(data.margenVenta / 100));
       setTarifas(textosDesde(data));
     }
   }, [data]);
 
   const topeValido = PATRON_BS.test(topeBs);
   const difValido = PATRON_BS.test(difBs);
+  const margenValido = /^\d+([.,]\d{1,2})?$/.test(margenPct.trim());
   const tarifaValida = (k: ClaveTarifaCorte) => tarifas != null && PATRON_BS.test(tarifas[k]);
-  const todoValido = topeValido && difValido && CLAVES_TARIFA_CORTE.every(tarifaValida);
+  const todoValido = topeValido && difValido && margenValido && CLAVES_TARIFA_CORTE.every(tarifaValida);
 
   const onGuardar = async () => {
     if (!todoValido || !tarifas) return;
@@ -103,6 +106,7 @@ export function ConfiguracionPage() {
       nombreTaller: nombre.trim() === '' ? null : nombre.trim(),
       topeAnticipoAdvertencia: aCentavos(topeBs),
       diferencialMaestroExterno: aCentavos(difBs),
+      margenVenta: Math.round(Number(margenPct.trim().replace(',', '.')) * 100),
       ...Object.fromEntries(CLAVES_TARIFA_CORTE.map((k) => [k, aCentavos(tarifas[k])])),
     });
     setGuardado(true);
@@ -165,6 +169,24 @@ export function ConfiguracionPage() {
               />
             </div>
             {!difValido && <p className="mt-1 text-xs text-error">Monto inválido (ej. 0.10)</p>}
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-sm font-medium">Margen de venta (costos)</label>
+            <p className="mb-2 text-xs text-gray-500">
+              Precio de venta = costo por prenda + este porcentaje. Se usa en las fichas de costo
+              que no tienen un margen propio. No afecta ningún pago.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                value={margenPct}
+                onChange={(e) => setMargenPct(e.target.value)}
+                inputMode="decimal"
+                className={`${claseInput} mono max-w-32`}
+              />
+              <span className="text-sm text-gray-500">%</span>
+            </div>
+            {!margenValido && <p className="mt-1 text-xs text-error">Porcentaje inválido (ej. 30)</p>}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">

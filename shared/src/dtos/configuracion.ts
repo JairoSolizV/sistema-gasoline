@@ -11,4 +11,5 @@ export interface ConfiguracionDTO {
   tarifaDobladoPares: number; // por prenda, total del proceso (2 dobladores)
   tarifaCorteRespaldo: number; // por prenda y cortador sin tarifa propia
   tarifaClasificacionRespaldo: number; // por prenda y clasificador sin tarifa propia
+  margenVenta: number; // costos: margen general del precio de venta, centésimas de % (3000 = 30 %)
 }

@@ -25,6 +25,7 @@ function aDTO(c: Configuracion): ConfiguracionDTO {
     tarifaDobladoPares: c.tarifaDobladoPares,
     tarifaCorteRespaldo: c.tarifaCorteRespaldo,
     tarifaClasificacionRespaldo: c.tarifaClasificacionRespaldo,
+    margenVenta: c.margenVenta,
   };
 }
 
@@ -43,6 +44,7 @@ export const configuracionService = {
         ? { diferencialMaestroExterno: input.diferencialMaestroExterno }
         : {}),
       ...(input.nombreTaller !== undefined ? { nombreTaller: input.nombreTaller } : {}),
+      ...(input.margenVenta !== undefined ? { margenVenta: input.margenVenta } : {}),
     };
     for (const clave of CLAVES_TARIFA_CORTE) {
       if (input[clave] !== undefined) data[clave] = input[clave];

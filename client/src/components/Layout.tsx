@@ -124,6 +124,14 @@ export function Layout() {
             Rendición de cuentas
           </ItemMenu>
 
+          <TituloSeccion>Costos</TituloSeccion>
+          <ItemMenu
+            a="/costos"
+            icono={<Icono d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" />}
+          >
+            Costos de producción
+          </ItemMenu>
+
           <TituloSeccion>Sistema</TituloSeccion>
           <ItemMenu a="/configuracion" icono={<Icono d="M5 7h14M5 12h14M5 17h14" />}>
             Configuración

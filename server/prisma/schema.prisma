@@ -96,6 +96,7 @@ model Modelo {
   buscador    Operario? @relation("ModeloBuscador", fields: [buscadorId], references: [id])
   buscadorId  String?
   sinBuscador Boolean   @default(false)
+  fichasCosto FichaCosto[] // costos (docs/PLAN_COSTOS.md); solo consulta
 }
 
 model ModeloVersion {
@@ -320,6 +321,10 @@ model Configuracion {
   tarifaDobladoPares          Int @default(10) // por prenda, TOTAL del proceso (se reparte en 2)
   tarifaCorteRespaldo         Int @default(15) // por prenda y por cortador sin tarifa propia
   tarifaClasificacionRespaldo Int @default(10) // por prenda y por clasificador sin tarifa propia
+
+  // Costos (docs/PLAN_COSTOS.md): margen general del precio de venta, en
+  // centésimas de % (30 % = 3000); cada ficha puede tener el suyo.
+  margenVenta                 Int @default(3000)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -563,4 +568,118 @@ model EnvioServicio {
 
   @@index([corteId])
   @@index([fechaDevolucion])
+}
+
+// ── Costos de producción (docs/PLAN_COSTOS.md) ───────────────────────────────
+// SOLO CONSULTA: nada de esto entra a los pagos. Cantidades en milésimas de su
+// unidad, dinero en centavos, tasa de cambio en diezmilésimos (shared/costos.ts).
+enum CategoriaInsumo {
+  tela
+  hilo
+  cierre
+  boton
+  remache
+  cuero
+  etiqueta
+  bolsa
+  logistica // saco, yute…
+  otro
+}
+
+enum OrigenCompra {
+  fabrica
+  mayorista
+  tienda
+}
+
+enum MonedaCompra {
+  BOB
+  USD
+}
+
+enum TipoLineaCosto {
+  por_prenda // cantidad de un insumo por prenda
+  tela_tizado // largo del tizado ÷ prendas por capa
+  hilo // precio del cono ÷ prendas que rinde
+  prorrateo // monto ÷ prendas (flete, pasajes…)
+  precio_prenda // precio directo por prenda (lavandería, bordado…)
+}
+
+model Insumo {
+  id          String          @id @default(uuid())
+  nombre      String
+  categoria   CategoriaInsumo
+  unidad      String // metro, cono, unidad…
+  color       String?
+  codigo      String?
+  titulo      String? // hilo: ej. 20/3
+  anchoCm     Int? // tela
+  marca       String? // cierre
+  numeroLlave String? // cierre
+  medidaCm    Int? // cierre
+  rendimiento Int? // hilo: prendas que rinde un cono (base; la ficha puede tener el suyo)
+  notas       String?
+  activo      Boolean         @default(true)
+  creadoEn    DateTime        @default(now())
+  compras     CompraInsumo[]
+  lineas      LineaCosto[]
+}
+
+// El costo usa el precio de la ÚLTIMA compra del insumo.
+model CompraInsumo {
+  id           String       @id @default(uuid())
+  insumo       Insumo       @relation(fields: [insumoId], references: [id])
+  insumoId     String
+  fecha        DateTime     @db.Date
+  tienda       String
+  origen       OrigenCompra @default(tienda)
+  ciudad       String?
+  presentacion String? // ej. "paquete de 144"
+  cantidad     Int // milésimas de la unidad del insumo
+  moneda       MonedaCompra @default(BOB)
+  montoUsd     Int? // centavos de $us (compra en dólares)
+  tasaCambio   Int? // diezmilésimos: tasa oficial del día de la compra
+  precioTotal  Int // centavos Bs (en dólares: montoUsd × tasa, redondeado una vez)
+  notas        String?
+  creadoEn     DateTime     @default(now())
+
+  @@index([insumoId, fecha])
+}
+
+// Ficha de costo por prenda. Vinculada a un modelo de Taller · Pagos, la mano de
+// obra y el empaque salen de los CT de su última versión; sin vincular, a mano.
+model FichaCosto {
+  id                   String       @id @default(uuid())
+  codigo               String? // el del catálogo local (ej. "31")
+  nombre               String       @unique
+  modelo               Modelo?      @relation(fields: [modeloId], references: [id], onDelete: SetNull)
+  modeloId             String?
+  manoDeObra           Int? // centavos por prenda; solo sin modelo vinculado
+  empaque              Int? // idem
+  servicioCorteInterno Boolean      @default(true) // suma las tarifas del servicio de corte
+  margen               Int? // centésimas de %; null = el general de Configuración
+  notas                String?
+  creadoEn             DateTime     @default(now())
+  actualizadoEn        DateTime     @updatedAt
+  lineas               LineaCosto[]
+}
+
+model LineaCosto {
+  id             String         @id @default(uuid())
+  ficha          FichaCosto     @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  fichaId        String
+  orden          Int
+  tipo           TipoLineaCosto
+  concepto       String
+  insumo         Insumo?        @relation(fields: [insumoId], references: [id])
+  insumoId       String? // por_prenda, tela_tizado, hilo
+  cantidad       Int? // por_prenda: milésimas por prenda
+  largoMm        Int? // tela_tizado
+  prendasPorCapa Int? // tela_tizado
+  rendimiento    Int? // hilo: prendas por cono en ESTE modelo (null = el del insumo)
+  monto          Int? // prorrateo: centavos
+  prendas        Int? // prorrateo: entre cuántas prendas
+  precio         Int? // precio_prenda: centavos
+
+  @@index([fichaId, orden])
 }
