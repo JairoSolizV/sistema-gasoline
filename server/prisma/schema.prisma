@@ -118,6 +118,9 @@ model Operacion {
   proceso         String
   pieza           String?
   ct              Int // centavos por pieza
+  // operación de empaque (botón, remache, cuero, deshilachado, embolsado…):
+  // se paga igual que la costura pero se muestra aparte (docs/PLAN_AYUDANTES.md)
+  esEmpaque       Boolean          @default(false)
   copias          CorteOperacion[]
 }
 
@@ -180,6 +183,7 @@ model CorteOperacion {
   proceso           String
   pieza             String?
   ct                Int // centavos, congelado al abrir el corte
+  esEmpaque         Boolean       @default(false) // congelado al abrir, como el ct
   // segundos por prenda del catálogo, congelado al abrir (solo para el estimado
   // de duración; no afecta pagos). null = el catálogo no tenía tiempo.
   tiempoSeg         Int?
@@ -372,6 +376,7 @@ model GrupoOperacion {
   proceso      String
   pieza        String?
   ctReferencia Int? // centavos; precio sugerido (null = sin referencia)
+  esEmpaque    Boolean @default(false)
 
   @@index([grupoId, orden])
 }
@@ -409,6 +414,7 @@ model PlantillaOperacion {
   pieza        String?
   // centavos; precio sugerido al crear un modelo (null = sin referencia)
   ctReferencia Int?
+  esEmpaque    Boolean   @default(false)
 
   @@index([plantillaId, orden])
 }

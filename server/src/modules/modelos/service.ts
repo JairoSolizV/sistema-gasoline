@@ -77,6 +77,8 @@ function aDetalleDTO(v: VersionConOperaciones): ModeloVersionDetalleDTO {
     numeroVersion: v.numeroVersion,
     notas: v.notas,
     costoManoObraPrenda: v.costoManoObraPrenda,
+    // empaque: parte del costo de mano de obra que se muestra aparte (PLAN_AYUDANTES §2.10)
+    costoEmpaquePrenda: sumaCt(v.operaciones.filter((o) => o.esEmpaque)),
     activa: v.activa,
     buscador: v.modelo.buscador,
     sinBuscador: v.modelo.sinBuscador,
@@ -90,6 +92,7 @@ function aDetalleDTO(v: VersionConOperaciones): ModeloVersionDetalleDTO {
       proceso: o.proceso,
       pieza: o.pieza,
       ct: o.ct,
+      esEmpaque: o.esEmpaque,
     })),
   };
 }

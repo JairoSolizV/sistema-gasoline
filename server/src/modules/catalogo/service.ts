@@ -137,6 +137,7 @@ export const catalogoService = {
         proceso: o.proceso,
         pieza: o.pieza,
         ctReferencia: o.ctReferencia,
+        esEmpaque: o.esEmpaque,
       })),
     };
   },
@@ -155,6 +156,7 @@ export const catalogoService = {
         proceso: normalizarNombreCatalogo(o.proceso),
         pieza: o.pieza ? normalizarNombreCatalogo(o.pieza) : null,
         ctReferencia: o.ctReferencia ?? null,
+        esEmpaque: o.esEmpaque ?? false,
       })),
     );
     return this.bloque(grupoId);

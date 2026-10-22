@@ -27,6 +27,7 @@ interface FilaPlantilla {
   proceso: string;
   pieza: string;
   ctRefBs: string; // Bs como texto; '' = sin referencia
+  esEmpaque: boolean; // pasa al modelo creado con la plantilla
 }
 
 interface PlantillaValores {
@@ -40,6 +41,7 @@ const FILA_VACIA: FilaPlantilla = {
   proceso: '',
   pieza: '',
   ctRefBs: '',
+  esEmpaque: false,
 };
 
 const claseInput =
@@ -102,6 +104,13 @@ function FilaOperacion({
           </p>
         )}
       </td>
+      <td className="px-2 py-2 pt-3 text-center">
+        <input
+          type="checkbox"
+          {...register(`operaciones.${i}.esEmpaque`)}
+          title="Operación de empaque"
+        />
+      </td>
       <td className="px-2 py-2 text-center">
         <button
           type="button"
@@ -137,6 +146,7 @@ export function PlantillaDetallePage() {
         proceso: o.proceso,
         pieza: o.pieza ?? '',
         ctRefBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+        esEmpaque: o.esEmpaque,
       })),
     });
   }, [plantilla, reset]);
@@ -156,6 +166,7 @@ export function PlantillaDetallePage() {
         proceso: o.proceso.trim(),
         pieza: o.pieza.trim() === '' ? null : o.pieza.trim(),
         ctReferencia: o.ctRefBs.trim() === '' ? null : aCentavos(o.ctRefBs.trim()),
+        esEmpaque: o.esEmpaque,
       })),
     });
   });
@@ -233,6 +244,9 @@ export function PlantillaDetallePage() {
                 <th className="px-2 py-2">Pieza</th>
                 <th className="w-28 px-2 py-2" title="Precio sugerido; se confirma al crear el modelo">
                   CT ref. (Bs)
+                </th>
+                <th className="w-14 px-2 py-2 text-center" title="Operación de empaque: costo aparte de la costura">
+                  Emp.
                 </th>
                 <th className="w-12 px-2 py-2" />
               </tr>

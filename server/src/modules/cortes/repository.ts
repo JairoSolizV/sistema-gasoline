@@ -67,7 +67,7 @@ function aFilaCambio(corteId: string, c: CambioData): Prisma.CorteCambioUnchecke
 /** Datos editables de una operación del corte (snapshot propio del corte). */
 export type DatosOperacionCorte = Pick<
   Prisma.CorteOperacionUncheckedCreateInput,
-  'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct'
+  'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct' | 'esEmpaque'
 >;
 
 export type CorteConDetalle = Prisma.CorteGetPayload<{ include: typeof incluirDetalle }>;

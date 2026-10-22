@@ -47,6 +47,7 @@ export interface BloqueOperacionDTO {
   proceso: string;
   pieza: string | null;
   ctReferencia: number | null; // centavos; sugerencia, el CT real va en el modelo
+  esEmpaque: boolean;
 }
 
 export interface BloqueGrupoDTO {

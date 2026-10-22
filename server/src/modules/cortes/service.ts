@@ -105,6 +105,7 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
       proceso: op.proceso,
       pieza: op.pieza,
       ct: op.ct,
+      esEmpaque: op.esEmpaque,
       cantidadObjetivo: op.cantidadObjetivo,
       tiempoSeg: op.tiempoSeg,
       estado: op.estado,
@@ -134,8 +135,11 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
   }
 
   const costoManoObraPrenda = sumaCt(corte.operaciones);
-  // tres costos separados (PLAN_SERVICIO_CORTE §2.11): costura · servicio · total
+  // costos separados (PLAN_SERVICIO_CORTE §2.11 y PLAN_AYUDANTES §2.10):
+  // costura (incluye empaque, que además se informa aparte) · servicio · total
   const costoCostura = corte.cantidadTotal * costoManoObraPrenda;
+  const costoEmpaqueCorte =
+    corte.cantidadTotal * sumaCt(corte.operaciones.filter((o) => o.esEmpaque));
   const servicio = aServicioDTO(corte);
   const costoServicioCorte = servicio?.total ?? 0;
   return {
@@ -166,6 +170,7 @@ function aDetalleDTO(corte: CorteConDetalle): CorteDetalleDTO {
     fechaCierre: corte.fechaCierre ? corte.fechaCierre.toISOString() : null,
     costoManoObraPrenda,
     costoTotalCorte: costoCostura,
+    costoEmpaqueCorte,
     costoServicioCorte,
     costoTotal: costoCostura + costoServicioCorte,
     operaciones,
@@ -410,6 +415,7 @@ export const cortesService = {
         proceso: o.proceso,
         pieza: o.pieza,
         ct: o.ct,
+        esEmpaque: o.esEmpaque,
         cantidadObjetivo: corte.cantidadTotal,
       })),
     );
@@ -596,6 +602,7 @@ export const cortesService = {
       proceso: input.proceso,
       pieza: input.pieza ?? null,
       ct: input.ct,
+      esEmpaque: input.esEmpaque ?? false,
     };
     const [tiempoSeg] = await tiemposDeOperaciones([datos]);
     await cortesRepository.agregarOperacion(

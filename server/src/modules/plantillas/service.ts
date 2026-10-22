@@ -54,6 +54,7 @@ function aDetalle(p: PlantillaConOperaciones): PlantillaDetalleDTO {
       proceso: o.proceso,
       pieza: o.pieza,
       ctReferencia: o.ctReferencia,
+      esEmpaque: o.esEmpaque,
     })),
   };
 }

@@ -9,6 +9,7 @@ export interface OperacionDTO {
   proceso: string;
   pieza: string | null;
   ct: number; // centavos por pieza
+  esEmpaque: boolean; // operación de empaque (se muestra aparte de la costura)
 }
 
 export type TipoMolde = 'nuevo' | 'modificacion';
@@ -50,6 +51,7 @@ export interface ModeloVersionDetalleDTO {
   numeroVersion: number;
   notas: string | null;
   costoManoObraPrenda: number; // centavos = Σ ct de sus operaciones
+  costoEmpaquePrenda: number; // centavos = Σ ct de las operaciones de empaque (incluido arriba)
   activa: boolean;
   buscador: PersonaDTO | null; // del modelo
   sinBuscador: boolean;

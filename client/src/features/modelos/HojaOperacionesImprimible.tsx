@@ -48,7 +48,10 @@ export function HojaOperacionesImprimible({ detalle }: { detalle: ModeloVersionD
               <tr key={op.id}>
                 <td>{op.n ?? ''}</td>
                 <td>{op.equipo}</td>
-                <td>{op.proceso}</td>
+                <td>
+                  {op.proceso}
+                  {op.esEmpaque && ' (empaque)'}
+                </td>
                 <td>{op.pieza ?? ''}</td>
                 <td className="num">{formatBs(op.ct)}</td>
               </tr>
@@ -60,6 +63,12 @@ export function HojaOperacionesImprimible({ detalle }: { detalle: ModeloVersionD
             <td colSpan={4}>Mano de obra por prenda</td>
             <td className="num">{formatBs(detalle.costoManoObraPrenda)}</td>
           </tr>
+          {detalle.costoEmpaquePrenda > 0 && (
+            <tr>
+              <td colSpan={4}>de la cual, empaque</td>
+              <td className="num">{formatBs(detalle.costoEmpaquePrenda)}</td>
+            </tr>
+          )}
         </tfoot>
       </table>
     </HojaOficio>

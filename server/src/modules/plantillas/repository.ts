@@ -51,6 +51,7 @@ export const plantillasRepository = {
             proceso: o.proceso,
             pieza: o.pieza,
             ctReferencia: o.ctReferencia,
+            esEmpaque: o.esEmpaque,
           })),
         },
       },

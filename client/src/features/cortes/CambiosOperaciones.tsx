@@ -8,6 +8,7 @@ import {
   type CorteDetalleDTO,
   type CorteOperacionDTO,
   type OperarioDTO,
+  type ValorCampo,
 } from '@taller/shared';
 import {
   useAgregarOperacionCorte,
@@ -245,9 +246,11 @@ const NOMBRE_CAMPO: Record<CampoOperacion, string> = {
   proceso: 'Proceso',
   pieza: 'Pieza',
   ct: 'CT',
+  esEmpaque: 'Empaque',
 };
 
-function valorCampo(campo: CampoOperacion, v: string | number | null): string {
+function valorCampo(campo: CampoOperacion, v: ValorCampo): string {
+  if (typeof v === 'boolean') return v ? 'sí' : 'no';
   if (v == null || v === '') return '—';
   return campo === 'ct' ? `Bs ${formatBs(Number(v))}` : String(v);
 }

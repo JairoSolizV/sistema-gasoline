@@ -23,6 +23,7 @@ export interface CorteOperacionDTO {
   proceso: string;
   pieza: string | null;
   ct: number; // centavos, snapshot congelado al abrir el corte
+  esEmpaque: boolean; // congelado al abrir, como el ct
   cantidadObjetivo: number;
   estado: EstadoCorteOperacion;
   asignado: number; // Σ cantidades asignadas
@@ -38,7 +39,8 @@ export interface CorteOperacionDTO {
 // ── Historial de cambios de las operaciones del corte (no tocan el modelo) ──
 
 export type TipoCambioCorte = 'reordenar' | 'editar' | 'agregar' | 'quitar';
-export type CampoOperacion = 'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct';
+export type CampoOperacion = 'grupo' | 'n' | 'equipo' | 'proceso' | 'pieza' | 'ct' | 'esEmpaque';
+export type ValorCampo = string | number | boolean | null;
 
 export interface OperacionResumenDTO {
   grupo: string;
@@ -47,12 +49,13 @@ export interface OperacionResumenDTO {
   proceso: string;
   pieza: string | null;
   ct: number; // centavos
+  esEmpaque?: boolean; // ausente en cambios anteriores a la marca = costura
 }
 
 export type DetalleCambioCorte =
   | {
       tipo: 'editar';
-      campos: { campo: CampoOperacion; antes: string | number | null; despues: string | number | null }[];
+      campos: { campo: CampoOperacion; antes: ValorCampo; despues: ValorCampo }[];
     }
   | { tipo: 'agregar' | 'quitar'; operacion: OperacionResumenDTO }
   | { tipo: 'reordenar'; antes: string[]; despues: string[] };
@@ -153,6 +156,7 @@ export interface CorteDetalleDTO {
   fechaCierre: string | null;
   costoManoObraPrenda: number; // centavos, Σ ct del snapshot
   costoTotalCorte: number; // costura: centavos = cantidadTotal × costoManoObraPrenda (CA-2.3)
+  costoEmpaqueCorte: number; // la parte de empaque de costoTotalCorte (Σ ct empaque × cantidad)
   costoServicioCorte: number; // Σ trabajos del servicio de corte interno (0 si externo)
   costoTotal: number; // costura + servicio de corte
   operaciones: CorteOperacionDTO[];

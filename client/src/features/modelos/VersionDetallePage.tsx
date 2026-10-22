@@ -15,6 +15,7 @@ import { useConfiguracion } from '../../api/configuracion';
 import { useOperarios } from '../../api/operarios';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { MarcaEmpaque } from '../../components/MarcaEmpaque';
 import { OperacionFormModal } from './OperacionFormModal';
 import { HojaOperacionesImprimible } from './HojaOperacionesImprimible';
 import { CamposMolde, moldeVacio, validarMolde, type MoldeForm } from './CamposDiseno';
@@ -129,6 +130,8 @@ function GrupoModelo({
   onEditar,
   onEliminar,
   onAgregar,
+  onMarcarEmpaque,
+  marcando,
 }: {
   grupo: string;
   ops: OperacionDTO[];
@@ -136,17 +139,28 @@ function GrupoModelo({
   onEditar: (op: OperacionDTO) => void;
   onEliminar: (op: OperacionDTO) => void;
   onAgregar: () => void;
+  onMarcarEmpaque: (esEmpaque: boolean) => void; // todo el grupo de una vez
+  marcando: boolean;
 }) {
   const { arrastrado, manija, fila, indicador } = useArrastrarOrden(
     ops.map((o) => o.id),
     onReordenar,
   );
+  const todoEmpaque = ops.every((o) => o.esEmpaque);
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
         <div className="flex items-baseline gap-3">
           <span className="text-sm font-semibold">{grupo}</span>
           <span className="text-xs text-gray-500">{ops.length} operaciones</span>
+          <button
+            onClick={() => onMarcarEmpaque(!todoEmpaque)}
+            disabled={marcando}
+            title="Las operaciones de empaque se pagan por prenda, con su costo aparte de la costura"
+            className="text-xs font-medium text-violet-700 hover:underline disabled:opacity-50"
+          >
+            {todoEmpaque ? 'Quitar marca de empaque' : 'Marcar grupo como empaque'}
+          </button>
         </div>
         <span className="mono text-sm font-semibold text-gray-600">
           Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
@@ -170,7 +184,10 @@ function GrupoModelo({
               </td>
               <td className="w-14 px-3 py-2 text-gray-400">{op.n ?? '—'}</td>
               <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
-              <td className="px-3 py-2 font-medium">{op.proceso}</td>
+              <td className="px-3 py-2 font-medium">
+                {op.proceso}
+                {op.esEmpaque && <MarcaEmpaque />}
+              </td>
               <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
               <td className="w-28 px-3 py-2 text-right">
                 <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
@@ -208,6 +225,24 @@ export function VersionDetallePage() {
   const eliminar = useEliminarOperacionModelo();
   const reordenar = useReordenarOperacionesModelo();
   const [modal, setModal] = useState<ModalAbierto>(null);
+
+  // Marcar/desmarcar un grupo entero como empaque: un PATCH por operación que
+  // cambia (el último deja la versión actualizada en la caché).
+  const [marcando, setMarcando] = useState(false);
+  const [errorMarca, setErrorMarca] = useState<unknown>(null);
+  const marcarGrupo = async (ops: OperacionDTO[], esEmpaque: boolean) => {
+    setMarcando(true);
+    setErrorMarca(null);
+    try {
+      for (const o of ops.filter((op) => op.esEmpaque !== esEmpaque)) {
+        await editar.mutateAsync({ operacionId: o.id, cambios: { esEmpaque } });
+      }
+    } catch (e) {
+      setErrorMarca(e);
+    } finally {
+      setMarcando(false);
+    }
+  };
 
   const grupos = useMemo(() => {
     if (!detalle) return [];
@@ -271,7 +306,16 @@ export function VersionDetallePage() {
               <div className="mono text-2xl font-semibold">
                 Bs {formatBs(detalle.costoManoObraPrenda)}
               </div>
-              <div className="text-[11px] text-gray-400">{detalle.operaciones.length} operaciones</div>
+              <div className="text-[11px] text-gray-400">
+                {detalle.operaciones.length} operaciones
+                {detalle.costoEmpaquePrenda > 0 && (
+                  <>
+                    {' · '}costura Bs {formatBs(detalle.costoManoObraPrenda - detalle.costoEmpaquePrenda)}
+                    {' · '}
+                    <span className="text-violet-700">empaque Bs {formatBs(detalle.costoEmpaquePrenda)}</span>
+                  </>
+                )}
+              </div>
             </div>
             <button
               onClick={() => window.print()}
@@ -309,6 +353,8 @@ export function VersionDetallePage() {
               onEditar={(op) => setModal({ tipo: 'editar', operacion: op })}
               onEliminar={(op) => setModal({ tipo: 'eliminar', operacion: op })}
               onAgregar={() => setModal({ tipo: 'agregar', grupo })}
+              marcando={marcando}
+              onMarcarEmpaque={(esEmpaque) => marcarGrupo(ops, esEmpaque)}
             />
           ))}
           {reordenar.error != null && (
@@ -316,6 +362,11 @@ export function VersionDetallePage() {
               {reordenar.error instanceof ErrorApi
                 ? reordenar.error.message
                 : 'No se pudo guardar el nuevo orden'}
+            </p>
+          )}
+          {errorMarca != null && (
+            <p className="rounded-lg bg-error-suave px-3 py-2 text-sm text-error">
+              {errorMarca instanceof ErrorApi ? errorMarca.message : 'No se pudo guardar la marca de empaque'}
             </p>
           )}
         </div>

@@ -45,6 +45,7 @@ const OP_VACIA: FilaNuevoModelo = {
   pieza: '',
   ctBs: '',
   ctRefBs: '',
+  esEmpaque: false,
 };
 
 const claseInput =
@@ -134,6 +135,13 @@ function FilaOperacion({
           </button>
         )}
       </td>
+      <td className="px-2 py-2 pt-3 text-center">
+        <input
+          type="checkbox"
+          {...register(`operaciones.${i}.esEmpaque`)}
+          title="Operación de empaque"
+        />
+      </td>
       <td className="px-2 py-2 text-center">
         <button
           type="button"
@@ -194,12 +202,13 @@ export function NuevoModeloPage() {
         pieza: o.pieza ?? '',
         ctBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
         ctRefBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+        esEmpaque: o.esEmpaque,
       }));
       // si solo está la fila vacía del inicio, el bloque la reemplaza
       const actuales = getValues('operaciones');
       const soloVacia =
         actuales.length === 1 &&
-        Object.values(actuales[0]).every((v) => (v ?? '').toString().trim() === '');
+        Object.values(actuales[0]).every((v) => v === false || (v ?? '').toString().trim() === '');
       if (soloVacia) replace(filas);
       else append(filas);
     } catch (e) {
@@ -221,6 +230,7 @@ export function NuevoModeloPage() {
         pieza: o.pieza ?? '',
         ctBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
         ctRefBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+        esEmpaque: o.esEmpaque,
       })),
     });
     setPlantillaCargada(plantilla.id);
@@ -345,6 +355,9 @@ export function NuevoModeloPage() {
                 <th className="px-2 py-2">Proceso</th>
                 <th className="px-2 py-2">Pieza</th>
                 <th className="w-28 px-2 py-2">CT (Bs)</th>
+                <th className="w-14 px-2 py-2 text-center" title="Operación de empaque: costo aparte de la costura">
+                  Emp.
+                </th>
                 <th className="w-12 px-2 py-2" />
               </tr>
             </thead>

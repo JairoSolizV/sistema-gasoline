@@ -7,6 +7,7 @@ import {
 } from '@taller/shared';
 import { useReemplazarAsignaciones } from '../../api/cortes';
 import { ErrorApi } from '../../api/client';
+import { MarcaEmpaque } from '../../components/MarcaEmpaque';
 import { etiquetaOperacion } from './estados';
 
 // Diferencial por defecto SOLO para el feedback en vivo; el que vale lo pone el
@@ -110,6 +111,7 @@ export function OperacionFila({
         <span className="min-w-0 flex-1 text-sm font-medium">
           {op.proceso}
           {op.pieza && <span className="font-normal text-gray-500"> · {op.pieza}</span>}
+          {op.esEmpaque && <MarcaEmpaque />}
           {op.agregadaEnCorte ? (
             <span
               title="Operación agregada solo en este corte (no está en el modelo)"

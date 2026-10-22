@@ -4,6 +4,7 @@ import { obtenerBloqueGrupo, useCatalogo } from '../../api/catalogo';
 import { useAgregarOperacionesLote } from '../../api/modelos';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { MarcaEmpaque } from '../../components/MarcaEmpaque';
 import { PATRON_BS } from './OperacionFormModal';
 
 // Agregar a una versión ya creada TODAS las operaciones del bloque de un grupo
@@ -57,6 +58,7 @@ export function AgregarBloqueModal({
         proceso: o.proceso,
         pieza: o.pieza,
         ct: aCentavos(cts[i].trim()),
+        esEmpaque: o.esEmpaque,
       })),
     });
     onCerrar();
@@ -105,7 +107,10 @@ export function AgregarBloqueModal({
                   <tr key={o.id} className="border-b border-gray-100 last:border-0">
                     <td className="w-10 px-3 py-1.5 text-gray-400">{o.n ?? '—'}</td>
                     <td className="px-2 py-1.5 text-gray-600">{o.equipo}</td>
-                    <td className="px-2 py-1.5 font-medium">{o.proceso}</td>
+                    <td className="px-2 py-1.5 font-medium">
+                      {o.proceso}
+                      {o.esEmpaque && <MarcaEmpaque />}
+                    </td>
                     <td className="px-2 py-1.5 text-gray-600">{o.pieza ?? '—'}</td>
                     <td className="w-28 px-3 py-1.5">
                       <input

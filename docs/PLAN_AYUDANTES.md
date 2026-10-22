@@ -1,7 +1,7 @@
 # Ayudantes con sueldo semanal, asistencia y operaciones de empaque
 
-> **Estado:** aprobado el 2026-10-01. Rebanadas 1 (**rol ayudante + sueldo**) y 2 (**asistencia**) implementadas y verificadas;
-> rebanadas 3–4 pendientes.
+> **Estado:** aprobado el 2026-10-01. Rebanadas 1 (**rol ayudante + sueldo**), 2 (**asistencia**) y 3
+> (**empaque**) implementadas y verificadas; rebanada 4 pendiente.
 > **Amplía el alcance** (CLAUDE.md §2): hasta ahora solo se pagaba por operación. Al implementar se
 > actualizan `CLAUDE.md` (alcance e invariantes 5 y 10) y `CONTEXTO_NEGOCIO_TALLER.md`.
 > Corrige `PLAN_SERVICIO_CORTE.md` §2.14: el **empaque** no es un proveedor externo; lo hacen
@@ -153,3 +153,16 @@ Liquidacion      + ganadoEmpaque Int, + ganadoSueldo Int   // desglose persistid
   vista previa del sueldo del día. Verificado en navegador: 66.67 + 66.66 + 29.63 = 162.96. El sueldo
   **todavía no entra a la liquidación** (rebanada 4). Migración
   `20261021130000_asistencia_ayudantes`. 314 tests en verde.
+- **2026-10-21 — Rebanada 3 (empaque).** Marca `esEmpaque` (default `false`) en `Operacion`,
+  `PlantillaOperacion`, `GrupoOperacion` (bloque del catálogo) y `CorteOperacion`. En el corte se
+  **congela al abrirlo**, como el CT (CA-1.4): cambiar el modelo después no lo toca; cambiarla dentro
+  del corte queda en el historial (campo "Empaque"). En los schemas es opcional **sin default**, así un
+  PATCH que solo cambia el CT no la borra. Pasa al copiar versión, duplicar plantilla, cargar plantilla
+  o bloque en un modelo nuevo y "Agregar grupo del catálogo". Costos: `costoEmpaquePrenda` (versión) y
+  `costoEmpaqueCorte` (corte) son **la parte de empaque** de la mano de obra; `costoTotalCorte` sigue
+  siendo costura + empaque (no cambia CA-2.3 ni el cuadre de asignaciones). UI: casilla "Operación de
+  empaque" en el modal y columna "Emp." en modelo nuevo, plantilla y bloque; "Marcar grupo como
+  empaque" en la versión; etiqueta violeta "empaque"; tarjetas Costura · Empaque · Servicio · Total en
+  el corte; la hoja impresa la indica. Los ayudantes ya podían recibir cualquier operación (R1). El
+  ganado de empaque **todavía no se separa en la liquidación** (rebanada 4). Migración
+  `20261021140000_operacion_empaque`. 322 tests en verde.

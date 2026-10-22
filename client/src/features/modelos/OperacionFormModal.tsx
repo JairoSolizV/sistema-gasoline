@@ -14,6 +14,7 @@ export interface OperacionFormValores {
   proceso: string;
   pieza: string;
   ctBs: string;
+  esEmpaque: boolean; // operación de empaque: costo informado aparte (PLAN_AYUDANTES §2.10)
 }
 
 export function aOperacionInput(v: OperacionFormValores): OperacionInput {
@@ -24,6 +25,7 @@ export function aOperacionInput(v: OperacionFormValores): OperacionInput {
     proceso: v.proceso.trim(),
     pieza: v.pieza.trim() === '' ? null : v.pieza.trim(),
     ct: aCentavos(v.ctBs),
+    esEmpaque: v.esEmpaque,
   };
 }
 
@@ -62,8 +64,9 @@ export function OperacionFormModal({
           proceso: operacion.proceso,
           pieza: operacion.pieza ?? '',
           ctBs: formatBs(operacion.ct).replace(/ /g, ''),
+          esEmpaque: operacion.esEmpaque,
         }
-      : { grupo: grupoSugerido ?? '', n: '', equipo: '', proceso: '', pieza: '', ctBs: '' },
+      : { grupo: grupoSugerido ?? '', n: '', equipo: '', proceso: '', pieza: '', ctBs: '', esEmpaque: false },
   });
 
   // Grupo, máquina, proceso y pieza salen del catálogo (cascada máquina →
@@ -133,6 +136,15 @@ export function OperacionFormModal({
             {errors.ctBs && <p className="mt-1 text-xs text-error">{errors.ctBs.message}</p>}
           </div>
         </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" {...register('esEmpaque')} className="mt-0.5" />
+          <span>
+            <span className="font-medium">Operación de empaque</span>
+            <span className="block text-xs text-gray-500">
+              Se paga por prenda igual que la costura, pero su costo se muestra aparte.
+            </span>
+          </span>
+        </label>
 
         {errorGuardar != null && (
           <p className="rounded-lg bg-error-suave px-3 py-2 text-xs text-error">

@@ -148,6 +148,7 @@ export const modelosRepository = {
               proceso: o.proceso,
               pieza: o.pieza,
               ct: o.ct,
+              esEmpaque: o.esEmpaque,
             })),
           },
           ...(molde ? { molde: { create: molde } } : {}),

@@ -18,6 +18,7 @@ export const plantillaOperacionInputSchema = z.object({
     .min(1, 'El CT de referencia debe ser mayor a 0')
     .nullable()
     .optional(),
+  esEmpaque: z.boolean().optional(), // se copia al modelo que se cree desde aquí
 });
 
 export const crearPlantillaSchema = z.object({

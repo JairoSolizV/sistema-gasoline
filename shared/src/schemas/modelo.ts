@@ -17,6 +17,9 @@ export const operacionInputSchema = z.object({
     .number('CT debe ser un número en centavos')
     .int('CT debe ser centavos enteros')
     .min(1, 'CT debe ser mayor a 0'),
+  // empaque (docs/PLAN_AYUDANTES.md §2.10). Opcional SIN default: así un PATCH
+  // que solo cambia el CT no la vuelve a false; al crear, ausente = costura.
+  esEmpaque: z.boolean().optional(),
 });
 
 // Moldes / patronaje de una versión (docs/PLAN_SERVICIO_CORTE.md §2.9). El tipo

@@ -7,10 +7,19 @@ import type {
   CorteCambioDTO,
   DetalleCambioCorte,
   OperacionResumenDTO,
+  ValorCampo,
 } from '@taller/shared';
 import type { CambioData, CorteConDetalle, DatosOperacionCorte } from './repository.js';
 
-export const CAMPOS_OPERACION: CampoOperacion[] = ['grupo', 'n', 'equipo', 'proceso', 'pieza', 'ct'];
+export const CAMPOS_OPERACION: CampoOperacion[] = [
+  'grupo',
+  'n',
+  'equipo',
+  'proceso',
+  'pieza',
+  'ct',
+  'esEmpaque',
+];
 
 type OperacionLike = OperacionResumenDTO;
 type OperacionConId = OperacionLike & { id: string };
@@ -20,7 +29,15 @@ export function etiquetaOperacion(o: { proceso: string; pieza: string | null }):
 }
 
 function resumen(o: OperacionLike): OperacionResumenDTO {
-  return { grupo: o.grupo, n: o.n, equipo: o.equipo, proceso: o.proceso, pieza: o.pieza, ct: o.ct };
+  return {
+    grupo: o.grupo,
+    n: o.n,
+    equipo: o.equipo,
+    proceso: o.proceso,
+    pieza: o.pieza,
+    ct: o.ct,
+    esEmpaque: o.esEmpaque ?? false,
+  };
 }
 
 /** Campos que realmente cambian (lo que no viene o es igual se ignora). */
@@ -28,8 +45,9 @@ export function camposCambiados(actual: OperacionLike, input: Partial<DatosOpera
   const campos: Extract<DetalleCambioCorte, { tipo: 'editar' }>['campos'] = [];
   for (const campo of CAMPOS_OPERACION) {
     const nuevo = input[campo];
-    if (nuevo === undefined || nuevo === actual[campo]) continue;
-    campos.push({ campo, antes: actual[campo], despues: nuevo ?? null });
+    const antes = actual[campo] ?? (campo === 'esEmpaque' ? false : null);
+    if (nuevo === undefined || nuevo === antes) continue;
+    campos.push({ campo, antes, despues: nuevo ?? null });
   }
   return campos;
 }
@@ -111,7 +129,7 @@ export function marcasDeOperacion(corte: CorteConDetalle, op: OperacionConId) {
     .filter((c) => c.corteOperacionId === op.id)
     .sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
   const agregadaEnCorte = propios.some((c) => c.tipo === 'agregar');
-  const original = new Map<CampoOperacion, string | number | null>();
+  const original = new Map<CampoOperacion, ValorCampo>();
   for (const c of propios) {
     const detalle = c.detalle as unknown as DetalleCambioCorte;
     if (detalle.tipo !== 'editar') continue;

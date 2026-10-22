@@ -299,16 +299,29 @@ export function CorteDetallePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* tres costos separados: costura · servicio de corte · total */}
+          {/* costos separados: costura · empaque (si hay) · servicio de corte · total */}
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
             <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
               Costura
             </div>
-            <div className="mono text-lg font-semibold">Bs {formatBs(corte.costoTotalCorte)}</div>
+            <div className="mono text-lg font-semibold">
+              Bs {formatBs(corte.costoTotalCorte - corte.costoEmpaqueCorte)}
+            </div>
             <div className="text-[11px] text-gray-400">
-              {corte.cantidadTotal} × Bs {formatBs(corte.costoManoObraPrenda)}
+              {corte.costoEmpaqueCorte > 0
+                ? 'sin las operaciones de empaque'
+                : `${corte.cantidadTotal} × Bs ${formatBs(corte.costoManoObraPrenda)}`}
             </div>
           </div>
+          {corte.costoEmpaqueCorte > 0 && (
+            <div className="rounded-xl border border-violet-200 bg-white px-4 py-3 text-right shadow-sm">
+              <div className="text-[11px] font-semibold tracking-wider text-violet-700 uppercase">
+                Empaque
+              </div>
+              <div className="mono text-lg font-semibold">Bs {formatBs(corte.costoEmpaqueCorte)}</div>
+              <div className="text-[11px] text-gray-400">se paga por prenda, como la costura</div>
+            </div>
+          )}
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
             <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
               Servicio de corte
@@ -325,7 +338,9 @@ export function CorteDetallePage() {
               Costo total del corte
             </div>
             <div className="mono text-2xl font-semibold">Bs {formatBs(corte.costoTotal)}</div>
-            <div className="text-[11px] text-gray-400">costura + servicio</div>
+            <div className="text-[11px] text-gray-400">
+              {corte.costoEmpaqueCorte > 0 ? 'costura + empaque + servicio' : 'costura + servicio'}
+            </div>
           </div>
           {corte.estado === 'borrador' ? (
             <button

@@ -12,6 +12,7 @@ export interface PlantillaOperacionDTO {
   pieza: string | null;
   /** centavos; precio sugerido para esta operación (null = sin referencia) */
   ctReferencia: number | null;
+  esEmpaque: boolean;
 }
 
 export interface PlantillaResumenDTO {

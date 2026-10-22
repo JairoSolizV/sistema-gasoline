@@ -36,6 +36,7 @@ interface FilaBloque {
   proceso: string;
   pieza: string;
   ctRefBs: string; // '' = sin referencia
+  esEmpaque: boolean; // pasa al modelo al agregar el bloque
 }
 
 interface BloqueValores {
@@ -119,6 +120,9 @@ function FilaOperacion({
       >
         {tiempo == null ? '—' : `${tiempo} s`}
       </td>
+      <td className="w-12 px-2 pt-3 text-center">
+        <input type="checkbox" {...register(`operaciones.${i}.esEmpaque`)} title="Operación de empaque" />
+      </td>
       <td className="w-10 px-2 pt-3 text-center">
         <button type="button" onClick={onQuitar} title="Quitar" className="text-gray-400 hover:text-error">
           ✕
@@ -153,6 +157,7 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
         proceso: o.proceso,
         pieza: o.pieza ?? '',
         ctRefBs: o.ctReferencia == null ? '' : formatBs(o.ctReferencia),
+        esEmpaque: o.esEmpaque,
       })),
     });
   }, [bloque, reset]);
@@ -185,6 +190,7 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
         proceso: o.proceso,
         pieza: o.pieza ?? '',
         ctRefBs: formatBs(o.ct),
+        esEmpaque: o.esEmpaque,
       })),
     );
     setAviso(
@@ -202,6 +208,7 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
         proceso: o.proceso.trim(),
         pieza: o.pieza.trim() === '' ? null : o.pieza.trim(),
         ctReferencia: o.ctRefBs.trim() === '' ? null : aCentavos(o.ctRefBs.trim()),
+        esEmpaque: o.esEmpaque,
       })),
     });
   });
@@ -260,6 +267,9 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
                 <th className="px-2 py-2 text-right" title="Segundos por prenda, del catálogo">
                   Tiempo
                 </th>
+                <th className="px-2 py-2 text-center" title="Operación de empaque: costo aparte de la costura">
+                  Emp.
+                </th>
                 <th />
               </tr>
             </thead>
@@ -281,7 +291,7 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
               ))}
               {fields.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-5 text-center text-sm text-gray-400">
+                  <td colSpan={9} className="px-4 py-5 text-center text-sm text-gray-400">
                     Este grupo todavía no tiene bloque. Agregá operaciones o copialas de un modelo.
                   </td>
                 </tr>
@@ -293,7 +303,7 @@ export function EditorBloqueGrupo({ grupoId, onCerrar }: { grupoId: string; onCe
             <button
               type="button"
               onClick={() =>
-                append({ grupo: nombreGrupo, n: '', equipo: '', proceso: '', pieza: '', ctRefBs: '' })
+                append({ grupo: nombreGrupo, n: '', equipo: '', proceso: '', pieza: '', ctRefBs: '', esEmpaque: false })
               }
               className="text-[13px] font-medium text-acento hover:underline"
             >
