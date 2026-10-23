@@ -18,6 +18,7 @@ import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { MESES } from '../../lib/meses';
 import { aCentesimasPct, fechaCorta, PATRON_BS, PATRON_DECIMAL, pct } from './formato';
+import { BotonImprimir } from '../../components/Imprimir';
 
 // Costos fijos del taller (docs/PLAN_COSTOS.md §7c). Cada gasto cuenta su parte
 // del taller (luz, agua y comida se comparten con la casa); la comida se anota
@@ -73,12 +74,7 @@ export function FijosTab() {
         </div>
         <div className="flex gap-2">
           {d && (
-            <button
-              onClick={() => window.print()}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Imprimir
-            </button>
+            <BotonImprimir texto="Imprimir" />
           )}
           <button
             onClick={() => setModal({ tipo: 'prestamo', prestamo: null })}

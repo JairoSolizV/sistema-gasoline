@@ -57,7 +57,7 @@ export function CuentasPorCobrarPage() {
                   <button
                     key={id}
                     onClick={() => setCobrar(id)}
-                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm shadow-sm hover:border-acento"
+                    className="imprime rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm shadow-sm hover:border-acento"
                   >
                     <div className="font-medium">{c.nombre}</div>
                     <div className="mono text-xs">

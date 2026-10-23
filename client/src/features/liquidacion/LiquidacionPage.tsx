@@ -13,6 +13,7 @@ import { useConsolidado } from '../../api/liquidacion';
 import { MESES } from '../../lib/meses';
 import { TABLA } from '../../components/tabla';
 import { CerrarMesModal } from './CerrarMesModal';
+import { BotonImprimir } from '../../components/Imprimir';
 
 /** Qué se gana en cada cuenta y cuándo (docs/PLAN_CUENTAS_SEPARADAS.md §2). */
 const REGLA_CUENTA: Record<Cuenta, string> = {
@@ -65,19 +66,14 @@ export function LiquidacionPage() {
     <div className="p-8">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Liquidación</h1>
+          <h1 className="text-2xl font-semibold">Pagos del mes <span className="text-base font-normal text-gray-400">(liquidación)</span></h1>
           <p className="mt-1 text-sm text-gray-500">
             Una planilla por cuenta: cada cuenta tiene su ganado, anticipos, saldo y arrastre, y{' '}
             <strong>no se mezcla</strong> con las demás. El cierre de mes liquida todas juntas.
           </p>
         </div>
         <div className="no-print flex items-center gap-2">
-          <button
-            onClick={() => window.print()}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            Imprimir
-          </button>
+          <BotonImprimir texto="Imprimir" />
           {data && !data.cerrado && data.cuentas.some((c) => c.filas.length > 0) && (
             <button
               onClick={() => setModalCerrar(true)}

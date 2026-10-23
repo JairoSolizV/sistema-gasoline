@@ -32,6 +32,7 @@ import { badgeEstadoCorte } from './estados';
 import { hoyLocalISO } from '../../lib/fechas';
 import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendido';
 import { ServicioCorte } from './ServicioCorte';
+import { PasosCorte } from '../../components/PasosCorte';
 import { EnviosServicio } from './EnviosServicio';
 import { DuracionEstimada } from './DuracionEstimada';
 import { CalculadoraTendido } from './CalculadoraTendido';
@@ -436,6 +437,9 @@ export function CorteDetallePage() {
 
       <CalculadoraTendido corte={corte} />
 
+      <div className="mt-6">
+        <PasosCorte corteId={corte.id} paso={corte.paso} pasoDesde={corte.pasoDesde} />
+      </div>
       <ServicioCorte corte={corte} />
       <EnviosServicio corte={corte} />
 

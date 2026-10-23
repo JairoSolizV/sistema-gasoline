@@ -121,7 +121,7 @@ function TarjetaEtapa({
   return (
     <button
       onClick={onClick}
-      className={`rounded-xl border bg-white p-4 text-left shadow-sm hover:border-acento ${activa ? 'border-acento ring-2 ring-acento/20' : 'border-gray-200'}`}
+      className={`imprime rounded-xl border bg-white p-4 text-left shadow-sm hover:border-acento ${activa ? 'border-acento ring-2 ring-acento/20' : 'border-gray-200'}`}
     >
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">{titulo}</span>

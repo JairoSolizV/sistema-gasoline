@@ -474,7 +474,7 @@ function FilaEditor({
       ? Number(f.largoM.replace(',', '.')) / entero(f.prendasPorCapa)
       : null;
   return (
-    <tr className="border-b border-gray-100 align-top last:border-0">
+    <tr className="border-b border-gray-200/70 even:bg-slate-100 align-top last:border-0">
       <td className="w-44 px-4 py-2">
         <input value={f.concepto} onChange={(e) => onCambiar({ concepto: e.target.value })} className={claseInput} />
         <div className="mt-0.5 text-[11px] text-gray-400">{ETIQUETA_TIPO_LINEA[f.tipo]}</div>

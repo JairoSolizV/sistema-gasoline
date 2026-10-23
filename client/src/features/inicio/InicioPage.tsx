@@ -8,6 +8,7 @@ import {
 import { useDashboard } from '../../api/dashboard';
 import { HojaOficio } from '../../components/HojaOficio';
 import { MESES } from '../../lib/meses';
+import { BotonImprimir } from '../../components/Imprimir';
 
 export function InicioPage() {
   const { data, isLoading, error } = useDashboard();
@@ -27,12 +28,7 @@ export function InicioPage() {
         </div>
         <div className="flex gap-2">
           {data && (
-            <button
-              onClick={() => window.print()}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Imprimir cuentas
-            </button>
+            <BotonImprimir texto="Imprimir cuentas" />
           )}
           <button
             onClick={() => navigate('/cortes/nuevo')}

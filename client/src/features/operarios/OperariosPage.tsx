@@ -33,6 +33,7 @@ import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
 import { aFechaInput, deFechaInput, hoyLocalISO } from '../../lib/fechas';
 import { HojaOperariosImprimible } from './HojaOperariosImprimible';
+import { BotonImprimir } from '../../components/Imprimir';
 
 // Los <input type="date"> trabajan con 'yyyy-mm-dd' (string); se convierten a
 // Date a mediodía local recién al enviar. CI y celular reusan los esquemas
@@ -711,14 +712,7 @@ export function OperariosPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => window.print()}
-              disabled={!operarios}
-              title={`Hoja oficio vertical · imprime la lista visible (${estado})`}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-60"
-            >
-              Imprimir lista
-            </button>
+            <BotonImprimir texto="Imprimir lista" />
             <button
               onClick={() => setModal({ tipo: 'alta' })}
               className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#265dc2]"

@@ -97,7 +97,7 @@ export function CerrarMesModal({
                 const k = clave(f.operarioId, g.cuenta);
                 const e = exc[k];
                 return (
-                  <tr key={k} className="border-b border-gray-100 last:border-0">
+                  <tr key={k} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                     <td className="px-4 py-2 font-medium">{f.nombre}</td>
                     <td className="mono px-3 py-2 text-right">Bs {formatBs(f.saldoPeriodo)}</td>
                     <td className="px-3 py-2">

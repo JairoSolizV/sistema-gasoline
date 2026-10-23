@@ -15,6 +15,7 @@ import {
   telaRealCorte,
   type CorteCostoDetalleDTO,
   type CorteCostoResumenDTO,
+  esInsumoDeEmpaque,
   type CortePendienteDTO,
   type KardexDTO,
   type Fraccion,
@@ -308,6 +309,44 @@ export function costoRealCorte(
     fichaTotal,
     telaReal: telaRealDTO,
     avisos,
+  };
+}
+
+/** Partes del costo de un corte para el camino de la plata: materia prima
+ *  (tela real), insumos de costura y de empaque (de la ficha), mano de obra,
+ *  servicio de corte y servicios externos (envíos reales o, si no hay, la
+ *  ficha). Todo en centavos para todas las prendas del corte. */
+export function partesDeCorte(c: CorteCosto, f: FichaConDatos | null, config: Configuracion) {
+  const d = costoRealCorte(c, f, config);
+  const rubro = (r: RubroCostoDTO['rubro']) => d.rubros.find((x) => x.rubro === r)?.real ?? 0;
+  const costura: (Fraccion | null)[] = [];
+  const empaque: (Fraccion | null)[] = [];
+  const telas: (Fraccion | null)[] = [];
+  const externos: (Fraccion | null)[] = [];
+  if (f) {
+    const principal = telaPrincipal(f);
+    f.lineas.forEach((l, i) => {
+      if (i === principal) return; // la tela principal va con el tizado real
+      const porPrenda = costoLinea(aLineaParaCosto(l));
+      const todas = porPrenda && porPrendas(porPrenda, c.cantidadTotal);
+      if (l.tipo === 'precio_prenda') externos.push(todas);
+      else if (l.tipo === 'prorrateo') empaque.push(todas);
+      else if (l.insumo?.categoria === 'tela') telas.push(todas);
+      else if (l.insumo && esInsumoDeEmpaque(l.insumo.categoria, l.insumo.nombre)) empaque.push(todas);
+      else costura.push(todas);
+    });
+  }
+  const enviosTotal = c.envios.reduce((a, e) => a + e.total, 0);
+  return {
+    detalle: d,
+    materiaPrima: rubro('tela') + redondear(sumarFracciones(telas)),
+    insumosCostura: redondear(sumarFracciones(costura)),
+    insumosEmpaque: redondear(sumarFracciones(empaque)),
+    servicioCorte: rubro('servicio_corte'),
+    manoCostura: rubro('costura'),
+    manoEmpaque: rubro('empaque'),
+    externos: enviosTotal > 0 ? enviosTotal : redondear(sumarFracciones(externos)),
+    externosPendientes: c.envios.filter((e) => !e.fechaDevolucion).reduce((a, e) => a + e.total, 0),
   };
 }
 

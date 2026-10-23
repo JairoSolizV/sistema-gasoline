@@ -156,7 +156,7 @@ export function InsumosTab({ alcance }: { alcance?: AlcanceInsumos }) {
                 </td>
                 <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
                   <button onClick={() => setKardex(i)} className="mr-3 text-acento hover:underline">
-                    Kárdex
+                    Historial
                   </button>
                   <button onClick={() => setContar(i)} className="mr-3 text-acento hover:underline">
                     Contar
@@ -376,7 +376,7 @@ function ModalKardex({ insumo, onCerrar }: { insumo: InsumoDTO; onCerrar: () => 
   const tipo = { compra: 'Compra', consumo: 'Corte', conteo: 'Conteo' } as const;
   return (
     <Modal onCerrar={onCerrar} ancho="max-w-3xl">
-      <h2 className="text-lg font-semibold">Kárdex · {insumo.nombre}</h2>
+      <h2 className="text-lg font-semibold">Historial (kárdex) · {insumo.nombre}</h2>
       <p className="mt-1 text-xs text-gray-500">
         Compras (entran), lo que gastó cada corte (sale, en la fecha del corte) y los conteos físicos (el saldo pasa a ser
         lo contado). En {insumo.unidad}.

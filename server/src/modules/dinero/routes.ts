@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import {
+  cambiarPasoSchema,
   clienteInputSchema,
   cobroInputSchema,
   despachoInputSchema,
@@ -15,6 +16,8 @@ import { dineroController } from './controller.js';
 export const dineroRouter = Router();
 
 dineroRouter.get('/tablero', dineroController.tablero);
+dineroRouter.get('/camino', dineroController.camino);
+dineroRouter.patch('/cortes/:id/paso', validar(cambiarPasoSchema), dineroController.cambiarPaso);
 dineroRouter.get('/deposito', dineroController.deposito);
 dineroRouter.get('/cuentas-por-pagar', dineroController.cuentasPorPagar);
 dineroRouter.get('/cuentas-por-cobrar', dineroController.cuentasPorCobrar);

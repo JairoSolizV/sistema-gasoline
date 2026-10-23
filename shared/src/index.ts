@@ -7,6 +7,8 @@ export * from './cuentas.js';
 export * from './costos.js';
 export * from './tiempos.js';
 export * from './tendido.js';
+export * from './pasos.js';
+export * from './reportes.js';
 export * from './dtos/operario.js';
 export * from './dtos/modelo.js';
 export * from './dtos/catalogo.js';

@@ -205,3 +205,27 @@ describe('deudas con proveedores', () => {
     expect(cxp.total).toBe(cxp.items.reduce((a: number, i: { monto: number }) => a + i.monto, 0));
   });
 });
+
+describe('el camino de la plata', () => {
+  test('lo puesto y lo que falta dependen del paso en que está el corte', async () => {
+    const paso = (p: string) => request(app).patch(`/api/v1/dinero/cortes/${ids.CORTE}/paso`).send({ paso: p });
+    const enCamino = async () => {
+      const c = (await request(app).get('/api/v1/dinero/camino')).body.data;
+      for (const p of c.pasos) {
+        const x = p.cortes.find((y: { corteId: string }) => y.corteId === ids.CORTE);
+        if (x) return x;
+      }
+      return null;
+    };
+    // en mesa: la costura (Bs 20.00 = 100 × 0.20) todavía falta
+    expect((await paso('mesa')).status).toBe(200);
+    expect(await enCamino()).toMatchObject({ paso: 'mesa', invertido: 0, falta: 2000, dias: 0, semaforo: 'ok' });
+    // en lavandería la costura ya está puesta
+    await paso('lavanderia');
+    expect(await enCamino()).toMatchObject({ paso: 'lavanderia', invertido: 2000, falta: 0 });
+    // en depósito cuenta solo lo que queda sin entregar (60 de 100)
+    await paso('deposito');
+    expect(await enCamino()).toMatchObject({ paso: 'deposito', prendas: 60, invertido: 1200, falta: 0 });
+    expect((await paso('volando')).status).toBe(400);
+  });
+});

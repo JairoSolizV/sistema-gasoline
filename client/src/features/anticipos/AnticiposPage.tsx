@@ -106,7 +106,7 @@ export function AnticiposPage() {
               <table className="w-full text-sm">
                 <tbody>
                   {lista.map((a) => (
-                    <tr key={a.id} className="border-b border-gray-100 last:border-0">
+                    <tr key={a.id} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                       <td className="px-5 py-2.5 text-gray-500 capitalize">{formatearFecha(a.fecha)}</td>
                       <td className="px-3 py-2.5 font-medium">{a.operarioNombre}</td>
                       <td className="px-3 py-2.5">

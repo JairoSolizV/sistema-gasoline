@@ -19,6 +19,14 @@ enum TipoOperario {
   proveedor_externo // serigrafía, láser, bordado o lavandería de afuera, cobra por prenda (docs/PLAN_CUENTAS_SEPARADAS.md §5)
 }
 
+enum PasoCorte {
+  mesa // cortado, en la mesa
+  costura
+  lavanderia
+  empaque
+  deposito // terminado, listo para despachar
+}
+
 enum EstadoCorte {
   borrador
   abierto
@@ -179,6 +187,10 @@ model Corte {
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
   operaciones     CorteOperacion[]
   cambios         CorteCambio[]
+  // dónde está físicamente (docs/PLAN_DIDACTICO_REPORTES.md): lo marca una persona
+  // con un botón. Informativo: no toca pagos ni el estado del corte.
+  paso            PasoCorte        @default(mesa)
+  pasoDesde       DateTime         @default(now())
   pedidos         Pedido[] // tablero de dinero: pedidos que se producen con este corte
   despachos       DespachoLinea[] // prendas de este corte que salieron del depósito
 

@@ -112,6 +112,11 @@ export const dineroRepository = {
     return new Map(filas.map((f) => [f.corteId!, f._sum.prendas ?? 0]));
   },
 
+  async cambiarPaso(corteId: string, paso: 'mesa' | 'costura' | 'lavanderia' | 'empaque' | 'deposito') {
+    const r = await prisma.corte.updateMany({ where: { id: corteId }, data: { paso, pasoDesde: new Date() } });
+    return r.count > 0;
+  },
+
   // ── Cobros ──
   listarCobros(rango?: { desde: Date; hasta: Date }) {
     return prisma.cobro.findMany({

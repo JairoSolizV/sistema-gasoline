@@ -9,6 +9,7 @@ import {
 } from '@taller/shared';
 import { api, ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { BotonImprimir } from '../../components/Imprimir';
 
 // Catálogo de productos: las fichas de costo con foto, tallas, colores y precio
 // por docena (Bs y $us). Con "mostrar costos" apagado se le puede mostrar o
@@ -77,9 +78,7 @@ export function CatalogoProductosPage() {
           <label className="flex items-center gap-2 text-sm text-gray-600">
             <input type="checkbox" checked={costos} onChange={(e) => setCostos(e.target.checked)} /> Mostrar costos
           </label>
-          <button onClick={() => window.print()} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50">
-            Imprimir
-          </button>
+          <BotonImprimir texto="Imprimir" />
         </div>
       </div>
       {isLoading && <div className="mt-6 text-sm text-gray-500">Cargando…</div>}

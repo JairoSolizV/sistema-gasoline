@@ -55,7 +55,7 @@ const aCategoriaDTO = (c: Awaited<ReturnType<typeof cajaRepository.categorias>>[
 });
 
 /** Todos los movimientos de las dos cajas con fecha en [desde, hasta). */
-async function movimientos(desde: string, hasta: string): Promise<MovimientoCajaDTO[]> {
+export async function movimientos(desde: string, hasta: string): Promise<MovimientoCajaDTO[]> {
   const rango = { gte: diaADate(desde), lt: diaADate(hasta) };
   // instantes (anticipos, cierre de mes): un día de margen y se filtra por día de Bolivia
   const amplio = { gte: diaADate(sumarDias(desde, -1)), lt: diaADate(sumarDias(hasta, 1)) };

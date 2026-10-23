@@ -1,6 +1,7 @@
 // HTTP puro: lee lo validado, llama al service, responde { data } (ARQUITECTURA §2.1).
 import type { Request, Response } from 'express';
 import type {
+  CambiarPasoInput,
   ClienteInput,
   CobroInput,
   DespachoInput,
@@ -17,6 +18,13 @@ const eliminado = (res: Response) => res.json({ data: { eliminado: true } });
 export const dineroController = {
   async tablero(_req: Request, res: Response) {
     res.json({ data: await dineroService.tablero() });
+  },
+  async camino(_req: Request, res: Response) {
+    res.json({ data: await dineroService.camino() });
+  },
+  async cambiarPaso(req: Request, res: Response) {
+    await dineroService.cambiarPaso(id(req), (req.body as CambiarPasoInput).paso);
+    res.json({ data: { guardado: true } });
   },
   async cuentasPorCobrar(_req: Request, res: Response) {
     res.json({ data: await dineroService.cuentasPorCobrar() });

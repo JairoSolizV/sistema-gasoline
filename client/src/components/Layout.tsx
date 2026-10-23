@@ -1,6 +1,8 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { logout } from '../api/auth';
+import { BotonImprimir } from './Imprimir';
+import { Ayuda } from './Ayuda';
 
 function Icono({ d }: { d: string }) {
   return (
@@ -55,6 +57,8 @@ const RUTAS_AREA: [string, ClaveArea][] = [
   ['/productos', 'costos'],
   ['/costos', 'costos'],
   ['/tablero', 'finanzas'],
+  ['/mi-plata', 'finanzas'],
+  ['/reportes', 'finanzas'],
   ['/caja', 'finanzas'],
   ['/configuracion', 'sistema'],
 ];
@@ -112,7 +116,8 @@ function TituloSeccion({ area }: { area: ClaveArea }) {
 }
 
 export function Layout() {
-  const area = areaDeRuta(useLocation().pathname);
+  const ruta = useLocation().pathname;
+  const area = areaDeRuta(ruta);
   return (
     <div className="flex h-screen w-full overflow-hidden print:block print:h-auto print:overflow-visible">
       <aside className="flex h-full w-[246px] flex-none flex-col border-r border-black/40 bg-lateral">
@@ -129,6 +134,9 @@ export function Layout() {
         <nav className="flex-1 overflow-y-auto py-3">
           <ItemMenu a="/" icono={<Icono d="M3 11l9-7 9 7M5 10v9h14v-9" />}>
             Inicio
+          </ItemMenu>
+          <ItemMenu a="/guia" icono={<Icono d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17h.01" />}>
+            Cómo se usa
           </ItemMenu>
 
           <TituloSeccion area="costos" />
@@ -187,10 +195,10 @@ export function Layout() {
             a="/liquidacion"
             icono={<Icono d="M9.5 6h10M9.5 12h10M9.5 18h10M4 5.6l1.3 1.3L7.6 4.6M4 11.6l1.3 1.3 2.3-2.3M4 17.6l1.3 1.3 2.3-2.3" />}
           >
-            Liquidación
+            Pagos del mes
           </ItemMenu>
           <ItemMenu area="personal" a="/rendicion" icono={<Icono d="M6 3h8l4 4v14H6zM14 3v4h4M9 12.5h6M9 16h6" />}>
-            Rendición de cuentas
+            Cuenta de cada operario
           </ItemMenu>
 
           <TituloSeccion area="ventas" />
@@ -202,6 +210,9 @@ export function Layout() {
           </ItemMenu>
 
           <TituloSeccion area="finanzas" />
+          <ItemMenu area="finanzas" a="/mi-plata" icono={<Icono d="M12 2v20M7 7h7.5a3.5 3.5 0 0 1 0 7H8M6 18h9" />}>
+            ¿Dónde está mi plata?
+          </ItemMenu>
           <ItemMenu area="finanzas" a="/tablero" icono={<Icono d="M4 19V10M10 19V5M16 19v-7M22 19H2" />}>
             Tablero de dinero
           </ItemMenu>
@@ -210,6 +221,9 @@ export function Layout() {
           </ItemMenu>
           <ItemMenu area="finanzas" a="/costos-fijos" icono={<Icono d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5" />}>
             Costos fijos
+          </ItemMenu>
+          <ItemMenu area="finanzas" a="/reportes" icono={<Icono d="M4 20h16M7 16v-5M12 16V8M17 16v-8" />}>
+            Reportes
           </ItemMenu>
 
           <TituloSeccion area="sistema" />
@@ -242,14 +256,20 @@ export function Layout() {
       <main className="h-full flex-1 overflow-y-auto">
         {area && (
           <div className="print:hidden" style={{ borderTop: `3px solid ${AREAS[area].color}` }}>
-            <div
-              className="px-8 pt-3 text-[11px] font-semibold tracking-widest uppercase"
-              style={{ color: AREAS[area].color }}
-            >
-              {AREAS[area].nombre}
+            <div className="flex items-center justify-between px-8 pt-3">
+              <span className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: AREAS[area].color }}>
+                {AREAS[area].nombre}
+              </span>
+              <BotonImprimir />
             </div>
           </div>
         )}
+        <Ayuda ruta={ruta} />
+        {/* encabezado de cada hoja impresa */}
+        <div className="hidden px-0 pb-2 text-[10px] text-gray-500 print:block">
+          Taller · {area ? AREAS[area].nombre : 'Inicio'} · impreso el{' '}
+          {new Date().toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+        </div>
         <Outlet />
       </main>
     </div>

@@ -13,6 +13,7 @@ import {
 import { useOperarios } from '../../api/operarios';
 import { useRendicion } from '../../api/rendicion';
 import { MESES } from '../../lib/meses';
+import { BotonImprimir } from '../../components/Imprimir';
 
 function SaldoBadge({ centavos }: { centavos: number }) {
   const neg = centavos < 0;
@@ -44,19 +45,14 @@ export function RendicionPage() {
     <div className="p-8">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Rendición de cuentas</h1>
+          <h1 className="text-2xl font-semibold">Cuenta de cada operario <span className="text-base font-normal text-gray-400">(rendición)</span></h1>
           <p className="mt-1 text-sm text-gray-500">
             Detalle individual de cada operario — solo lo suyo, para mostrárselo y evitar
             comparaciones
           </p>
         </div>
         {data && (
-          <button
-            onClick={() => window.print()}
-            className="no-print rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            Imprimir
-          </button>
+          <BotonImprimir texto="Imprimir" />
         )}
       </div>
 
@@ -179,7 +175,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
             <table className="w-full text-sm">
               <tbody>
                 {data.servicioCorte.map((t, i) => (
-                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                  <tr key={i} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                     <td className="px-5 py-2 text-gray-500">{fechaCorta(t.fecha)}</td>
                     <td className="px-3 py-2 font-medium">
                       {ETIQUETA_PROCESO[t.proceso]}
@@ -223,7 +219,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
             <table className="w-full text-sm">
               <tbody>
                 {data.envios.map((e, i) => (
-                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                  <tr key={i} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                     <td className="px-5 py-2 text-gray-500">{fechaDia(e.fechaDevolucion)}</td>
                     <td className="px-3 py-2 font-medium">{ETIQUETA_CUENTA[e.servicio]}</td>
                     <td className="px-3 py-2 text-gray-600">
@@ -255,7 +251,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
             <table className="w-full text-sm">
               <tbody>
                 {data.moldes.map((m, i) => (
-                  <tr key={i} className="border-b border-gray-100 last:border-0">
+                  <tr key={i} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                     <td className="px-5 py-2 text-gray-500">{fechaCorta(m.fecha)}</td>
                     <td className="px-3 py-2 font-medium">
                       {m.tipo === 'nuevo' ? 'Modelo nuevo' : 'Modificación de moldes'}
@@ -290,7 +286,7 @@ function Detalle({ data, nombreMes }: { data: RendicionDTO; nombreMes: string })
           <table className="w-full text-sm">
             <tbody>
               {data.anticipos.map((a, i) => (
-                <tr key={i} className="border-b border-gray-100 last:border-0">
+                <tr key={i} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                   <td className="px-5 py-2 text-gray-500 capitalize">
                     {new Date(a.fecha).toLocaleDateString('es-BO', {
                       weekday: 'short',
@@ -345,7 +341,7 @@ function SeccionSueldo({ sueldo }: { sueldo: RendicionSueldoDTO }) {
         <table className="w-full text-sm">
           <tbody>
             {sueldo.dias.map((d) => (
-              <tr key={d.fecha} className="border-b border-gray-100 last:border-0">
+              <tr key={d.fecha} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                 <td className="w-36 px-5 py-1.5 text-gray-500 capitalize">{fechaDia(d.fecha)}</td>
                 <td className={`px-3 py-1.5 ${d.estado === 'falta' ? 'text-error' : ''}`}>
                   {ESTADO_DIA[d.estado]}
@@ -417,7 +413,7 @@ function ListaCortes({ cortes, vacio }: { cortes: RendicionCorteDTO[]; vacio: st
           <table className="w-full text-sm">
             <tbody>
               {c.operaciones.map((op, i) => (
-                <tr key={i} className="border-b border-gray-100 last:border-0">
+                <tr key={i} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
                   <td className="w-14 px-5 py-2 text-gray-400">{op.n ?? '—'}</td>
                   <td className="px-3 py-2 text-gray-600">{op.grupo}</td>
                   <td className="px-3 py-2 font-medium">

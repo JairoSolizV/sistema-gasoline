@@ -85,7 +85,7 @@ function FilaOperacion({
   const tiempo = tiempoDesdeCatalogo(arbol, valores?.equipo ?? '', valores?.proceso ?? '', valores?.pieza);
 
   return (
-    <tr {...fila} className={`border-b border-gray-100 align-top last:border-0 ${clase}`}>
+    <tr {...fila} className={`border-b border-gray-200/70 even:bg-slate-100 align-top last:border-0 ${clase}`}>
       <td
         {...manija}
         className="w-6 cursor-grab pt-3 pl-3 text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"

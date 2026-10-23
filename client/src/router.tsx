@@ -23,6 +23,9 @@ import { ConfiguracionPage } from './features/configuracion/ConfiguracionPage';
 import { TableroPage } from './features/dinero/TableroPage';
 import { VentasPage } from './features/dinero/VentasPage';
 import { CajaPage } from './features/dinero/CajaPage';
+import { MiPlataPage } from './features/dinero/MiPlataPage';
+import { GuiaPage } from './features/guia/GuiaPage';
+import { ReportesPage } from './features/reportes/ReportesPage';
 import { CuentasPorPagarPage } from './features/dinero/CuentasPorPagarPage';
 import { CuentasPorCobrarPage } from './features/dinero/CuentasPorCobrarPage';
 import { CatalogoProductosPage } from './features/costos/CatalogoProductosPage';
@@ -66,6 +69,9 @@ export const router = createBrowserRouter([
           { path: '/tablero', element: <TableroPage /> },
           { path: '/ventas', element: <VentasPage /> },
           { path: '/caja', element: <CajaPage /> },
+          { path: '/mi-plata', element: <MiPlataPage /> },
+          { path: '/guia', element: <GuiaPage /> },
+          { path: '/reportes', element: <ReportesPage /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagarPage /> },
           { path: '/cuentas-por-cobrar', element: <CuentasPorCobrarPage /> },
           { path: '/configuracion', element: <ConfiguracionPage /> },

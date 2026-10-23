@@ -201,14 +201,21 @@ export const costosRepository = {
 
   /** Cortes ya cortados (abiertos o cerrados) con lo necesario para su costo
    *  real y su consumo de material. Con corteId, solo ese. */
-  cortesParaCosto(corteId?: string) {
+  /** Cortes con lo necesario para su costo. Los borradores (cortados pero sin
+   *  abrir) solo si se piden: no gastan stock ni tienen costo real todavía. */
+  cortesParaCosto(corteId?: string, conBorradores = false) {
     return prisma.corte.findMany({
-      where: { estado: { in: ['abierto', 'cerrado'] }, ...(corteId ? { id: corteId } : {}) },
+      where: {
+        estado: { in: conBorradores ? ['borrador', 'abierto', 'cerrado'] : ['abierto', 'cerrado'] },
+        ...(corteId ? { id: corteId } : {}),
+      },
       orderBy: { codigo: 'desc' },
       select: {
         id: true,
         codigo: true,
         estado: true,
+        paso: true,
+        pasoDesde: true,
         fechaInicio: true,
         cantidadTotal: true,
         trazadoCm: true,

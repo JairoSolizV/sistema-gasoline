@@ -168,7 +168,7 @@ function TarjetaCaja({ c, onArqueo, onInicio }: { c: ResumenCajaDTO; onArqueo: (
       <div className="flex items-baseline justify-between">
         <span className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">{ETIQUETA_CAJA[c.caja]}</span>
         <button onClick={onArqueo} className="text-xs font-semibold text-acento hover:underline">
-          Hacer arqueo
+          Contar la plata (arqueo)
         </button>
       </div>
       <div className={`mono mt-1 text-2xl font-semibold ${c.saldoFinal < 0 ? 'text-error' : ''}`}>{bs(c.saldoFinal)}</div>

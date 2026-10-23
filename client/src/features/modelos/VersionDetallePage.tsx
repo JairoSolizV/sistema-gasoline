@@ -21,6 +21,7 @@ import { HojaOperacionesImprimible } from './HojaOperacionesImprimible';
 import { CamposMolde, moldeVacio, validarMolde, type MoldeForm } from './CamposDiseno';
 import { TarjetaDiseno } from './TarjetaDiseno';
 import { AgregarBloqueModal } from './AgregarBloqueModal';
+import { BotonImprimir } from '../../components/Imprimir';
 
 type ModalAbierto =
   | { tipo: 'agregar'; grupo?: string }
@@ -317,13 +318,7 @@ export function VersionDetallePage() {
                 )}
               </div>
             </div>
-            <button
-              onClick={() => window.print()}
-              title="Hoja oficio vertical (21.5 × 33 cm)"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50"
-            >
-              Imprimir operaciones
-            </button>
+            <BotonImprimir texto="Imprimir operaciones" />
             <button
               onClick={() => setModal({ tipo: 'nueva-version' })}
               className="rounded-lg border border-acento px-4 py-2 text-sm font-semibold text-acento hover:bg-[rgba(47,111,224,0.06)]"

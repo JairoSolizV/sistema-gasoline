@@ -1,4 +1,5 @@
 import type { ModalidadDoblado, ProcesoCorte } from '../servicioCorte.js';
+import type { PasoCorte } from '../pasos.js';
 import type { ServicioExterno } from '../schemas/corte.js';
 
 export type EstadoCorte = 'borrador' | 'abierto' | 'cerrado';
@@ -119,6 +120,8 @@ export interface CorteResumenDTO {
   numeroVersion: number;
   cantidadTotal: number;
   estado: EstadoCorte;
+  paso: PasoCorte; // dónde está físicamente (en mesa, costura, lavandería…)
+  pasoDesde: string; // ISO
   fechaInicio: string;
   fechaCierre: string | null;
   operacionesTotal: number;
@@ -154,6 +157,8 @@ export interface CorteDetalleDTO {
   esInterno: boolean;
   servicio: ServicioCorteDTO | null; // null en cortes externos
   estado: EstadoCorte;
+  paso: PasoCorte; // dónde está físicamente (en mesa, costura, lavandería…)
+  pasoDesde: string; // ISO
   fechaInicio: string;
   fechaCierre: string | null;
   costoManoObraPrenda: number; // centavos, Σ ct del snapshot

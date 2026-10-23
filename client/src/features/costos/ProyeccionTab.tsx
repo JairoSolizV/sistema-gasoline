@@ -187,7 +187,7 @@ function Necesidades({ p }: { p: ProyeccionDTO }) {
         </thead>
         <tbody>
           {p.necesidades.map((n) => (
-            <tr key={n.insumo.id} className="border-b border-gray-100 last:border-0">
+            <tr key={n.insumo.id} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
               <td className="px-4 py-2 font-medium">{n.insumo.nombre}</td>
               <td className="mono px-3 py-2 text-right text-gray-600">
                 {deMilesimas(n.necesario)} {n.insumo.unidad}
@@ -217,7 +217,7 @@ function CortesAbiertos({ p }: { p: ProyeccionDTO }) {
       <table className="w-full text-sm">
         <tbody>
           {p.cortesAbiertos.map((c) => (
-            <tr key={c.corteId} className="border-b border-gray-100 last:border-0">
+            <tr key={c.corteId} className="border-b border-gray-200/70 even:bg-slate-100 last:border-0">
               <td className="px-4 py-2">
                 <span className="font-medium">COD {c.codigo}</span> <span className="text-gray-600">{c.modeloNombre}</span>
               </td>

@@ -15,7 +15,12 @@ import {
   type ClienteInput,
   type CobroDTO,
   type CobroInput,
+  type CaminoDTO,
   type CorteDineroDTO,
+  type CorteEnCaminoDTO,
+  type PasoCorte,
+  PASOS_CORTE,
+  semaforoPaso,
   type CuentaPorCobrarDTO,
   type CuentasPorCobrarDTO,
   type CuentaPorPagarDTO,
@@ -38,7 +43,7 @@ import { AppError } from '../../middleware/errors.js';
 import { configuracionRepository } from '../configuracion/repository.js';
 import { costosRepository, type FichaConDatos } from '../costos/repository.js';
 import { calcularFicha } from '../costos/service.js';
-import { costoRealCorte, fichaDeCorte, stockPorInsumo } from '../costos/produccion.js';
+import { costoRealCorte, fichaDeCorte, partesDeCorte, stockPorInsumo } from '../costos/produccion.js';
 import { costoFijoPorPrenda, fijosService } from '../costos/fijos.js';
 import { liquidacionService } from '../liquidacion/service.js';
 import { rangoMesUTC } from '../liquidacion/repository.js';
@@ -460,6 +465,114 @@ export const dineroService = {
       throw new AppError('NO_ENCONTRADO', 'Pago no encontrado', 404);
     }
     await dineroRepository.eliminarPagoProveedor(id);
+  },
+
+  // ── El camino de la plata (para entenderlo de un vistazo) ──
+  /** Cada corte, en su paso, con lo que ya está puesto y lo que falta para
+   *  terminarlo. Lo puesto crece con los pasos: en mesa, la tela y el corte;
+   *  en costura, además los insumos de costura; en lavandería, además la
+   *  costura; en empaque, además la lavandería; en depósito, todo. */
+  async camino(): Promise<CaminoDTO> {
+    const hoy = hoyEnBolivia();
+    const [anio, mes] = hoy.split('-').map(Number);
+    const { inicio: desde, fin: hasta } = rangoMesUTC(anio, mes);
+    const [{ config, fichas, fijo }, cortes, despachadas, pedidos, cxc, cobrosMes] = await Promise.all([
+      contexto(),
+      costosRepository.cortesParaCosto(undefined, true),
+      dineroRepository.despachadasPorCorte(),
+      this.listarPedidos(),
+      this.cuentasPorCobrar(),
+      dineroRepository.listarCobros({ desde, hasta }),
+    ]);
+    const precioPedido = new Map(
+      pedidos.filter((p) => p.corte && p.estado !== 'cancelado').map((p) => [p.corte!.id, p.precioPrenda]),
+    );
+    const orden: Record<PasoCorte, number> = { mesa: 0, costura: 1, lavanderia: 2, empaque: 3, deposito: 4 };
+    const avisos: string[] = [];
+    const lista: CorteEnCaminoDTO[] = [];
+    for (const c of cortes) {
+      const disponibles = c.cantidadTotal - (despachadas.get(c.id) ?? 0);
+      if (disponibles <= 0) continue; // ya se entregó todo
+      const f = fichaDeCorte(c, fichas);
+      const p = partesDeCorte(c, f, config);
+      const n = orden[c.paso];
+      // lo que ya se hizo según el paso (true = ya está puesto)
+      const hecho = { costura: n >= 1, manoCostura: n >= 2, externos: n >= 3, empaque: n >= 4 };
+      const externosFalta = c.paso === 'lavanderia' ? p.externosPendientes : hecho.externos ? 0 : p.externos;
+      const desglose = {
+        insumosCostura: hecho.costura ? 0 : p.insumosCostura,
+        insumosEmpaque: hecho.empaque ? 0 : p.insumosEmpaque,
+        manoDeObra: (hecho.manoCostura ? 0 : p.manoCostura) + (hecho.empaque ? 0 : p.manoEmpaque),
+        servicios: externosFalta,
+      };
+      const total =
+        p.materiaPrima + p.servicioCorte + p.insumosCostura + p.insumosEmpaque + p.manoCostura + p.manoEmpaque + p.externos;
+      const falta = desglose.insumosCostura + desglose.insumosEmpaque + desglose.manoDeObra + desglose.servicios;
+      // en depósito solo cuenta lo que queda sin entregar
+      const parte = (x: number) => (c.paso === 'deposito' ? Math.round((x * disponibles) / c.cantidadTotal) : x);
+      const precio = precioPedido.get(c.id) ?? (f ? calcularFicha(f, config, fijo).precioVenta : null);
+      const dias = Math.max(0, Math.floor((Date.now() - c.pasoDesde.getTime()) / 86_400_000));
+      if (!f) avisos.push(`COD ${c.codigo}: su modelo no tiene ficha de costo, faltan los insumos y el precio.`);
+      lista.push({
+        corteId: c.id,
+        codigo: c.codigo,
+        modelo: c.version.modelo.nombre,
+        prendas: c.paso === 'deposito' ? disponibles : c.cantidadTotal,
+        paso: c.paso,
+        dias,
+        semaforo: semaforoPaso(c.paso, dias),
+        invertido: parte(total - falta),
+        falta,
+        desglose,
+        vale: precio != null ? precio * (c.paso === 'deposito' ? disponibles : c.cantidadTotal) : null,
+      });
+    }
+    const pasos = PASOS_CORTE.map((paso) => {
+      const cs = lista.filter((x) => x.paso === paso).sort((a, b) => b.dias - a.dias);
+      return {
+        paso,
+        prendas: cs.reduce((a, x) => a + x.prendas, 0),
+        invertido: cs.reduce((a, x) => a + x.invertido, 0),
+        falta: cs.reduce((a, x) => a + x.falta, 0),
+        vale: cs.reduce((a, x) => a + (x.vale ?? 0), 0),
+        cortes: cs,
+      };
+    });
+    const enPuerta = pedidos.filter((p) => p.estado === 'pendiente');
+    const sumaDesglose = (k: keyof CorteEnCaminoDTO['desglose']) => lista.reduce((a, x) => a + x.desglose[k], 0);
+    return {
+      pedidos: {
+        cantidad: enPuerta.length,
+        prendas: enPuerta.reduce((a, p) => a + p.prendas, 0),
+        necesitas: enPuerta.reduce((a, p) => a + p.costo, 0),
+        vale: enPuerta.reduce((a, p) => a + p.venta, 0),
+      },
+      pasos,
+      porCobrar: {
+        total: cxc.total,
+        vencido: cxc.vencido,
+        clientes: new Set(cxc.items.map((i) => i.cliente.id)).size,
+      },
+      cobradoMes: cobrosMes.reduce((a, c) => a + c.monto, 0),
+      resumen: {
+        invertido: pasos.reduce((a, p) => a + p.invertido, 0),
+        falta: pasos.reduce((a, p) => a + p.falta, 0),
+        desglose: {
+          insumosCostura: sumaDesglose('insumosCostura'),
+          insumosEmpaque: sumaDesglose('insumosEmpaque'),
+          manoDeObra: sumaDesglose('manoDeObra'),
+          servicios: sumaDesglose('servicios'),
+        },
+      },
+      avisos,
+    };
+  },
+
+  /** Lo marca una persona: dónde está el corte ahora. No toca pagos. */
+  async cambiarPaso(corteId: string, paso: PasoCorte): Promise<void> {
+    if (!(await dineroRepository.cambiarPaso(corteId, paso))) {
+      throw new AppError('NO_ENCONTRADO', 'Corte no encontrado', 404);
+    }
   },
 
   // ── Cuentas por cobrar: despachos sin pagar ──

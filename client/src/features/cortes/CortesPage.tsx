@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { EstadoCorte } from '@taller/shared';
+import { INFO_PASO, type EstadoCorte } from '@taller/shared';
+import { diasDesde } from '../../components/PasosCorte';
 import { useAbrirCorte, useCortes } from '../../api/cortes';
+import { TABLA } from '../../components/tabla';
 import { badgeEstadoCorte } from './estados';
 
 function formatearFecha(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('es-BO', { day: '2-digit', month: '2-digit', year: '2-digit' });
 }
 
 const FILTROS: { valor: EstadoCorte | undefined; texto: string }[] = [
@@ -53,7 +55,7 @@ export function CortesPage() {
         ))}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className={`mt-4 ${TABLA.contenedor}`}>
         {isLoading && <div className="p-8 text-center text-sm text-gray-500">Cargando cortes…</div>}
         {error && (
           <div className="p-8 text-center text-sm text-error">
@@ -61,17 +63,18 @@ export function CortesPage() {
           </div>
         )}
         {cortes && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-                <th className="px-5 py-3">COD</th>
-                <th className="px-5 py-3">Corte</th>
-                <th className="px-5 py-3">Cantidad</th>
-                <th className="px-5 py-3">Estado</th>
-                <th className="px-5 py-3">Asignación</th>
-                <th className="px-5 py-3">Inicio</th>
-                <th className="px-5 py-3">Cierre</th>
-                <th className="px-5 py-3 text-right">Acciones</th>
+          <table className="text-sm">
+            <thead className={TABLA.cabecera}>
+              <tr className={TABLA.filaCabecera}>
+                <th className="px-3 py-2.5">COD</th>
+                <th className="px-3 py-2.5">Corte</th>
+                <th className="px-3 py-2.5">Cantidad</th>
+                <th className="px-3 py-2.5">Estado</th>
+                <th className="px-3 py-2.5">¿Dónde está?</th>
+                <th className="px-3 py-2.5">Asignación</th>
+                <th className="px-3 py-2.5">Inicio</th>
+                <th className="px-3 py-2.5">Cierre</th>
+                <th className="px-3 py-2.5 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -82,9 +85,9 @@ export function CortesPage() {
                     ? Math.round((c.operacionesAsignadas / c.operacionesTotal) * 100)
                     : 0;
                 return (
-                  <tr key={c.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="mono px-5 py-3 font-semibold">{c.codigo}</td>
-                    <td className="px-5 py-3">
+                  <tr key={c.id} className={TABLA.fila}>
+                    <td className="mono px-3 py-2 font-semibold">{c.codigo}</td>
+                    <td className="max-w-[280px] px-3 py-2">
                       <Link to={`/cortes/${c.id}`} className="font-medium text-acento hover:underline">
                         {c.modeloNombre}
                       </Link>{' '}
@@ -92,8 +95,8 @@ export function CortesPage() {
                         v{c.numeroVersion}
                       </span>
                     </td>
-                    <td className="mono px-5 py-3">{c.cantidadTotal}</td>
-                    <td className="px-5 py-3">
+                    <td className="mono px-3 py-2">{c.cantidadTotal}</td>
+                    <td className="px-3 py-2">
                       <span
                         className="rounded-full border px-2 py-0.5 text-[11px] font-semibold"
                         style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
@@ -101,7 +104,13 @@ export function CortesPage() {
                         {badge.texto}
                       </span>
                     </td>
-                    <td className="px-5 py-3">
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span title={INFO_PASO[c.paso].que}>
+                        {INFO_PASO[c.paso].icono} {INFO_PASO[c.paso].nombre}
+                      </span>
+                      <span className="ml-1 text-[11px] text-gray-400">{diasDesde(c.pasoDesde)} d</span>
+                    </td>
+                    <td className="px-3 py-2">
                       {c.estado === 'borrador' ? (
                         <span className="text-xs text-gray-400">sin abrir</span>
                       ) : (
@@ -118,9 +127,9 @@ export function CortesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">{formatearFecha(c.fechaInicio)}</td>
-                    <td className="px-5 py-3 text-gray-600">{formatearFecha(c.fechaCierre)}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-600">{formatearFecha(c.fechaInicio)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-gray-600">{formatearFecha(c.fechaCierre)}</td>
+                    <td className="px-3 py-2 text-right">
                       {c.estado === 'borrador' && (
                         <button
                           onClick={() => abrir.mutate(c.id)}
@@ -135,7 +144,7 @@ export function CortesPage() {
               })}
               {cortes.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
                     No hay cortes {estado ? `en estado "${estado}"` : ''} todavía.
                   </td>
                 </tr>

@@ -34,6 +34,16 @@ body {
 
 /* Vista imprimible de la planilla (Liquidación / Rendición): sin sidebar ni controles. */
 @media print {
+  /* las franjas y colores también salen en el papel */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* los botones de acción (Editar, Quitar, pestañas…) no se imprimen; los que
+     son contenido (tarjetas) llevan la clase "imprime" */
+  main button:not(.imprime) {
+    display: none !important;
+  }
   aside {
     display: none !important;
   }
