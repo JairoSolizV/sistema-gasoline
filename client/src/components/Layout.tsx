@@ -19,7 +19,8 @@ function Icono({ d }: { d: string }) {
   );
 }
 
-// Áreas del sistema, cada una con su color. El color identifica el área en el
+// Áreas del sistema, cada una con su color. En el menú van en el orden en que
+// trabaja el taller: costear → comprar → producir → personal → vender → finanzas. El color identifica el área en el
 // menú y en la franja de arriba de cada página; los botones de acción siguen
 // en azul y el verde/rojo quedan para plata a favor o en contra.
 type Area = { nombre: string; color: string; claro: string };
@@ -130,6 +131,29 @@ export function Layout() {
             Inicio
           </ItemMenu>
 
+          <TituloSeccion area="costos" />
+          <ItemMenu
+            area="costos"
+            a="/costos"
+            icono={<Icono d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" />}
+          >
+            Costos de producción
+          </ItemMenu>
+          <ItemMenu area="costos" a="/productos" icono={<Icono d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />}>
+            Catálogo de productos
+          </ItemMenu>
+
+          <TituloSeccion area="compras" />
+          <ItemMenu area="compras" a="/compras" icono={<Icono d="M5 7h14l-1.5 9h-11zM9 7V5h6v2M9 20h.01M15 20h.01" />}>
+            Compras y proveedores
+          </ItemMenu>
+          <ItemMenu area="compras" a="/inventario" icono={<Icono d="M4 8l8-4 8 4v10l-8 4-8-4zM4 8l8 4 8-4M12 12v10" />}>
+            Inventario
+          </ItemMenu>
+          <ItemMenu area="compras" a="/cuentas-por-pagar" icono={<Icono d="M4 5h16v14H4zM4 9h16M8 14h4M15 14h1" />}>
+            Cuentas por pagar
+          </ItemMenu>
+
           <TituloSeccion area="produccion" />
           <ItemMenu area="produccion" a="/cortes" badge="central" icono={<Icono d="M3.5 4.5h17v15h-17zM3.5 9.5h17M9 9.5v10" />}>
             Cortes
@@ -169,35 +193,12 @@ export function Layout() {
             Rendición de cuentas
           </ItemMenu>
 
-          <TituloSeccion area="compras" />
-          <ItemMenu area="compras" a="/compras" icono={<Icono d="M5 7h14l-1.5 9h-11zM9 7V5h6v2M9 20h.01M15 20h.01" />}>
-            Compras y proveedores
-          </ItemMenu>
-          <ItemMenu area="compras" a="/inventario" icono={<Icono d="M4 8l8-4 8 4v10l-8 4-8-4zM4 8l8 4 8-4M12 12v10" />}>
-            Inventario
-          </ItemMenu>
-          <ItemMenu area="compras" a="/cuentas-por-pagar" icono={<Icono d="M4 5h16v14H4zM4 9h16M8 14h4M15 14h1" />}>
-            Cuentas por pagar
-          </ItemMenu>
-
           <TituloSeccion area="ventas" />
           <ItemMenu area="ventas" a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
             Ventas y cobros
           </ItemMenu>
           <ItemMenu area="ventas" a="/cuentas-por-cobrar" icono={<Icono d="M4 5h16v14H4zM4 9h16M15 14h1M8 14h4" />}>
             Cuentas por cobrar
-          </ItemMenu>
-
-          <TituloSeccion area="costos" />
-          <ItemMenu
-            area="costos"
-            a="/costos"
-            icono={<Icono d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" />}
-          >
-            Costos de producción
-          </ItemMenu>
-          <ItemMenu area="costos" a="/productos" icono={<Icono d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />}>
-            Catálogo de productos
           </ItemMenu>
 
           <TituloSeccion area="finanzas" />
