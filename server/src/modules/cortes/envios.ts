@@ -29,6 +29,7 @@ export function aEnviosDTO(
     fechaEnvio: dateADia(e.fechaEnvio),
     fechaDevolucion: e.fechaDevolucion ? dateADia(e.fechaDevolucion) : null,
     nota: e.nota,
+    color: e.color,
     bloqueado: e.fechaDevolucion != null && liquidado(e.fechaDevolucion),
   }));
 }

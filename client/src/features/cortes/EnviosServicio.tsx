@@ -20,18 +20,18 @@ import { hoyLocalISO } from '../../lib/fechas';
 // precio por prenda del proveedor (editable). Cada envío se paga en su fecha
 // de devolución, en la cuenta de su servicio (nunca mezclado con la costura).
 
-const PATRON_BS = /^\d+([.,]\d{1,2})?$/;
-const aTexto = (c: number) => formatBs(c).replace(/ /g, '');
-const aCent = (s: string) => aCentavos(s.trim().replace(',', '.'));
+export const PATRON_BS = /^\d+([.,]\d{1,2})?$/;
+export const aTexto = (c: number) => formatBs(c).replace(/ /g, '');
+export const aCent = (s: string) => aCentavos(s.trim().replace(',', '.'));
 const fechaCorta = (dia: string) => dia.split('-').reverse().join('/');
-const claseInput =
+export const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
 
-function mensaje(error: unknown) {
+export function mensaje(error: unknown) {
   return error instanceof ErrorApi ? error.message : 'Error al guardar';
 }
 
-const enviadas = (corte: CorteDetalleDTO, servicio: ServicioExterno, excluir?: string) =>
+export const enviadas = (corte: CorteDetalleDTO, servicio: ServicioExterno, excluir?: string) =>
   corte.envios
     .filter((e) => e.servicio === servicio && e.id !== excluir)
     .reduce((a, e) => a + e.cantidad, 0);
@@ -137,7 +137,17 @@ function FilaEnvio({
 }) {
   return (
     <tr className="border-t border-gray-100">
-      <td className="py-2 pr-3 font-medium">{e.operario.nombre}</td>
+      <td className="py-2 pr-3 font-medium">
+        {e.operario.nombre}
+        {e.color && (
+          <span
+            className="ml-2 rounded-full border border-sky-200 bg-sky-50 px-1.5 py-px text-[10px] font-semibold text-sky-700"
+            title="Color de lavado (salió del surtido)"
+          >
+            {e.color}
+          </span>
+        )}
+      </td>
       <td className="mono px-3 py-2 text-right text-gray-600">{e.cantidad} prendas</td>
       <td className="mono px-3 py-2 text-right text-gray-500">× Bs {formatBs(e.precioPrenda)}</td>
       <td className="mono px-3 py-2 text-right font-semibold">Bs {formatBs(e.total)}</td>

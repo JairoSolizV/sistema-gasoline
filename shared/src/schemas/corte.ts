@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
 import { PROCESOS_CORTE } from '../servicioCorte.js';
+import { MAX_COLORES_SURTIDO } from '../surtido.js';
 
 // Datos del tendido (informativos; no afectan pagos). Los mismos campos se
 // piden al crear el corte y al completarlos/editarlos después. Quién cortó y
@@ -169,6 +170,43 @@ export const editarEnvioSchema = z
   })
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
+
+// ── Surtido por colores para la lavandería (docs/PLAN_SURTIDO.md) ──
+const nombreColor = z
+  .string()
+  .trim()
+  .min(1, 'El nombre del color es obligatorio')
+  .max(30)
+  .transform((v) => v.toUpperCase());
+
+/** Colores en el orden en que se reparte (lo que sobra va a los primeros) y
+ *  qué tallas son ESPECIAL. */
+export const guardarSurtidoSchema = z.object({
+  colores: z
+    .array(nombreColor)
+    .max(MAX_COLORES_SURTIDO, `Como máximo ${MAX_COLORES_SURTIDO} colores`)
+    .refine((cs) => new Set(cs).size === cs.length, 'Hay un color repetido'),
+  tallasEspeciales: z.array(z.number().int()),
+});
+
+/** Registra un envío a lavandería por cada color del surtido. */
+export const enviarSurtidoSchema = z.object({
+  operarioId: z.uuid('Elegí la lavandería'),
+  precioPrenda: centavos.optional(),
+  fechaEnvio: dia('La fecha de envío es obligatoria'),
+});
+
+export const crearColorLavadoSchema = z.object({ nombre: nombreColor });
+
+export const editarColorLavadoSchema = z
+  .object({ nombre: nombreColor, activo: z.boolean(), orden: z.number().int().min(0) })
+  .partial()
+  .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
+
+export type GuardarSurtidoInput = z.infer<typeof guardarSurtidoSchema>;
+export type EnviarSurtidoInput = z.infer<typeof enviarSurtidoSchema>;
+export type CrearColorLavadoInput = z.infer<typeof crearColorLavadoSchema>;
+export type EditarColorLavadoInput = z.infer<typeof editarColorLavadoSchema>;
 
 export type CrearEnvioInput = z.infer<typeof crearEnvioSchema>;
 export type EditarEnvioInput = z.infer<typeof editarEnvioSchema>;

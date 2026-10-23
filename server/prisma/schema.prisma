@@ -182,6 +182,11 @@ model Corte {
   modalidadDoblado            ModalidadDoblado?
   trabajos                    TrabajoCorte[]
   envios                      EnvioServicio[] // lavandería y bordado externos
+  // Surtido por colores para la lavandería (docs/PLAN_SURTIDO.md). Informativo:
+  // no toca pagos. Colores en el orden elegido (texto, copiado del catálogo de
+  // colores de lavado); null = sin surtido. Tallas ESPECIAL: null = desde la 48.
+  surtidoColores              Json?
+  tallasEspeciales            Json?
   estado          EstadoCorte      @default(borrador)
   fechaInicio     DateTime         @default(now())
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
@@ -594,10 +599,22 @@ model EnvioServicio {
   fechaEnvio      DateTime        @db.Date
   fechaDevolucion DateTime?       @db.Date // null = todavía no volvió
   nota            String?
+  color           String? // color de lavado, si salió del surtido (informativo)
   creadoEn        DateTime        @default(now())
 
   @@index([corteId])
   @@index([fechaDevolucion])
+}
+
+// Colores de lavado que se eligen al surtir un corte (docs/PLAN_SURTIDO.md).
+// Lista editable; el corte guarda el NOMBRE, así renombrar o quitar un color
+// no cambia los cortes ya surtidos.
+model ColorLavado {
+  id       String   @id @default(uuid())
+  nombre   String   @unique
+  orden    Int      @default(0)
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now())
 }
 
 // ── Costos de producción (docs/PLAN_COSTOS.md) ───────────────────────────────

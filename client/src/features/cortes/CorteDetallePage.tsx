@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 import {
   ETIQUETA_PROCESO,
@@ -34,6 +35,8 @@ import { CamposTendido, tendidoDesdeCorte, validarTendido } from './CamposTendid
 import { ServicioCorte } from './ServicioCorte';
 import { PasosCorte } from '../../components/PasosCorte';
 import { EnviosServicio } from './EnviosServicio';
+import { HojaSurtido, SurtidoLavanderia } from './SurtidoLavanderia';
+import { imprimir, type Tamano } from '../../components/Imprimir';
 import { DuracionEstimada } from './DuracionEstimada';
 import { CalculadoraTendido } from './CalculadoraTendido';
 
@@ -221,6 +224,17 @@ export function CorteDetallePage() {
   const [modalOp, setModalOp] = useState<ModalOperacion | null>(null);
   const reordenar = useReordenarOperacionesCorte();
   const [fechaCierre, setFechaCierre] = useState(hoyLocalISO);
+  // mientras se imprime la hoja de surtido, el resto de la página no sale
+  const [hojaSurtido, setHojaSurtido] = useState(false);
+  const imprimirSurtido = (tamano: Tamano) => {
+    flushSync(() => setHojaSurtido(true));
+    const terminar = () => {
+      setHojaSurtido(false);
+      window.removeEventListener('afterprint', terminar);
+    };
+    window.addEventListener('afterprint', terminar);
+    imprimir(tamano);
+  };
 
   const grupos = useMemo(() => {
     if (!corte) return [];
@@ -252,7 +266,9 @@ export function CorteDetallePage() {
   const costoExternos = SERVICIOS_EXTERNOS.reduce((a, s) => a + corte.costoExternos[s], 0);
 
   return (
-    <div className="p-8">
+    <>
+      {hojaSurtido && <HojaSurtido corte={corte} />}
+    <div className={`p-8 ${hojaSurtido ? 'print:hidden' : ''}`}>
       <div className="text-xs text-gray-500">
         <Link to="/cortes" className="hover:underline">
           Cortes
@@ -508,6 +524,7 @@ export function CorteDetallePage() {
 
           <HistorialCambios cambios={corte.cambios} />
 
+          <SurtidoLavanderia corte={corte} onImprimir={imprimirSurtido} />
           <EnviosServicio corte={corte} />
         </div>
       )}
@@ -556,6 +573,7 @@ export function CorteDetallePage() {
         </Modal>
       )}
     </div>
+    </>
   );
 }
 

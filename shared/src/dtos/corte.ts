@@ -169,6 +169,11 @@ export interface CorteDetalleDTO {
   costoExternos: Record<ServicioExterno, number>;
   costoTotal: number; // costura + servicio de corte + servicios externos
   envios: EnvioServicioDTO[]; // a serigrafía, láser, bordado y lavandería (PLAN_CUENTAS_SEPARADAS §5)
+  // surtido por colores para la lavandería (docs/PLAN_SURTIDO.md): colores en
+  // orden ([] = sin surtido) y tallas ESPECIAL efectivas (por defecto desde la
+  // 48). El reparto se calcula con calcularSurtido() de shared.
+  surtidoColores: string[];
+  tallasEspeciales: number[];
   operaciones: CorteOperacionDTO[];
   totalesPorOperario: TotalPorOperarioDTO[];
   cambios: CorteCambioDTO[]; // historial de cambios respecto del modelo, más reciente primero
@@ -197,5 +202,14 @@ export interface EnvioServicioDTO {
   fechaEnvio: string; // 'aaaa-mm-dd'
   fechaDevolucion: string | null; // 'aaaa-mm-dd'; null = todavía no volvió
   nota: string | null;
+  color: string | null; // color de lavado, si salió del surtido
   bloqueado: boolean; // devuelto en un mes ya liquidado: no se puede tocar
+}
+
+/** Color de lavado de la lista que se usa para surtir (docs/PLAN_SURTIDO.md). */
+export interface ColorLavadoDTO {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
 }

@@ -25,7 +25,7 @@ import type {
   ReordenarOperacionesInput,
   TotalPorOperarioDTO,
 } from '@taller/shared';
-import { diaADate, ETIQUETA_PROCESO } from '@taller/shared';
+import { diaADate, ETIQUETA_PROCESO, tallasEspecialesPorDefecto } from '@taller/shared';
 import { Prisma } from '@prisma/client';
 import { cantidadTotal, sumaCt, tarifaEfectiva, totalAsignacion } from '../../domain/calculo.js';
 import {
@@ -192,6 +192,10 @@ function aDetalleDTO(
     costoTotal:
       costoCostura + costoServicioCorte + Object.values(externos).reduce((a, v) => a + v, 0),
     envios: aEnviosDTO(corte, liquidado),
+    surtidoColores: (corte.surtidoColores as string[] | null) ?? [],
+    tallasEspeciales:
+      (corte.tallasEspeciales as number[] | null) ??
+      tallasEspecialesPorDefecto(corte.tallas as number[]),
     operaciones,
     totalesPorOperario: [...porOperario.values()].sort((a, b) => b.total - a.total),
     cambios: aCambiosDTO(corte),

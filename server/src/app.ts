@@ -17,6 +17,7 @@ import { costosRouter } from './modules/costos/routes.js';
 import { dineroRouter } from './modules/dinero/routes.js';
 import { cajaRouter } from './modules/caja/routes.js';
 import { reportesRouter } from './modules/reportes/routes.js';
+import { surtidoRouter } from './modules/surtido/routes.js';
 
 // authObligatoria: el server real (server.ts) lo activa; los tests de módulos
 // llaman crearApp() sin auth (la prueban aparte en auth.test.ts con tokens).
@@ -48,6 +49,7 @@ export function crearApp({ authObligatoria = false } = {}) {
   app.use('/api/v1/reportes', reportesRouter);
   app.use('/api/v1', modelosRouter);
   app.use('/api/v1', plantillasRouter);
+  app.use('/api/v1', surtidoRouter);
 
   app.use(noEncontrado);
   app.use(errorHandler);

@@ -46,8 +46,18 @@ function ultimoTamano(): Tamano {
   return 'oficio-v';
 }
 
-/** Botón "Imprimir" con la lista de tamaños (recuerda el último usado). */
-export function BotonImprimir({ texto = 'Imprimir', className = '' }: { texto?: string; className?: string }) {
+/** Botón "Imprimir" con la lista de tamaños (recuerda el último usado).
+ *  Con `alElegir`, en vez de imprimir la página entera llama a esa función
+ *  (ej. para montar una hoja propia antes de imprimir). */
+export function BotonImprimir({
+  texto = 'Imprimir',
+  className = '',
+  alElegir,
+}: {
+  texto?: string;
+  className?: string;
+  alElegir?: (clave: Tamano) => void;
+}) {
   const [abierto, setAbierto] = useState(false);
   const caja = useRef<HTMLDivElement>(null);
   const ultimo = ultimoTamano();
@@ -77,7 +87,7 @@ export function BotonImprimir({ texto = 'Imprimir', className = '' }: { texto?: 
               onClick={() => {
                 setAbierto(false);
                 // deja cerrar el menú antes de abrir la ventana de impresión
-                setTimeout(() => imprimir(t.clave), 50);
+                setTimeout(() => (alElegir ? alElegir(t.clave) : imprimir(t.clave)), 50);
               }}
               className={`flex w-full items-center justify-between px-3 py-2 text-left hover:bg-blue-50 ${t.clave === ultimo ? 'font-semibold' : ''}`}
             >
