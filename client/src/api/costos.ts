@@ -22,6 +22,7 @@ import type {
   FichaCostoInput,
   FichaCostoResumenDTO,
   InsumoDTO,
+  KardexDTO,
   InsumoInput,
 } from '@taller/shared';
 import { api } from './client';
@@ -38,6 +39,13 @@ function useInvalidarCostos() {
       qc.invalidateQueries({ queryKey: ['dinero'] }),
       qc.invalidateQueries({ queryKey: ['caja'] }),
     ]);
+}
+
+export function useKardex(insumoId: string) {
+  return useQuery({
+    queryKey: ['costos', 'kardex', insumoId],
+    queryFn: () => api<KardexDTO>(`/costos/insumos/${insumoId}/kardex`),
+  });
 }
 
 export function useInsumos() {

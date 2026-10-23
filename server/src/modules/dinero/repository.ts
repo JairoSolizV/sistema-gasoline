@@ -135,7 +135,15 @@ export const dineroRepository = {
     return prisma.compraInsumo.findMany({
       where: { condicion: 'credito' },
       orderBy: [{ fecha: 'desc' }, { creadoEn: 'desc' }],
-      select: { id: true, fecha: true, tienda: true, precioTotal: true, codigoCorte: true, insumo: { select: { nombre: true } } },
+      select: {
+        id: true,
+        fecha: true,
+        vence: true,
+        tienda: true,
+        precioTotal: true,
+        codigoCorte: true,
+        insumo: { select: { nombre: true } },
+      },
     });
   },
   pagosProveedor() {

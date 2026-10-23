@@ -29,6 +29,12 @@ import {
 const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Error al guardar');
+/** 'aaaa-mm-dd' + n días (las compras a crédito vencen por defecto a los 30). */
+const masDias = (dia: string, n: number) => {
+  const d = new Date(`${dia}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 
 export function ComprasTab() {
   const { data: insumos } = useInsumos();
@@ -182,6 +188,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
     codigoCorte: '',
     condicion: 'contado' as 'contado' | 'credito',
     caja: 'efectivo' as Caja,
+    vence: '',
     notas: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +228,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
       codigoCorte: v.codigoCorte.trim() || undefined,
       condicion: v.condicion,
       caja: v.caja,
+      ...(v.condicion === 'credito' ? { vence: v.vence || masDias(v.fecha, 30) } : {}),
       notas: v.notas,
     });
     onCerrar();
@@ -337,8 +345,18 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
             />
           </div>
         )}
-        {v.condicion === 'contado' && (
+        {v.condicion === 'contado' ? (
           <SelectorCaja valor={v.caja} onCambiar={(c) => cambiar('caja', c)} etiqueta="Pagado con" />
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Hay que pagarla el</label>
+            <input
+              type="date"
+              value={v.vence || masDias(v.fecha, 30)}
+              onChange={(e) => cambiar('vence', e.target.value)}
+              className={claseInput}
+            />
+          </div>
         )}
         <div>
           <label className="mb-1 block text-sm font-medium">Para el corte (código)</label>
@@ -388,9 +406,16 @@ function ModalEditarCompra({ compra, onCerrar }: { compra: CompraDTO; onCerrar: 
     codigoCorte: compra.codigoCorte ?? '',
     condicion: compra.condicion,
     caja: compra.caja,
+    vence: compra.vence ?? masDias(compra.fecha, 30),
   });
   const onGuardar = () =>
-    editar.mutate({ id: compra.id, input: { ...v, codigoCorte: v.codigoCorte.trim() || null } }, { onSuccess: onCerrar });
+    editar.mutate(
+      {
+        id: compra.id,
+        input: { ...v, codigoCorte: v.codigoCorte.trim() || null, vence: v.condicion === 'credito' ? v.vence : null },
+      },
+      { onSuccess: onCerrar },
+    );
   return (
     <Modal onCerrar={onCerrar}>
       <h2 className="text-lg font-semibold">Editar compra</h2>
@@ -416,7 +441,14 @@ function ModalEditarCompra({ compra, onCerrar }: { compra: CompraDTO; onCerrar: 
             crédito <span className="text-xs text-gray-500">(se la debés al proveedor)</span>
           </label>
         </div>
-        {v.condicion === 'contado' && <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />}
+        {v.condicion === 'contado' ? (
+          <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />
+        ) : (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Hay que pagarla el</label>
+            <input type="date" value={v.vence} onChange={(e) => setV({ ...v, vence: e.target.value })} className={claseInput} />
+          </div>
+        )}
       </div>
       {editar.error != null && <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{mensaje(editar.error)}</p>}
       <div className="mt-5 flex justify-end gap-2">

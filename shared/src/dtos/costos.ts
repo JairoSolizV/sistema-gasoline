@@ -35,6 +35,7 @@ export interface InsumoDTO {
   precioUnitarioBs: number | null;
   usadoEnFichas: number;
   stock: StockDTO; // milésimas (etapa 4)
+  valorStock: number; // centavos: stock (si es positivo) × precio de la última compra
   codigosCorte: string[]; // cortes para los que se compró, de la compra más reciente a la más vieja
 }
 
@@ -55,6 +56,7 @@ export interface CompraDTO {
   codigoCorte: string | null; // corte para el que se compró
   condicion: 'contado' | 'credito';
   caja: 'efectivo' | 'banco';
+  vence: string | null; // a crédito: 'aaaa-mm-dd'
   notas: string | null;
 }
 
@@ -113,6 +115,23 @@ export interface StockDTO {
   compras: number; // milésimas compradas después del conteo (o todas, sin conteo)
   consumo: number; // milésimas gastadas por cortes después del conteo
   stock: number; // puede ser negativo si faltan compras o conteos
+}
+
+/** Un renglón del kárdex de un insumo: compra (entra), consumo de un corte
+ *  (sale) o conteo físico (el saldo pasa a ser lo contado). Milésimas. */
+export interface MovimientoKardexDTO {
+  fecha: string;
+  tipo: 'compra' | 'consumo' | 'conteo';
+  detalle: string;
+  entrada: number | null;
+  salida: number | null;
+  saldo: number;
+  diferencia: number | null; // conteo: contado − lo que decía el sistema
+}
+
+export interface KardexDTO {
+  insumo: { id: string; nombre: string; unidad: string };
+  movimientos: MovimientoKardexDTO[]; // del más viejo al más nuevo
 }
 
 export interface ConteoDTO {
@@ -248,4 +267,29 @@ export interface CostosFijosMesDTO {
   prendasReferencia: number; // Configuración (1500)
   porPrendaFicha: number;
   simulacion: { prendas: number; porPrenda: number }[]; // 1500 / 2000 / 3000 / 4000
+}
+
+// ── Catálogo de productos ──
+
+export interface ProductoCatalogoDTO {
+  id: string; // la ficha de costo
+  codigo: string | null;
+  nombre: string;
+  modelo: { id: string; nombre: string } | null;
+  tallas: string | null;
+  colores: string | null;
+  descripcion: string | null;
+  tieneFoto: boolean;
+  fotoVersion: string | null; // cambia al cambiar la foto (para refrescarla)
+  costoPrenda: number; // centavos, con costos fijos (el de la ficha)
+  precioPrenda: number; // precio de venta por prenda
+  precioDocena: number; // Bs = 12 × precio por prenda
+  costoDocenaUsd: number; // centavos de $us
+  ventaDocenaUsd: number;
+  incompleto: boolean;
+}
+
+export interface FotoFichaDTO {
+  mime: string;
+  base64: string;
 }

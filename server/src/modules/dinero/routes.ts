@@ -16,6 +16,7 @@ export const dineroRouter = Router();
 
 dineroRouter.get('/tablero', dineroController.tablero);
 dineroRouter.get('/deposito', dineroController.deposito);
+dineroRouter.get('/cuentas-por-pagar', dineroController.cuentasPorPagar);
 
 dineroRouter.get('/clientes', dineroController.listarClientes);
 dineroRouter.post('/clientes', validar(clienteInputSchema), dineroController.crearCliente);

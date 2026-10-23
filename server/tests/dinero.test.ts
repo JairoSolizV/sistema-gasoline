@@ -134,8 +134,9 @@ describe('despachos y cobranzas', () => {
   });
 
   test('despacho de una ficha y cobro parcial: por cobrar = despachado − cobrado', async () => {
-    const res = await despachar({ lineas: [{ fichaId: ficha.id, prendas: 24, precioPrenda: 2000 }] });
+    const res = await despachar({ lineas: [{ fichaId: ficha.id, prendas: 24, precioPrenda: 2000, detalle: '12 de la 30 negro' }] });
     expect(res.body.data).toMatchObject({ total: 48_000, costo: 24 * costoFicha });
+    expect(res.body.data.lineas[0].detalle).toBe('12 de la 30 negro');
     const cobro = await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: hoy, monto: 30_000 });
     expect(cobro.status).toBe(201);
     const t = await tablero();
@@ -162,7 +163,7 @@ describe('deudas con proveedores', () => {
     const comprar = (condicion: string, monto: number) =>
       request(app)
         .post('/api/v1/costos/compras')
-        .send({ insumoId: ins.body.data.id, fecha: hoy, tienda: ' test  nancy ', cantidad: 100_000, precioTotal: monto, condicion });
+        .send({ insumoId: ins.body.data.id, fecha: hoy, tienda: ' test  nancy ', cantidad: 100_000, precioTotal: monto, condicion, vence: '2099-01-31' });
     expect((await comprar('credito', 100_000)).body.data.condicion).toBe('credito');
     await comprar('contado', 50_000); // al contado no es deuda
     const pago = await request(app)
@@ -174,5 +175,13 @@ describe('deudas con proveedores', () => {
     const t = await tablero();
     expect(t.deudas.proveedores.lista).toContainEqual({ proveedor: 'TEST NANCY', monto: 60_000 });
     expect(t.capitalDeTrabajo).toBe(t.tenes - t.deudas.total);
+
+    // cuentas por pagar: el pago cancela primero la compra más vieja; queda lo demás con su vencimiento
+    const cxp = (await request(app).get('/api/v1/dinero/cuentas-por-pagar')).body.data;
+    const deNancy = cxp.items.filter((i: { acreedor: string }) => i.acreedor === 'TEST NANCY');
+    expect(deNancy).toEqual([
+      expect.objectContaining({ tipo: 'proveedor', monto: 60_000, vence: '2099-01-31', enlace: '/compras?tab=proveedores' }),
+    ]);
+    expect(cxp.total).toBe(cxp.items.reduce((a: number, i: { monto: number }) => a + i.monto, 0));
   });
 });

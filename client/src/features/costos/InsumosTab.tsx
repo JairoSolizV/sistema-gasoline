@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CATEGORIAS_INSUMO, type CategoriaInsumo, type InsumoDTO, type InsumoInput } from '@taller/shared';
-import { useCrearConteo, useEliminarInsumo, useGuardarInsumo, useInsumos } from '../../api/costos';
+import { CATEGORIAS_INSUMO, formatBs, type CategoriaInsumo, type InsumoDTO, type InsumoInput } from '@taller/shared';
+import { useCrearConteo, useEliminarInsumo, useGuardarInsumo, useInsumos, useKardex } from '../../api/costos';
 import { hoyLocalISO } from '../../lib/fechas';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
@@ -35,29 +35,46 @@ export function detalleInsumo(i: InsumoDTO): string {
     .join(' · ');
 }
 
-export function InsumosTab() {
+/** Materia prima = telas; insumos = todo lo demás (hilos, cierres, botones…). */
+export type AlcanceInsumos = 'materia_prima' | 'insumos';
+const esDelAlcance = (i: InsumoDTO, alcance?: AlcanceInsumos) =>
+  !alcance || (alcance === 'materia_prima') === (i.categoria === 'tela');
+
+export function InsumosTab({ alcance }: { alcance?: AlcanceInsumos }) {
   const { data: insumos, isLoading } = useInsumos();
   const eliminar = useEliminarInsumo();
   const [modal, setModal] = useState<InsumoDTO | 'nuevo' | null>(null);
   const [contar, setContar] = useState<InsumoDTO | null>(null);
+  const [kardex, setKardex] = useState<InsumoDTO | null>(null);
   const [filtro, setFiltro] = useState<CategoriaInsumo | ''>('');
-  const lista = (insumos ?? []).filter((i) => !filtro || i.categoria === filtro);
+  const lista = (insumos ?? []).filter((i) => esDelAlcance(i, alcance) && (!filtro || i.categoria === filtro));
+  const categorias = CATEGORIAS_INSUMO.filter((c) => !alcance || (alcance === 'materia_prima') === (c === 'tela'));
+  const valorTotal = lista.reduce((a, i) => a + i.valorStock, 0);
+  const sinConteo = lista.filter((i) => i.stock.stock > 0 && !i.stock.conteo).length;
 
   return (
     <>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <select
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value as CategoriaInsumo | '')}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-        >
-          <option value="">Todas las categorías</option>
-          {CATEGORIAS_INSUMO.map((c) => (
-            <option key={c} value={c}>
-              {ETIQUETA_CATEGORIA[c]}
-            </option>
-          ))}
-        </select>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {categorias.length > 1 && (
+            <select
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value as CategoriaInsumo | '')}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Todas las categorías</option>
+              {categorias.map((c) => (
+                <option key={c} value={c}>
+                  {ETIQUETA_CATEGORIA[c]}
+                </option>
+              ))}
+            </select>
+          )}
+          <span className="text-sm text-gray-600">
+            Vale <span className="mono font-semibold">Bs {formatBs(valorTotal)}</span>
+            {sinConteo > 0 && <span className="ml-2 text-xs text-amber-700">· {sinConteo} sin conteo físico</span>}
+          </span>
+        </div>
         <button
           onClick={() => setModal('nuevo')}
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2]"
@@ -78,13 +95,14 @@ export function InsumosTab() {
               <th className="px-3 py-2.5">Última compra</th>
               <th className="px-3 py-2.5">Comprado para</th>
               <th className="px-3 py-2.5 text-right">Stock</th>
+              <th className="px-3 py-2.5 text-right">Vale</th>
               <th className="px-3 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
@@ -133,7 +151,13 @@ export function InsumosTab() {
                     {i.stock.conteo ? `contado el ${fechaCorta(i.stock.conteo.fecha)}` : 'sin conteo'}
                   </div>
                 </td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">
+                  {i.valorStock > 0 ? `Bs ${formatBs(i.valorStock)}` : <span className="text-gray-400">—</span>}
+                </td>
                 <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
+                  <button onClick={() => setKardex(i)} className="mr-3 text-acento hover:underline">
+                    Kárdex
+                  </button>
                   <button onClick={() => setContar(i)} className="mr-3 text-acento hover:underline">
                     Contar
                   </button>
@@ -153,7 +177,7 @@ export function InsumosTab() {
             ))}
             {!isLoading && lista.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
                   No hay insumos {filtro ? 'en esta categoría' : 'cargados'}.
                 </td>
               </tr>
@@ -161,6 +185,7 @@ export function InsumosTab() {
           </tbody>
         </table>
       </div>
+      {kardex && <ModalKardex insumo={kardex} onCerrar={() => setKardex(null)} />}
       {modal && <ModalInsumo insumo={modal === 'nuevo' ? null : modal} onCerrar={() => setModal(null)} />}
       {contar && <ModalConteo insumo={contar} onCerrar={() => setContar(null)} />}
     </>
@@ -338,6 +363,76 @@ function ModalConteo({ insumo, onCerrar }: { insumo: InsumoDTO; onCerrar: () => 
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
         >
           Guardar conteo
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Historial de entradas y salidas de un insumo, con el saldo después de cada una. */
+function ModalKardex({ insumo, onCerrar }: { insumo: InsumoDTO; onCerrar: () => void }) {
+  const { data, isLoading } = useKardex(insumo.id);
+  const cant = (m: number | null) => (m == null ? '' : deMilesimas(m));
+  const tipo = { compra: 'Compra', consumo: 'Corte', conteo: 'Conteo' } as const;
+  return (
+    <Modal onCerrar={onCerrar} ancho="max-w-3xl">
+      <h2 className="text-lg font-semibold">Kárdex · {insumo.nombre}</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Compras (entran), lo que gastó cada corte (sale, en la fecha del corte) y los conteos físicos (el saldo pasa a ser
+        lo contado). En {insumo.unidad}.
+      </p>
+      <div className="mt-3 max-h-[60vh] overflow-auto rounded-lg border border-gray-200">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0">
+            <tr className="bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase shadow-[inset_0_-1px_0_#e5e7eb]">
+              <th className="px-3 py-2">Fecha</th>
+              <th className="px-3 py-2">Movimiento</th>
+              <th className="px-3 py-2 text-right">Entra</th>
+              <th className="px-3 py-2 text-right">Sale</th>
+              <th className="px-3 py-2 text-right">Saldo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  Cargando…
+                </td>
+              </tr>
+            )}
+            {data?.movimientos.map((m, i) => (
+              <tr
+                key={i}
+                className={`border-b border-gray-200/70 last:border-0 even:bg-slate-100 ${m.tipo === 'conteo' ? 'font-semibold' : ''}`}
+              >
+                <td className="px-3 py-1.5 whitespace-nowrap text-gray-600">{fechaCorta(m.fecha)}</td>
+                <td className="px-3 py-1.5">
+                  <span className="text-xs text-gray-500">{tipo[m.tipo]} · </span>
+                  {m.detalle}
+                  {m.diferencia != null && m.diferencia !== 0 && (
+                    <span className={`ml-1 text-xs ${m.diferencia < 0 ? 'text-error' : 'text-ok'}`}>
+                      ({m.diferencia > 0 ? 'sobró' : 'faltó'} {deMilesimas(Math.abs(m.diferencia))})
+                    </span>
+                  )}
+                </td>
+                <td className="mono px-3 py-1.5 text-right text-ok">{cant(m.entrada)}</td>
+                <td className="mono px-3 py-1.5 text-right text-error">{cant(m.salida)}</td>
+                <td className={`mono px-3 py-1.5 text-right ${m.saldo < 0 ? 'text-error' : ''}`}>{deMilesimas(m.saldo)}</td>
+              </tr>
+            ))}
+            {data?.movimientos.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  Sin movimientos todavía.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-4 flex justify-end">
+        <button onClick={onCerrar} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50">
+          Cerrar
         </button>
       </div>
     </Modal>

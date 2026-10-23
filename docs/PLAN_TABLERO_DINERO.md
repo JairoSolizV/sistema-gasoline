@@ -74,3 +74,11 @@ invertido y que no gasta de más:
   no entra en la ganancia (no es una pérdida) y se avisa; también se avisa del stock sin conteo físico.
   Verificado con los datos reales (COD 23 en depósito, anticipos adelantados 3 550, saldo de servicio de
   corte 721). 384 tests en verde (`tests/dinero.test.ts` nuevo).
+- **2026-10-23 — Inventario, cuentas por pagar y despacho en docenas.** Pantalla **Inventario** (área
+  Compras): materia prima (telas) e insumos con su valor en Bs (stock × precio de la última compra) y
+  **kárdex** por material (compras, consumo de cada corte, conteos), y **producto terminado** por modelo
+  en docenas. **Cuentas por pagar**: compras a crédito con fecha de vencimiento (30 días por defecto; los
+  pagos cancelan primero las más viejas), saldos de servicios externos y operarios del mes y la cuota del
+  banco, ordenado por vencimiento (vencido · esta semana · total). Despachos en docenas surtidas + sueltas,
+  con talla y color opcional por línea. Migraciones `20261023180000_despacho_detalle` y
+  `20261023200000_compra_vence`.

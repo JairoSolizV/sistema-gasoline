@@ -21,7 +21,7 @@ import { cajaRouter } from './modules/caja/routes.js';
 // llaman crearApp() sin auth (la prueban aparte en auth.test.ts con tokens).
 export function crearApp({ authObligatoria = false } = {}) {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '3mb' })); // fotos del catálogo (ya achicadas por el panel)
 
   // Rutas públicas (sin token): salud y login.
   app.get('/api/v1/health', (_req, res) => {

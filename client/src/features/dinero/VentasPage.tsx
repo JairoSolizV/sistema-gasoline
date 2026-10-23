@@ -23,7 +23,7 @@ import { Modal } from '../../components/Modal';
 import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
-import { fechaCorta } from '../costos/formato';
+import { enDocenas, fechaCorta } from '../costos/formato';
 
 // Ventas (docs/PLAN_TABLERO_DINERO.md): pedidos de clientes (modelos en puerta),
 // despachos desde el depósito, cobros y clientes. No toca ningún pago.
@@ -402,11 +402,12 @@ function DespachosTab() {
                 <td className="max-w-[300px] px-3 py-2 text-xs text-gray-600">
                   {d.lineas.map((l) => (
                     <div key={l.id}>
-                      {l.prendas} × {l.descripcion} a {formatBs(l.precioPrenda)}
+                      {enDocenas(l.prendas)} · {l.descripcion} a {formatBs(l.precioPrenda)}
+                      {l.detalle && <span className="text-gray-400"> · {l.detalle}</span>}
                     </div>
                   ))}
                 </td>
-                <td className="mono px-3 py-2 text-right">{d.prendas}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">{enDocenas(d.prendas)}</td>
                 <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bs(d.total)}</td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(d.costo)}</td>
                 <td className={`mono px-3 py-2 text-right whitespace-nowrap ${d.total - d.costo < 0 ? 'text-error' : 'text-ok'}`}>
@@ -434,7 +435,17 @@ function DespachosTab() {
   );
 }
 
-type LineaForm = { clave: string; corteId?: string; fichaId?: string; prendas: string; precio: string };
+// se despacha en docenas surtidas; las sueltas y la talla/color, si no va surtido
+type LineaForm = {
+  clave: string;
+  corteId?: string;
+  fichaId?: string;
+  docenas: string;
+  sueltas: string;
+  precio: string;
+  detalle: string;
+};
+const prendasDe = (l: LineaForm) => (Number(l.docenas) || 0) * 12 + (Number(l.sueltas) || 0);
 
 function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   const { data: deposito } = useDeposito();
@@ -445,12 +456,12 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   const [notas, setNotas] = useState('');
   const [lineas, setLineas] = useState<LineaForm[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const cambiar = (clave: string, k: 'prendas' | 'precio', valor: string) =>
+  const cambiar = (clave: string, k: 'docenas' | 'sueltas' | 'precio' | 'detalle', valor: string) =>
     setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, [k]: valor } : l)));
   const agregar = (valor: string) => {
     if (!valor) return;
     const [tipo, id] = valor.split(':');
-    setLineas((ls) => [...ls, { clave: crypto.randomUUID(), ...(tipo === 'corte' ? { corteId: id } : { fichaId: id }), prendas: '', precio: '' }]);
+    setLineas((ls) => [...ls, { clave: crypto.randomUUID(), ...(tipo === 'corte' ? { corteId: id } : { fichaId: id }), docenas: '', sueltas: '', precio: '', detalle: '' }]);
   };
   const info = (l: LineaForm) => {
     if (l.corteId) {
@@ -461,13 +472,13 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
     return { nombre: f?.nombre ?? 'ficha', precio: f?.precioVenta ?? null, max: undefined };
   };
   const precioDe = (l: LineaForm) => (l.precio.trim() && PATRON_BS.test(l.precio.trim()) ? aCent(l.precio) : info(l).precio ?? 0);
-  const total = lineas.reduce((a, l) => a + (Number(l.prendas) || 0) * precioDe(l), 0);
+  const total = lineas.reduce((a, l) => a + prendasDe(l) * precioDe(l), 0);
 
   const onGuardar = async () => {
     setError(null);
     if (!clienteId) return setError('Elegí el cliente');
     if (lineas.length === 0) return setError('Agregá al menos un corte o modelo');
-    if (lineas.some((l) => !(Number(l.prendas) > 0))) return setError('Indicá las prendas de cada línea');
+    if (lineas.some((l) => prendasDe(l) <= 0)) return setError('Indicá las docenas (o sueltas) de cada línea');
     if (lineas.some((l) => l.precio.trim() && !PATRON_BS.test(l.precio.trim()))) return setError('Hay un precio inválido');
     try {
       await mutar.mutateAsync({
@@ -478,8 +489,9 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
           notas,
           lineas: lineas.map((l) => ({
             ...(l.corteId ? { corteId: l.corteId } : { fichaId: l.fichaId }),
-            prendas: Number(l.prendas),
+            prendas: prendasDe(l),
             ...(l.precio.trim() ? { precioPrenda: aCent(l.precio) } : {}),
+            ...(l.detalle.trim() ? { detalle: l.detalle } : {}),
           })),
         },
       });
@@ -526,8 +538,9 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
           <thead>
             <tr className="text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
               <th className="py-1">Qué</th>
-              <th className="py-1 text-right">Prendas</th>
-              <th className="py-1 text-right">Precio (Bs)</th>
+              <th className="py-1 text-right">Docenas</th>
+              <th className="py-1 text-right">Sueltas</th>
+              <th className="py-1 text-right">Precio / prenda</th>
               <th />
             </tr>
           </thead>
@@ -538,12 +551,21 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
                 <tr key={l.clave} className="border-t border-gray-100">
                   <td className="py-1.5 pr-2">
                     {i.nombre}
-                    {i.max != null && <span className="text-xs text-gray-400"> · máx. {i.max}</span>}
+                    {i.max != null && <span className="text-xs text-gray-400"> · quedan {enDocenas(i.max)}</span>}
+                    <input
+                      value={l.detalle}
+                      onChange={(e) => cambiar(l.clave, 'detalle', e.target.value)}
+                      placeholder="surtido · o talla y color (ej. 12 de la 30 negro)"
+                      className="mt-1 block w-full rounded border border-gray-200 px-2 py-0.5 text-xs"
+                    />
                   </td>
-                  <td className="py-1.5 text-right">
-                    <input value={l.prendas} onChange={(e) => cambiar(l.clave, 'prendas', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="mono w-20 rounded-lg border border-gray-300 px-2 py-1 text-right" />
+                  <td className="py-1.5 text-right align-top">
+                    <input value={l.docenas} onChange={(e) => cambiar(l.clave, 'docenas', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="mono w-16 rounded-lg border border-gray-300 px-2 py-1 text-right" />
                   </td>
-                  <td className="py-1.5 text-right">
+                  <td className="py-1.5 text-right align-top">
+                    <input value={l.sueltas} onChange={(e) => cambiar(l.clave, 'sueltas', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className="mono w-14 rounded-lg border border-gray-300 px-2 py-1 text-right" />
+                  </td>
+                  <td className="py-1.5 text-right align-top">
                     <input
                       value={l.precio}
                       onChange={(e) => cambiar(l.clave, 'precio', e.target.value)}
@@ -552,7 +574,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
                       className="mono w-24 rounded-lg border border-gray-300 px-2 py-1 text-right"
                     />
                   </td>
-                  <td className="py-1.5 pl-2 text-right">
+                  <td className="py-1.5 pl-2 text-right align-top">
                     <button onClick={() => setLineas((ls) => ls.filter((x) => x.clave !== l.clave))} className="text-error">
                       ✕
                     </button>

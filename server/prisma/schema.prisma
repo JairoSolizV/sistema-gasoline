@@ -665,6 +665,7 @@ model CompraInsumo {
   tasaCambio   Int? // diezmilésimos: tasa oficial del día de la compra
   precioTotal  Int // centavos Bs (en dólares: montoUsd × tasa, redondeado una vez)
   condicion    CondicionCompra @default(contado) // a crédito: suma a la deuda con el proveedor (tablero)
+  vence        DateTime?       @db.Date // a crédito: cuándo hay que pagarla (cuentas por pagar)
   caja         Caja            @default(efectivo) // al contado: de qué caja salió
   codigoCorte  String? // corte para el que se compró (texto: "28-1"; los cortes 25–32 no están en el sistema)
   notas        String?
@@ -686,6 +687,11 @@ model FichaCosto {
   servicioCorteInterno Boolean      @default(true) // suma las tarifas del servicio de corte
   margen               Int? // centésimas de %; null = el general de Configuración
   notas                String?
+  // catálogo de productos: lo que se le muestra al cliente
+  tallas               String? // ej. "28 al 38"
+  colores              String? // ej. "azul, negro, celeste"
+  descripcion          String?
+  foto                 FotoFicha?
   creadoEn             DateTime     @default(now())
   actualizadoEn        DateTime     @updatedAt
   lineas               LineaCosto[]
@@ -905,6 +911,7 @@ model DespachoLinea {
   ficha        FichaCosto? @relation(fields: [fichaId], references: [id])
   fichaId      String?
   descripcion  String
+  detalle      String? // talla y color cuando no va surtido (ej. "12 de la 30 negro")
   prendas      Int
   precioPrenda Int // centavos
   costoPrenda  Int // centavos (foto)
@@ -990,4 +997,14 @@ model ArqueoCaja {
   creadoEn   DateTime @default(now())
 
   @@index([caja, fecha])
+}
+
+// Foto del producto para el catálogo. Se guarda en la base (entra en los
+// respaldos); el panel la achica a ≤1000 px antes de subirla.
+model FotoFicha {
+  ficha         FichaCosto @relation(fields: [fichaId], references: [id], onDelete: Cascade)
+  fichaId       String     @id
+  mime          String
+  datos         Bytes
+  actualizadoEn DateTime   @updatedAt
 }

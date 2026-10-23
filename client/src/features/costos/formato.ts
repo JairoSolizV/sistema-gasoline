@@ -63,3 +63,10 @@ export const ETIQUETA_TIPO_LINEA: Record<LineaCostoDTO['tipo'], string> = {
 };
 
 export const fechaCorta = (dia: string) => dia.split('-').reverse().join('/');
+
+/** 150 prendas → "12 doc + 6" */
+export const enDocenas = (prendas: number) => {
+  const doc = Math.floor(prendas / 12);
+  const sueltas = prendas % 12;
+  return doc === 0 ? `${sueltas} sueltas` : sueltas === 0 ? `${doc} doc` : `${doc} doc + ${sueltas}`;
+};

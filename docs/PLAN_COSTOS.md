@@ -206,3 +206,12 @@ y la proyección suman el costo fijo por prenda. Solo consulta: no toca pagos.
   Costos y la planilla de Liquidación con ancho ajustado, cabecera fija y filas en franjas
   (`components/tabla.ts`); en Liquidación la primera columna de los servicios externos dice "Empresa".
   377 tests en verde.
+- **2026-10-23 — Menú por áreas y catálogo de productos.** El menú se ordena en áreas con color
+  (Producción azul, Personal turquesa, Compras ámbar, Ventas violeta, Costos coral, Finanzas verde,
+  Sistema gris) y cada página muestra una franja con el color de su área; los botones siguen en azul y
+  verde/rojo quedan para plata a favor o en contra. Las pestañas de Costos se reparten: Compras y
+  Deudas a proveedores → **Compras**; Insumos → **Inventario**; Costos fijos → **Finanzas**. "Catálogo"
+  pasa a llamarse **Catálogo de operaciones**. **Catálogo de productos** sobre las fichas: foto
+  (guardada en la base, achicada a ≤1000 px por el panel), tallas, colores, descripción y precio por
+  docena en Bs y $us; "mostrar costos" apagado para mostrarlo o imprimirlo al cliente. Migración
+  `20261023220000_catalogo_productos`. 392 tests en verde.

@@ -65,6 +65,7 @@ export const compraInputSchema = z
     codigoCorte: texto(20).optional(), // corte para el que se compró (ej. "28-1")
     condicion: z.enum(['contado', 'credito']).default('contado'), // a crédito: deuda con el proveedor
     caja: cajaSchema.default('efectivo'), // al contado: de qué caja salió
+    vence: dia.optional(), // a crédito: cuándo hay que pagarla
     notas: texto(200).optional(),
   })
   .refine((c) => c.moneda !== 'BOB' || c.precioTotal != null, {
@@ -125,6 +126,7 @@ export const editarCompraSchema = z
     codigoCorte: texto(20),
     condicion: z.enum(['contado', 'credito']),
     caja: cajaSchema,
+    vence: dia.nullable(),
   })
   .partial()
   .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
@@ -237,3 +239,21 @@ export type CompraGastoInput = z.infer<typeof compraGastoInputSchema>;
 export type PrestamoInput = z.infer<typeof prestamoInputSchema>;
 export type EditarPrestamoInput = z.infer<typeof editarPrestamoSchema>;
 export type PagoPrestamoInput = z.infer<typeof pagoPrestamoInputSchema>;
+
+// ── Catálogo de productos (sobre las fichas de costo) ──
+
+/** Lo que se le muestra al cliente de cada producto. */
+export const catalogoFichaSchema = z
+  .object({ tallas: texto(60), colores: texto(120), descripcion: texto(300) })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
+
+export const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp'] as const;
+/** Foto ya achicada por el panel, en base64 (máx. ~2 MB de imagen). */
+export const fotoFichaSchema = z.object({
+  mime: z.enum(TIPOS_FOTO, 'La foto tiene que ser JPG, PNG o WEBP'),
+  base64: z.string().min(10).max(2_800_000, 'La foto es muy pesada'),
+});
+
+export type CatalogoFichaInput = z.infer<typeof catalogoFichaSchema>;
+export type FotoFichaInput = z.infer<typeof fotoFichaSchema>;

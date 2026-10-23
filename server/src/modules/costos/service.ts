@@ -8,10 +8,12 @@ import {
   docenaEnDolares,
   CANTIDAD_ESCALA,
   consumoTela,
+  costoDeCantidad,
   costoFicha,
   dateADia,
   diaADate,
   precioUnitario,
+  redondear,
   type CompraDTO,
   type CompraInput,
   type EditarCompraInput,
@@ -22,6 +24,11 @@ import {
   type Fraccion,
   type InsumoDTO,
   type InsumoInput,
+  type CatalogoFichaInput,
+  type FotoFichaDTO,
+  type FotoFichaInput,
+  type ProductoCatalogoDTO,
+  type KardexDTO,
   type LineaCostoDTO,
   type LineaParaCosto,
   type ConteoDTO,
@@ -40,6 +47,7 @@ import {
   aResumenCorte,
   costoRealCorte,
   fichaDeCorte,
+  kardexInsumo,
   proyeccion,
   STOCK_VACIO,
   stockPorInsumo,
@@ -80,6 +88,10 @@ function aInsumoDTO(
     precioUnitarioBs: ultima ? bsPorUnidad(ultima) : null,
     usadoEnFichas: i._count.lineas,
     stock,
+    valorStock:
+      ultima && stock.stock > 0
+        ? redondear(costoDeCantidad({ num: BigInt(stock.stock), den: 1n }, precioUnitario(ultima)))
+        : 0,
     codigosCorte,
   };
 }
@@ -103,6 +115,7 @@ function aCompraDTO(c: CompraConInsumo): CompraDTO {
     codigoCorte: c.codigoCorte,
     condicion: c.condicion,
     caja: c.caja,
+    vence: c.vence ? dateADia(c.vence) : null,
     notas: c.notas,
   };
 }
@@ -256,6 +269,11 @@ export const costosService = {
     return insumos.map((i) => aInsumoDTO(i, stock.get(i.id), codigos.get(i.id)));
   },
 
+  async kardex(id: string): Promise<KardexDTO> {
+    const insumo = await insumoOError(id);
+    return { insumo: { id: insumo.id, nombre: insumo.nombre, unidad: insumo.unidad }, movimientos: await kardexInsumo(id) };
+  },
+
   async crearInsumo(input: InsumoInput): Promise<InsumoDTO> {
     return aInsumoDTO(await costosRepository.crearInsumo(input));
   },
@@ -303,6 +321,7 @@ export const costosService = {
       codigoCorte: input.codigoCorte ?? null,
       condicion: input.condicion,
       caja: input.caja,
+      vence: input.condicion === 'credito' && input.vence ? diaADate(input.vence) : null,
       notas: input.notas ?? null,
     });
     return aCompraDTO(compra);
@@ -310,7 +329,13 @@ export const costosService = {
 
   async editarCompra(id: string, input: EditarCompraInput): Promise<CompraDTO> {
     if (!(await costosRepository.obtenerCompra(id))) throw new AppError('NO_ENCONTRADO', 'Compra no encontrada', 404);
-    return aCompraDTO(await costosRepository.actualizarCompra(id, input));
+    const { vence, ...resto } = input;
+    return aCompraDTO(
+      await costosRepository.actualizarCompra(id, {
+        ...resto,
+        ...(vence !== undefined ? { vence: vence ? diaADate(vence) : null } : {}),
+      }),
+    );
   },
 
   async eliminarCompra(id: string): Promise<void> {
@@ -347,6 +372,52 @@ export const costosService = {
       throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
     }
     return this.obtenerFicha(await guardar(id, input));
+  },
+
+  // ── Catálogo de productos ──
+  async catalogo(): Promise<ProductoCatalogoDTO[]> {
+    const [fichas, config] = await Promise.all([costosRepository.catalogo(), configuracionRepository.obtener()]);
+    const fijo = await costoFijoPorPrenda(config);
+    return fichas.map((f) => {
+      const c = calcularFicha(f, config, fijo);
+      return {
+        id: f.id,
+        codigo: f.codigo,
+        nombre: f.nombre,
+        modelo: c.modelo,
+        tallas: f.tallas,
+        colores: f.colores,
+        descripcion: f.descripcion,
+        tieneFoto: f.foto != null,
+        fotoVersion: f.foto ? f.foto.actualizadoEn.toISOString() : null,
+        costoPrenda: c.total,
+        precioPrenda: c.precioVenta,
+        precioDocena: c.precioVenta * 12,
+        costoDocenaUsd: c.costoDocenaUsd,
+        ventaDocenaUsd: c.ventaDocenaUsd,
+        incompleto: c.incompleto,
+      };
+    });
+  },
+
+  async editarCatalogo(id: string, input: CatalogoFichaInput): Promise<void> {
+    if (!(await costosRepository.obtenerFicha(id))) throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
+    await costosRepository.actualizarCatalogo(id, input);
+  },
+
+  async obtenerFoto(id: string): Promise<FotoFichaDTO> {
+    const foto = await costosRepository.obtenerFoto(id);
+    if (!foto) throw new AppError('NO_ENCONTRADO', 'El producto no tiene foto', 404);
+    return { mime: foto.mime, base64: Buffer.from(foto.datos).toString('base64') };
+  },
+
+  async guardarFoto(id: string, input: FotoFichaInput): Promise<void> {
+    if (!(await costosRepository.obtenerFicha(id))) throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
+    await costosRepository.guardarFoto(id, input.mime, new Uint8Array(Buffer.from(input.base64, 'base64')));
+  },
+
+  async quitarFoto(id: string): Promise<void> {
+    await costosRepository.quitarFoto(id);
   },
 
   async eliminarFicha(id: string): Promise<void> {

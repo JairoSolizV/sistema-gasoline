@@ -98,6 +98,18 @@ describe('compras', () => {
     expect(insumos.find((i) => i.id === ids.HILO)!.codigosCorte).toEqual(['28-1', '31']);
     expect(insumos.find((i) => i.id === ids.BOLSA)!.codigosCorte).toEqual([]);
   });
+  test('kárdex: compras suman, el conteo fija el saldo; el stock vale al precio de la última compra', async () => {
+    // HILO: 4 compras de 1 cono a Bs 28 (en las pruebas anteriores)
+    const conteo = await request(app).post('/api/v1/costos/conteos').send({ insumoId: ids.HILO, fecha: '2026-09-23', cantidad: 3000 });
+    expect(conteo.status).toBe(201);
+    const k = (await request(app).get(`/api/v1/costos/insumos/${ids.HILO}/kardex`)).body.data;
+    expect(k.movimientos.filter((m: { tipo: string }) => m.tipo === 'compra')).toHaveLength(4);
+    const ultimo = k.movimientos.at(-1);
+    expect(ultimo).toMatchObject({ tipo: 'conteo', saldo: 3000, diferencia: -1000 }); // había 4, se contaron 3
+    const hilo = ((await request(app).get('/api/v1/costos/insumos')).body.data as InsumoDTO[]).find((i) => i.id === ids.HILO)!;
+    expect(hilo.stock.stock).toBe(3000);
+    expect(hilo.valorStock).toBe(8400); // 3 conos × Bs 28
+  });
 });
 
 describe('ficha de costo', () => {
@@ -166,6 +178,21 @@ describe('ficha de costo', () => {
     await comprar({ insumoId: ids.HILO, fecha: '2026-10-15', cantidad: 1000, precioTotal: 3000 }); // cono a Bs 30
     const f = (await request(app).get(`/api/v1/costos/fichas/${ids.FICHA}`)).body.data as FichaCostoDetalleDTO;
     expect(f.lineas[1].costo).toBe(30);
+  });
+
+  test('catálogo: tallas, colores, foto y precio por docena de cada ficha', async () => {
+    const edit = await request(app)
+      .patch(`/api/v1/costos/fichas/${ids.FICHA}/catalogo`)
+      .send({ tallas: '28 al 38', colores: 'azul, negro' });
+    expect(edit.status).toBe(200);
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    expect((await request(app).put(`/api/v1/costos/fichas/${ids.FICHA}/foto`).send({ mime: 'image/png', base64: png })).status).toBe(200);
+    expect((await request(app).get(`/api/v1/costos/fichas/${ids.FICHA}/foto`)).body.data).toEqual({ mime: 'image/png', base64: png });
+    const malo = await request(app).put(`/api/v1/costos/fichas/${ids.FICHA}/foto`).send({ mime: 'application/pdf', base64: png });
+    expect(malo.status).toBe(400);
+    const p = (await request(app).get('/api/v1/costos/catalogo')).body.data.find((x: { id: string }) => x.id === ids.FICHA);
+    expect(p).toMatchObject({ tallas: '28 al 38', colores: 'azul, negro', tieneFoto: true });
+    expect(p.precioDocena).toBe(p.precioPrenda * 12);
   });
 
   test('nombre repetido y modelo inexistente se rechazan', async () => {

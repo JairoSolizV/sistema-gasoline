@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { logout } from '../api/auth';
 
@@ -19,25 +19,69 @@ function Icono({ d }: { d: string }) {
   );
 }
 
+// Áreas del sistema, cada una con su color. El color identifica el área en el
+// menú y en la franja de arriba de cada página; los botones de acción siguen
+// en azul y el verde/rojo quedan para plata a favor o en contra.
+type Area = { nombre: string; color: string; claro: string };
+export const AREAS = {
+  produccion: { nombre: 'Producción', color: '#378ADD', claro: '#85B7EB' },
+  personal: { nombre: 'Personal', color: '#1D9E75', claro: '#5DCAA5' },
+  compras: { nombre: 'Compras', color: '#BA7517', claro: '#EF9F27' },
+  ventas: { nombre: 'Ventas', color: '#7F77DD', claro: '#AFA9EC' },
+  costos: { nombre: 'Costos', color: '#D85A30', claro: '#F0997B' },
+  finanzas: { nombre: 'Finanzas', color: '#639922', claro: '#97C459' },
+  sistema: { nombre: 'Sistema', color: '#888780', claro: '#B4B2A9' },
+} satisfies Record<string, Area>;
+type ClaveArea = keyof typeof AREAS;
+
+// a qué área pertenece cada ruta (el prefijo más largo gana)
+const RUTAS_AREA: [string, ClaveArea][] = [
+  ['/modelos', 'produccion'],
+  ['/plantillas', 'produccion'],
+  ['/catalogo', 'produccion'],
+  ['/cortes', 'produccion'],
+  ['/asistencia', 'produccion'],
+  ['/operarios', 'personal'],
+  ['/anticipos', 'personal'],
+  ['/liquidacion', 'personal'],
+  ['/rendicion', 'personal'],
+  ['/compras', 'compras'],
+  ['/inventario', 'compras'],
+  ['/cuentas-por-pagar', 'compras'],
+  ['/ventas', 'ventas'],
+  ['/costos-fijos', 'finanzas'],
+  ['/productos', 'costos'],
+  ['/costos', 'costos'],
+  ['/tablero', 'finanzas'],
+  ['/caja', 'finanzas'],
+  ['/configuracion', 'sistema'],
+];
+const areaDeRuta = (ruta: string): ClaveArea | null =>
+  RUTAS_AREA.filter(([p]) => ruta === p || ruta.startsWith(`${p}/`)).sort((a, b) => b[0].length - a[0].length)[0]?.[1] ??
+  null;
+
 function ItemMenu({
   a,
   icono,
   children,
   badge,
+  area,
 }: {
   a: string;
   icono: ReactNode;
   children: ReactNode;
   badge?: string;
+  area?: ClaveArea;
 }) {
+  const color = area ? AREAS[area].color : '#2f6fe0';
   return (
     <NavLink
       to={a}
+      end={a === '/'}
+      style={({ isActive }) => (isActive ? { boxShadow: `inset 3px 0 0 ${color}`, background: `${color}26` } : undefined)}
       className={({ isActive }) =>
-        `flex w-full items-center gap-3 px-4 py-2.5 text-[13.5px] font-medium transition-colors ${
-          isActive
-            ? 'bg-[rgba(47,111,224,0.14)] text-[#eef4ff] shadow-[inset_3px_0_0_#2f6fe0]'
-            : 'text-[#98a2b3] hover:text-[#cdd6e2]'
+        `flex w-full items-center gap-3 px-4 py-2 text-[13.5px] font-medium transition-colors ${
+          isActive ? 'text-[#eef4ff]' : 'text-[#98a2b3] hover:text-[#cdd6e2]'
         }`
       }
     >
@@ -52,15 +96,21 @@ function ItemMenu({
   );
 }
 
-function TituloSeccion({ children }: { children: ReactNode }) {
+function TituloSeccion({ area }: { area: ClaveArea }) {
+  const { nombre, claro } = AREAS[area];
   return (
-    <div className="px-5 pt-4 pb-2 text-[10.5px] font-semibold tracking-widest text-[#5a6473] uppercase">
-      {children}
+    <div
+      className="flex items-center gap-2 px-5 pt-4 pb-1.5 text-[10.5px] font-semibold tracking-widest uppercase"
+      style={{ color: claro }}
+    >
+      <span className="h-2 w-2 rounded-sm" style={{ background: claro }} />
+      {nombre}
     </div>
   );
 }
 
 export function Layout() {
+  const area = areaDeRuta(useLocation().pathname);
   return (
     <div className="flex h-screen w-full overflow-hidden print:block print:h-auto print:overflow-visible">
       <aside className="flex h-full w-[246px] flex-none flex-col border-r border-black/40 bg-lateral">
@@ -75,76 +125,90 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3">
-          <TituloSeccion>General</TituloSeccion>
           <ItemMenu a="/" icono={<Icono d="M3 11l9-7 9 7M5 10v9h14v-9" />}>
             Inicio
           </ItemMenu>
+
+          <TituloSeccion area="produccion" />
+          <ItemMenu area="produccion" a="/cortes" badge="central" icono={<Icono d="M3.5 4.5h17v15h-17zM3.5 9.5h17M9 9.5v10" />}>
+            Cortes
+          </ItemMenu>
+          <ItemMenu area="produccion" a="/modelos" icono={<Icono d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16.5l8 4 8-4" />}>
+            Modelos
+          </ItemMenu>
+          <ItemMenu area="produccion" a="/plantillas" icono={<Icono d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7" />}>
+            Plantillas
+          </ItemMenu>
+          <ItemMenu area="produccion" a="/catalogo" icono={<Icono d="M4 6h16M4 12h10M4 18h6M18 12v6M15 15h6" />}>
+            Catálogo de operaciones
+          </ItemMenu>
+          <ItemMenu area="produccion" a="/asistencia" icono={<Icono d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8.5 15l2 2 4-4" />}>
+            Asistencia
+          </ItemMenu>
+
+          <TituloSeccion area="personal" />
           <ItemMenu
+            area="personal"
             a="/operarios"
             icono={<Icono d="M12 11a3.2 3.2 0 1 0-3.2-3.2A3.2 3.2 0 0 0 12 11zm-6 8c0-3 2.7-4.6 6-4.6s6 1.6 6 4.6" />}
           >
             Operarios
           </ItemMenu>
-          <ItemMenu a="/modelos" icono={<Icono d="M12 3l8 4-8 4-8-4 8-4zM4 12l8 4 8-4M4 16.5l8 4 8-4" />}>
-            Modelos
-          </ItemMenu>
-          <ItemMenu
-            a="/plantillas"
-            icono={<Icono d="M6 3h9l4 4v14H6zM15 3v4h4M9 12h7M9 16h7" />}
-          >
-            Plantillas
-          </ItemMenu>
-          <ItemMenu
-            a="/catalogo"
-            icono={<Icono d="M4 6h16M4 12h10M4 18h6M18 12v6M15 15h6" />}
-          >
-            Catálogo
-          </ItemMenu>
-
-          <TituloSeccion>Producción</TituloSeccion>
-          <ItemMenu a="/cortes" badge="central" icono={<Icono d="M3.5 4.5h17v15h-17zM3.5 9.5h17M9 9.5v10" />}>
-            Cortes
-          </ItemMenu>
-          <ItemMenu a="/anticipos" icono={<Icono d="M3 6h18v12H3zM12 9.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z" />}>
+          <ItemMenu area="personal" a="/anticipos" icono={<Icono d="M3 6h18v12H3zM12 9.6a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8z" />}>
             Anticipos
           </ItemMenu>
           <ItemMenu
-            a="/asistencia"
-            icono={<Icono d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8.5 15l2 2 4-4" />}
-          >
-            Asistencia
-          </ItemMenu>
-          <ItemMenu
+            area="personal"
             a="/liquidacion"
             icono={<Icono d="M9.5 6h10M9.5 12h10M9.5 18h10M4 5.6l1.3 1.3L7.6 4.6M4 11.6l1.3 1.3 2.3-2.3M4 17.6l1.3 1.3 2.3-2.3" />}
           >
             Liquidación
           </ItemMenu>
-          <ItemMenu a="/rendicion" icono={<Icono d="M6 3h8l4 4v14H6zM14 3v4h4M9 12.5h6M9 16h6" />}>
+          <ItemMenu area="personal" a="/rendicion" icono={<Icono d="M6 3h8l4 4v14H6zM14 3v4h4M9 12.5h6M9 16h6" />}>
             Rendición de cuentas
           </ItemMenu>
 
-          <TituloSeccion>Dinero</TituloSeccion>
-          <ItemMenu a="/tablero" icono={<Icono d="M4 19V10M10 19V5M16 19v-7M22 19H2" />}>
-            Tablero de dinero
+          <TituloSeccion area="compras" />
+          <ItemMenu area="compras" a="/compras" icono={<Icono d="M5 7h14l-1.5 9h-11zM9 7V5h6v2M9 20h.01M15 20h.01" />}>
+            Compras y proveedores
           </ItemMenu>
-          <ItemMenu a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
-            Ventas y cobros
+          <ItemMenu area="compras" a="/inventario" icono={<Icono d="M4 8l8-4 8 4v10l-8 4-8-4zM4 8l8 4 8-4M12 12v10" />}>
+            Inventario
           </ItemMenu>
-          <ItemMenu a="/caja" icono={<Icono d="M3 7h18v12H3zM3 11h18M7 15h3" />}>
-            Caja
+          <ItemMenu area="compras" a="/cuentas-por-pagar" icono={<Icono d="M4 5h16v14H4zM4 9h16M8 14h4M15 14h1" />}>
+            Cuentas por pagar
           </ItemMenu>
 
-          <TituloSeccion>Costos</TituloSeccion>
+          <TituloSeccion area="ventas" />
+          <ItemMenu area="ventas" a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
+            Ventas y cobros
+          </ItemMenu>
+
+          <TituloSeccion area="costos" />
           <ItemMenu
+            area="costos"
             a="/costos"
             icono={<Icono d="M12 3v18M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" />}
           >
             Costos de producción
           </ItemMenu>
+          <ItemMenu area="costos" a="/productos" icono={<Icono d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />}>
+            Catálogo de productos
+          </ItemMenu>
 
-          <TituloSeccion>Sistema</TituloSeccion>
-          <ItemMenu a="/configuracion" icono={<Icono d="M5 7h14M5 12h14M5 17h14" />}>
+          <TituloSeccion area="finanzas" />
+          <ItemMenu area="finanzas" a="/tablero" icono={<Icono d="M4 19V10M10 19V5M16 19v-7M22 19H2" />}>
+            Tablero de dinero
+          </ItemMenu>
+          <ItemMenu area="finanzas" a="/caja" icono={<Icono d="M3 7h18v12H3zM3 11h18M7 15h3" />}>
+            Caja
+          </ItemMenu>
+          <ItemMenu area="finanzas" a="/costos-fijos" icono={<Icono d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5" />}>
+            Costos fijos
+          </ItemMenu>
+
+          <TituloSeccion area="sistema" />
+          <ItemMenu area="sistema" a="/configuracion" icono={<Icono d="M5 7h14M5 12h14M5 17h14" />}>
             Configuración
           </ItemMenu>
         </nav>
@@ -171,6 +235,16 @@ export function Layout() {
       </aside>
 
       <main className="h-full flex-1 overflow-y-auto">
+        {area && (
+          <div className="print:hidden" style={{ borderTop: `3px solid ${AREAS[area].color}` }}>
+            <div
+              className="px-8 pt-3 text-[11px] font-semibold tracking-widest uppercase"
+              style={{ color: AREAS[area].color }}
+            >
+              {AREAS[area].nombre}
+            </div>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

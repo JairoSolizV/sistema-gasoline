@@ -5,6 +5,7 @@ import type {
   CobroDTO,
   CobroInput,
   CorteDineroDTO,
+  CuentasPorPagarDTO,
   DespachoDTO,
   DespachoInput,
   EditarClienteInput,
@@ -22,6 +23,11 @@ import { api } from './client';
 
 export const useTablero = () =>
   useQuery({ queryKey: ['dinero', 'tablero'], queryFn: () => api<TableroDTO>('/dinero/tablero') });
+export const useCuentasPorPagar = () =>
+  useQuery({
+    queryKey: ['dinero', 'cuentas-por-pagar'],
+    queryFn: () => api<CuentasPorPagarDTO>('/dinero/cuentas-por-pagar'),
+  });
 export const useDeposito = () =>
   useQuery({ queryKey: ['dinero', 'deposito'], queryFn: () => api<CorteDineroDTO[]>('/dinero/deposito') });
 export const useClientes = () =>

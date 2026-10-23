@@ -15,7 +15,7 @@ import { NuevoCortePage } from './features/cortes/NuevoCortePage';
 import { CorteDetallePage } from './features/cortes/CorteDetallePage';
 import { AnticiposPage } from './features/anticipos/AnticiposPage';
 import { AsistenciaPage } from './features/asistencia/AsistenciaPage';
-import { CostosPage } from './features/costos/CostosPage';
+import { ComprasPage, CostosFijosPage, CostosPage, InventarioPage } from './features/costos/CostosPage';
 import { FichaCostoPage } from './features/costos/FichaCostoPage';
 import { LiquidacionPage } from './features/liquidacion/LiquidacionPage';
 import { RendicionPage } from './features/rendicion/RendicionPage';
@@ -23,6 +23,8 @@ import { ConfiguracionPage } from './features/configuracion/ConfiguracionPage';
 import { TableroPage } from './features/dinero/TableroPage';
 import { VentasPage } from './features/dinero/VentasPage';
 import { CajaPage } from './features/dinero/CajaPage';
+import { CuentasPorPagarPage } from './features/dinero/CuentasPorPagarPage';
+import { CatalogoProductosPage } from './features/costos/CatalogoProductosPage';
 import { PantallaError } from './components/PantallaError';
 
 export const router = createBrowserRouter([
@@ -55,10 +57,15 @@ export const router = createBrowserRouter([
           { path: '/liquidacion', element: <LiquidacionPage /> },
           { path: '/rendicion', element: <RendicionPage /> },
           { path: '/costos', element: <CostosPage /> },
+          { path: '/compras', element: <ComprasPage /> },
+          { path: '/inventario', element: <InventarioPage /> },
+          { path: '/costos-fijos', element: <CostosFijosPage /> },
+          { path: '/productos', element: <CatalogoProductosPage /> },
           { path: '/costos/fichas/:fichaId', element: <FichaCostoPage /> },
           { path: '/tablero', element: <TableroPage /> },
           { path: '/ventas', element: <VentasPage /> },
           { path: '/caja', element: <CajaPage /> },
+          { path: '/cuentas-por-pagar', element: <CuentasPorPagarPage /> },
           { path: '/configuracion', element: <ConfiguracionPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],

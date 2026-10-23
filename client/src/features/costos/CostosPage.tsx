@@ -1,7 +1,8 @@
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { formatBs } from '@taller/shared';
 import { useFichasCosto } from '../../api/costos';
 import { useConfiguracion } from '../../api/configuracion';
+import { PaginaPestanas } from '../../components/PaginaPestanas';
 import { TABLA } from '../../components/tabla';
 import { ComprasTab } from './ComprasTab';
 import { CortesCostoTab } from './CortesCostoTab';
@@ -9,62 +10,60 @@ import { FijosTab } from './FijosTab';
 import { InsumosTab } from './InsumosTab';
 import { ProyeccionTab } from './ProyeccionTab';
 import { ProveedoresTab } from './ProveedoresTab';
+import { ProductoTerminadoTab } from './ProductoTerminadoTab';
 
-// Costos de producción (docs/PLAN_COSTOS.md). Solo consulta: nada de esto toca
-// los pagos. Pestañas: fichas de costo por modelo, insumos y compras.
-
-const PESTANAS = [
-  { clave: 'fichas', etiqueta: 'Fichas de costo' },
-  { clave: 'insumos', etiqueta: 'Insumos' },
-  { clave: 'compras', etiqueta: 'Compras' },
-  { clave: 'proveedores', etiqueta: 'Deudas a proveedores' },
-  { clave: 'cortes', etiqueta: 'Costo real de cortes' },
-  { clave: 'proyeccion', etiqueta: 'Proyección del mes' },
-  { clave: 'fijos', etiqueta: 'Costos fijos' },
-] as const;
-type Pestana = (typeof PESTANAS)[number]['clave'];
+// Páginas del módulo Costos (docs/PLAN_COSTOS.md), repartidas por área del
+// menú: Costos (fichas, costo real, proyección), Compras, Inventario y Costos
+// fijos (Finanzas). Solo consulta: nada de esto toca los pagos.
 
 export function CostosPage() {
-  const [parametros, setParametros] = useSearchParams();
-  const pedida = parametros.get('tab') as Pestana | null;
-  const activa: Pestana = PESTANAS.some((p) => p.clave === pedida) ? pedida! : 'fichas';
-
-  // Costos fijos imprime su propia hoja oficio: el resto de la página no sale
-  const soloHoja = activa === 'fijos' ? 'print:hidden' : '';
-
   return (
-    <div className="p-8 print:p-0">
-      <h1 className={`text-2xl font-semibold ${soloHoja}`}>Costos de producción</h1>
-      <p className={`mt-1 text-sm text-gray-500 ${soloHoja}`}>
-        Cuánto cuesta producir cada prenda hoy: materiales con el precio de la última compra, mano
-        de obra, empaque y servicio de corte del sistema, y el precio de venta con el margen. Solo
-        consulta: no cambia ningún pago.
-      </p>
-      <div className={`mt-5 flex gap-1 border-b border-gray-200 ${soloHoja}`}>
-        {PESTANAS.map((p) => (
-          <button
-            key={p.clave}
-            onClick={() => setParametros({ tab: p.clave }, { replace: true })}
-            className={`-mb-px rounded-t-lg border px-4 py-2 text-sm ${
-              p.clave === activa
-                ? 'border-gray-200 border-b-white bg-white font-semibold'
-                : 'border-transparent text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {p.etiqueta}
-          </button>
-        ))}
-      </div>
-      <div className="mt-4 print:mt-0">
-        {activa === 'fichas' && <FichasTab />}
-        {activa === 'insumos' && <InsumosTab />}
-        {activa === 'compras' && <ComprasTab />}
-        {activa === 'proveedores' && <ProveedoresTab />}
-        {activa === 'cortes' && <CortesCostoTab />}
-        {activa === 'proyeccion' && <ProyeccionTab />}
-        {activa === 'fijos' && <FijosTab />}
-      </div>
-    </div>
+    <PaginaPestanas
+      titulo="Costos de producción"
+      descripcion="Cuánto cuesta producir cada prenda hoy: materiales con el precio de la última compra, mano de obra, empaque y servicio de corte del sistema, y el precio de venta con el margen. Solo consulta: no cambia ningún pago."
+      pestanas={[
+        { clave: 'fichas', etiqueta: 'Fichas de costo', contenido: () => <FichasTab /> },
+        { clave: 'cortes', etiqueta: 'Costo real de cortes', contenido: () => <CortesCostoTab /> },
+        { clave: 'proyeccion', etiqueta: 'Proyección del mes', contenido: () => <ProyeccionTab /> },
+      ]}
+    />
+  );
+}
+
+export function ComprasPage() {
+  return (
+    <PaginaPestanas
+      titulo="Compras"
+      descripcion="Lo que comprás para producir: telas, hilos, cierres, botones… al contado o a crédito, y lo que le debés a cada proveedor."
+      pestanas={[
+        { clave: 'compras', etiqueta: 'Compras', contenido: () => <ComprasTab /> },
+        { clave: 'proveedores', etiqueta: 'Deudas a proveedores', contenido: () => <ProveedoresTab /> },
+      ]}
+    />
+  );
+}
+
+export function InventarioPage() {
+  return (
+    <PaginaPestanas
+      titulo="Inventario"
+      descripcion="Lo que tenés en el depósito: telas e insumos (último conteo + compras − lo que gastó cada corte) y prendas terminadas sin despachar."
+      pestanas={[
+        { clave: 'materia_prima', etiqueta: 'Materia prima (telas)', contenido: () => <InsumosTab alcance="materia_prima" /> },
+        { clave: 'insumos', etiqueta: 'Insumos', contenido: () => <InsumosTab alcance="insumos" /> },
+        { clave: 'terminado', etiqueta: 'Producto terminado', contenido: () => <ProductoTerminadoTab /> },
+      ]}
+    />
+  );
+}
+
+export function CostosFijosPage() {
+  return (
+    <PaginaPestanas
+      titulo="Costos fijos"
+      descripcion="Lo que cuesta mantener el taller cada mes (la parte del taller de cada gasto) y la cuota del préstamo, repartidos por prenda en las fichas."
+      pestanas={[{ clave: 'fijos', etiqueta: 'Costos fijos', contenido: () => <FijosTab />, imprimeSola: true }]}
+    />
   );
 }
 

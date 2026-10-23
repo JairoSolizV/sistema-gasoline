@@ -541,7 +541,7 @@ export function CatalogoPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-semibold">Catálogo</h1>
+      <h1 className="text-2xl font-semibold">Catálogo de operaciones</h1>
       <p className="mt-1 max-w-4xl text-sm text-gray-500">
         Lo que se puede elegir al cargar las operaciones de un modelo. Renombrar o unir acá{' '}
         <strong>actualiza los modelos</strong> que usaban ese nombre; los <strong>cortes</strong> ya

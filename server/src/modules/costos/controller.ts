@@ -4,7 +4,9 @@ import type {
   CompraGastoInput,
   CompraInput,
   ConteoInput,
+  CatalogoFichaInput,
   EditarCompraInput,
+  FotoFichaInput,
   EditarGastoFijoInput,
   EditarInsumoInput,
   EditarPrestamoInput,
@@ -24,6 +26,27 @@ const id = (req: Request) => String(req.params.id);
 export const costosController = {
   async listarInsumos(_req: Request, res: Response) {
     res.json({ data: await costosService.listarInsumos() });
+  },
+  async catalogo(_req: Request, res: Response) {
+    res.json({ data: await costosService.catalogo() });
+  },
+  async editarCatalogo(req: Request, res: Response) {
+    await costosService.editarCatalogo(id(req), req.body as CatalogoFichaInput);
+    res.json({ data: { guardado: true } });
+  },
+  async obtenerFoto(req: Request, res: Response) {
+    res.json({ data: await costosService.obtenerFoto(id(req)) });
+  },
+  async guardarFoto(req: Request, res: Response) {
+    await costosService.guardarFoto(id(req), req.body as FotoFichaInput);
+    res.json({ data: { guardado: true } });
+  },
+  async quitarFoto(req: Request, res: Response) {
+    await costosService.quitarFoto(id(req));
+    res.json({ data: { eliminado: true } });
+  },
+  async kardex(req: Request, res: Response) {
+    res.json({ data: await costosService.kardex(id(req)) });
   },
   async crearInsumo(req: Request, res: Response) {
     res.status(201).json({ data: await costosService.crearInsumo(req.body as InsumoInput) });

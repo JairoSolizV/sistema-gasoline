@@ -16,6 +16,7 @@ import {
   type CorteCostoDetalleDTO,
   type CorteCostoResumenDTO,
   type CortePendienteDTO,
+  type KardexDTO,
   type Fraccion,
   type NecesidadInsumoDTO,
   type ProyeccionDTO,
@@ -124,6 +125,68 @@ export async function stockPorInsumo(): Promise<Map<string, StockDTO>> {
 }
 
 export const STOCK_VACIO: StockDTO = { conteo: null, compras: 0, consumo: 0, stock: 0 };
+
+/** Kárdex de un insumo: compras (entran), consumo de cada corte (sale, en la
+ *  fecha de inicio del corte) y conteos (el saldo pasa a ser lo contado). Un
+ *  conteo va después de los movimientos de su mismo día: ya los incluye, igual
+ *  que en el stock. */
+export async function kardexInsumo(insumoId: string): Promise<KardexDTO['movimientos']> {
+  const [compras, conteos, cortes, fichas] = await Promise.all([
+    costosRepository.comprasDeInsumo(insumoId),
+    costosRepository.listarConteos(insumoId),
+    costosRepository.cortesParaCosto(),
+    costosRepository.listarFichas(),
+  ]);
+  type Renglon = { fecha: string; orden: number; tipo: 'compra' | 'consumo' | 'conteo'; detalle: string; cantidad: number };
+  const renglones: Renglon[] = [
+    ...compras.map((c) => ({
+      fecha: dateADia(c.fecha),
+      orden: 0,
+      tipo: 'compra' as const,
+      detalle: `${c.tienda}${c.codigoCorte ? ` · para el COD ${c.codigoCorte}` : ''}`,
+      cantidad: c.cantidad,
+    })),
+    ...conteos.map((c) => ({
+      fecha: dateADia(c.fecha),
+      orden: 1,
+      tipo: 'conteo' as const,
+      detalle: c.notas ?? 'conteo físico',
+      cantidad: c.cantidad,
+    })),
+  ];
+  for (const c of cortes) {
+    const f = fichaDeCorte(c, fichas);
+    const gasto = f && consumoDeCorte(c, f).get(insumoId);
+    if (!gasto) continue;
+    renglones.push({
+      fecha: diaEnBolivia(c.fechaInicio),
+      orden: 0,
+      tipo: 'consumo',
+      detalle: `COD ${c.codigo} · ${c.version.modelo.nombre} (${c.cantidadTotal} prendas)`,
+      cantidad: redondear(gasto),
+    });
+  }
+  renglones.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.orden - b.orden);
+
+  let saldo = 0;
+  return renglones.map((r) => {
+    if (r.tipo === 'conteo') {
+      const diferencia = r.cantidad - saldo;
+      saldo = r.cantidad;
+      return { fecha: r.fecha, tipo: r.tipo, detalle: r.detalle, entrada: null, salida: null, saldo, diferencia };
+    }
+    saldo += r.tipo === 'compra' ? r.cantidad : -r.cantidad;
+    return {
+      fecha: r.fecha,
+      tipo: r.tipo,
+      detalle: r.detalle,
+      entrada: r.tipo === 'compra' ? r.cantidad : null,
+      salida: r.tipo === 'consumo' ? r.cantidad : null,
+      saldo,
+      diferencia: null,
+    };
+  });
+}
 
 // ── Costo real del corte ──
 

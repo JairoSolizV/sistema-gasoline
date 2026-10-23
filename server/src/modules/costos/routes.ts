@@ -3,7 +3,9 @@ import {
   compraGastoInputSchema,
   compraInputSchema,
   conteoInputSchema,
+  catalogoFichaSchema,
   editarCompraSchema,
+  fotoFichaSchema,
   editarGastoFijoSchema,
   editarInsumoSchema,
   editarPrestamoSchema,
@@ -23,7 +25,13 @@ import { costosController } from './controller.js';
 // Costos de producción (docs/PLAN_COSTOS.md). Solo consulta: no toca pagos.
 export const costosRouter = Router();
 
+costosRouter.get('/catalogo', costosController.catalogo);
+costosRouter.patch('/fichas/:id/catalogo', validar(catalogoFichaSchema), costosController.editarCatalogo);
+costosRouter.get('/fichas/:id/foto', costosController.obtenerFoto);
+costosRouter.put('/fichas/:id/foto', validar(fotoFichaSchema), costosController.guardarFoto);
+costosRouter.delete('/fichas/:id/foto', costosController.quitarFoto);
 costosRouter.get('/insumos', costosController.listarInsumos);
+costosRouter.get('/insumos/:id/kardex', costosController.kardex);
 costosRouter.post('/insumos', validar(insumoInputSchema), costosController.crearInsumo);
 costosRouter.patch('/insumos/:id', validar(editarInsumoSchema), costosController.editarInsumo);
 costosRouter.delete('/insumos/:id', costosController.eliminarInsumo);

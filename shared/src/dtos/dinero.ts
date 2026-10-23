@@ -34,6 +34,7 @@ export interface DespachoLineaDTO {
   corte: { id: string; codigo: number } | null;
   ficha: { id: string; nombre: string } | null;
   descripcion: string;
+  detalle: string | null; // talla y color si no fue surtido
   prendas: number;
   precioPrenda: number;
   costoPrenda: number; // foto al despachar
@@ -113,6 +114,25 @@ export interface EtapaDineroDTO {
   sinPrecio: number; // cuántos ítems no tienen precio de venta (modelo sin ficha)
   faltaPagar: number;
   items: TableroItemDTO[];
+}
+
+/** Algo que hay que pagar (cuentas por pagar). */
+export interface CuentaPorPagarDTO {
+  id: string;
+  tipo: 'proveedor' | 'servicio' | 'operarios' | 'banco';
+  acreedor: string; // a quién
+  detalle: string;
+  monto: number; // lo que falta pagar
+  vence: string | null; // 'aaaa-mm-dd'; null = sin fecha acordada
+  enlace: string; // dónde se paga en el sistema
+}
+
+export interface CuentasPorPagarDTO {
+  hoy: string;
+  items: CuentaPorPagarDTO[]; // por fecha de vencimiento (sin fecha al final)
+  total: number;
+  vencido: number; // ya pasó la fecha
+  semana: number; // vence en los próximos 7 días
 }
 
 export interface TableroDTO {

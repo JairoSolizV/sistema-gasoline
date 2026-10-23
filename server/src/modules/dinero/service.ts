@@ -6,6 +6,7 @@ import {
   costoDeCantidad,
   dateADia,
   diaADate,
+  ETIQUETA_CUENTA,
   normalizarProveedor,
   precioUnitario,
   redondear,
@@ -15,6 +16,8 @@ import {
   type CobroDTO,
   type CobroInput,
   type CorteDineroDTO,
+  type CuentaPorPagarDTO,
+  type CuentasPorPagarDTO,
   type Cuenta,
   type DespachoDTO,
   type DespachoInput,
@@ -158,6 +161,7 @@ function aDespachoDTO(d: DespachoConDatos): DespachoDTO {
       corte: l.corte,
       ficha: l.ficha,
       descripcion: l.descripcion,
+      detalle: l.detalle,
       prendas: l.prendas,
       precioPrenda: l.precioPrenda,
       costoPrenda: l.costoPrenda,
@@ -323,6 +327,7 @@ export const dineroService = {
           corteId: c.corteId,
           fichaId: null,
           descripcion: `COD ${c.codigo} · ${c.modeloNombre}`,
+          detalle: l.detalle ?? null,
           prendas: l.prendas,
           precioPrenda: precio,
           costoPrenda: c.costoPrenda,
@@ -337,6 +342,7 @@ export const dineroService = {
         corteId: null,
         fichaId: f.id,
         descripcion: f.nombre,
+        detalle: l.detalle ?? null,
         prendas: l.prendas,
         precioPrenda: precioFinal,
         costoPrenda: costo,
@@ -440,6 +446,100 @@ export const dineroService = {
     await dineroRepository.eliminarPagoProveedor(id);
   },
 
+  // ── Cuentas por pagar: proveedores, servicios, operarios y banco ──
+  /** A cada proveedor sus pagos le cancelan primero las compras más viejas;
+   *  lo que queda de cada compra vence en su fecha. Servicios externos y
+   *  operarios: saldo a favor del mes, se paga al cerrar el mes. */
+  async cuentasPorPagar(): Promise<CuentasPorPagarDTO> {
+    const hoy = hoyEnBolivia();
+    const [anio, mes] = hoy.split('-').map(Number);
+    const finMes = dateADia(new Date(Date.UTC(anio, mes, 0)));
+    const [compras, pagos, consolidado, fijos] = await Promise.all([
+      dineroRepository.comprasCredito(),
+      dineroRepository.pagosProveedor(),
+      liquidacionService.consolidado(anio, mes),
+      fijosService.mes(anio, mes),
+    ]);
+    const items: CuentaPorPagarDTO[] = [];
+
+    const pagado = new Map<string, number>();
+    for (const p of pagos) pagado.set(normalizarProveedor(p.proveedor), (pagado.get(normalizarProveedor(p.proveedor)) ?? 0) + p.monto);
+    const viejasPrimero = [...compras].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
+    for (const c of viejasPrimero) {
+      const prov = normalizarProveedor(c.tienda);
+      const disponible = pagado.get(prov) ?? 0;
+      const cubierto = Math.min(disponible, c.precioTotal);
+      pagado.set(prov, disponible - cubierto);
+      if (c.precioTotal - cubierto <= 0) continue;
+      items.push({
+        id: `compra:${c.id}`,
+        tipo: 'proveedor',
+        acreedor: prov,
+        detalle: `${c.insumo.nombre} del ${dateADia(c.fecha).split('-').reverse().join('/')}${c.codigoCorte ? ` · COD ${c.codigoCorte}` : ''}${cubierto > 0 ? ' (pagada en parte)' : ''}`,
+        monto: c.precioTotal - cubierto,
+        vence: c.vence ? dateADia(c.vence) : null,
+        enlace: '/compras?tab=proveedores',
+      });
+    }
+
+    const externas = new Set<Cuenta>(SERVICIOS_EXTERNOS);
+    const operarios = new Map<Cuenta, number>();
+    if (!consolidado.cerrado) {
+      for (const cuenta of consolidado.cuentas) {
+        for (const f of cuenta.filas) {
+          if (f.saldoPeriodo <= 0) continue;
+          if (externas.has(cuenta.cuenta)) {
+            items.push({
+              id: `servicio:${cuenta.cuenta}:${f.operarioId}`,
+              tipo: 'servicio',
+              acreedor: f.nombre,
+              detalle: ETIQUETA_CUENTA[cuenta.cuenta],
+              monto: f.saldoPeriodo,
+              vence: finMes,
+              enlace: `/liquidacion?cuenta=${cuenta.cuenta}`,
+            });
+          } else {
+            operarios.set(cuenta.cuenta, (operarios.get(cuenta.cuenta) ?? 0) + f.saldoPeriodo);
+          }
+        }
+      }
+    }
+    for (const [cuenta, monto] of operarios) {
+      items.push({
+        id: `operarios:${cuenta}`,
+        tipo: 'operarios',
+        acreedor: 'Operarios',
+        detalle: `${ETIQUETA_CUENTA[cuenta]} · saldo a favor del mes`,
+        monto,
+        vence: finMes,
+        enlace: `/liquidacion?cuenta=${cuenta}`,
+      });
+    }
+
+    for (const p of fijos.prestamos.filter((x) => x.activo && !x.pago)) {
+      items.push({
+        id: `banco:${p.id}`,
+        tipo: 'banco',
+        acreedor: p.banco,
+        detalle: `Cuota de ${mes}/${anio}${p.cuotasRestantes != null ? ` · quedan ${p.cuotasRestantes} cuotas` : ''}`,
+        monto: p.cuota,
+        vence: p.vence,
+        enlace: '/costos-fijos',
+      });
+    }
+
+    items.sort((a, b) => (a.vence ?? '9999').localeCompare(b.vence ?? '9999') || b.monto - a.monto);
+    const enSemana = dateADia(new Date(Date.UTC(anio, mes - 1, Number(hoy.slice(8, 10)) + 7)));
+    const suma = (xs: CuentaPorPagarDTO[]) => xs.reduce((a, x) => a + x.monto, 0);
+    return {
+      hoy,
+      items,
+      total: suma(items),
+      vencido: suma(items.filter((x) => x.vence != null && x.vence < hoy)),
+      semana: suma(items.filter((x) => x.vence != null && x.vence >= hoy && x.vence <= enSemana)),
+    };
+  },
+
   // ── Tablero ──
   async tablero(): Promise<TableroDTO> {
     const hoy = hoyEnBolivia();
@@ -514,7 +614,7 @@ export const dineroService = {
     const insumosValor = valorInsumos.reduce((a, f) => a + redondear(f), 0);
     if (insumos.some((i) => (stock.get(i.id)?.stock ?? 0) > 0 && !stock.get(i.id)?.conteo)) {
       avisos.push(
-        'Hay insumos sin conteo físico: su stock suma todo lo comprado y puede estar inflado. Contalos en Costos → Insumos.',
+        'Hay insumos sin conteo físico: su stock suma todo lo comprado y puede estar inflado. Contalos en Inventario.',
       );
     }
 

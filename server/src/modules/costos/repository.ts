@@ -62,6 +62,29 @@ export const costosRepository = {
     }
     return mapa;
   },
+  /** Fichas con sus datos de catálogo y si tienen foto (sin bajar la imagen). */
+  catalogo() {
+    return prisma.fichaCosto.findMany({
+      orderBy: [{ codigo: 'asc' }, { nombre: 'asc' }],
+      include: { ...incluirFicha, foto: { select: { actualizadoEn: true } } },
+    });
+  },
+  obtenerFoto(fichaId: string) {
+    return prisma.fotoFicha.findUnique({ where: { fichaId } });
+  },
+  guardarFoto(fichaId: string, mime: string, datos: Uint8Array<ArrayBuffer>) {
+    return prisma.fotoFicha.upsert({
+      where: { fichaId },
+      create: { fichaId, mime, datos },
+      update: { mime, datos },
+    });
+  },
+  quitarFoto(fichaId: string) {
+    return prisma.fotoFicha.deleteMany({ where: { fichaId } });
+  },
+  actualizarCatalogo(id: string, data: Prisma.FichaCostoUpdateInput) {
+    return prisma.fichaCosto.update({ where: { id }, data });
+  },
   pedidosDeFicha(fichaId: string) {
     return prisma.pedido.count({ where: { fichaId } });
   },
@@ -139,6 +162,12 @@ export const costosRepository = {
   // ── Etapas 3 y 4: stock, costo real del corte y plan ──
 
   /** Todas las compras (solo lo que mueve stock). */
+  comprasDeInsumo(insumoId: string) {
+    return prisma.compraInsumo.findMany({
+      where: { insumoId },
+      select: { fecha: true, cantidad: true, tienda: true, codigoCorte: true },
+    });
+  },
   movimientosCompra() {
     return prisma.compraInsumo.findMany({ select: { insumoId: true, fecha: true, cantidad: true } });
   },

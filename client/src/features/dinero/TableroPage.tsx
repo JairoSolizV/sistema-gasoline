@@ -232,7 +232,7 @@ function LoQueTenes({ t }: { t: TableroDTO }) {
         etiqueta="Insumos en depósito"
         monto={t.insumos.valor}
         ayuda={`stock × precio de la última compra${t.insumos.sinPrecio ? ` · ${t.insumos.sinPrecio} sin precio` : ''}`}
-        a="/costos?tab=insumos"
+        a="/inventario"
       />
       <Fila etiqueta="En producción" monto={t.enProduccion.costo} ayuda="cortes abiertos, a costo" />
       <Fila etiqueta="En servicios externos" monto={t.enServicios.costo} ayuda="cortes cerrados con prendas afuera" />
@@ -257,10 +257,10 @@ function LoQueDebes({ t }: { t: TableroDTO }) {
         <span className="mono font-semibold text-error">{bs(d.total)}</span>
       </div>
       {d.proveedores.lista.map((p) => (
-        <Fila key={p.proveedor} etiqueta={p.proveedor} monto={p.monto} ayuda="compras a crédito − pagos" a="/costos?tab=proveedores" />
+        <Fila key={p.proveedor} etiqueta={p.proveedor} monto={p.monto} ayuda="compras a crédito − pagos" a="/compras?tab=proveedores" />
       ))}
       {d.proveedores.lista.length === 0 && (
-        <Fila etiqueta="Proveedores" monto={0} ayuda="marcá las compras a crédito en Costos → Compras" a="/costos?tab=proveedores" />
+        <Fila etiqueta="Proveedores" monto={0} ayuda="marcá las compras a crédito en Compras" a="/compras?tab=proveedores" />
       )}
       {d.servicios.porCuenta.map((s) => (
         <Fila key={s.cuenta} etiqueta={ETIQUETA_CUENTA[s.cuenta]} monto={s.monto} ayuda="saldo pendiente del mes" a={`/liquidacion?cuenta=${s.cuenta}`} />
@@ -298,7 +298,7 @@ function CapitalYBanco({ t }: { t: TableroDTO }) {
             </li>
           ))}
         </ul>
-        <Link to="/costos?tab=fijos" className="mt-1 inline-block text-xs text-acento hover:underline">
+        <Link to="/costos-fijos" className="mt-1 inline-block text-xs text-acento hover:underline">
           ver costos fijos
         </Link>
       </div>

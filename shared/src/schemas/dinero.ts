@@ -64,6 +64,7 @@ const lineaDespachoSchema = z
     fichaId: z.uuid().optional(),
     prendas,
     precioPrenda: precio.optional(),
+    detalle: texto(80).optional(), // talla y color si no va surtido
   })
   .refine((l) => (l.corteId == null) !== (l.fichaId == null), {
     message: 'Cada línea es de un corte o de una ficha',
