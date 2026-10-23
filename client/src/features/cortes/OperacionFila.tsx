@@ -21,6 +21,13 @@ interface FilaEditor {
   difBs: string; // vacío = usar el de configuración
 }
 
+/** Columnas de la tabla de operaciones: ⠿ · N · máquina · operación · CT ·
+ *  estado · total (· acciones con el corte abierto). El encabezado del grupo
+ *  usa la misma plantilla, así todo queda alineado en columnas. */
+export function columnasOperacion(conAcciones: boolean): string {
+  return `1rem 2rem 6.5rem minmax(0,1fr) 6rem 7.5rem 7rem${conAcciones ? ' 6rem' : ''}`;
+}
+
 const entero = (s: string) => (/^\d+$/.test(s.trim()) ? parseInt(s, 10) : 0);
 const PATRON_BS = /^\d+(\.\d{1,2})?$/;
 
@@ -78,6 +85,9 @@ export function OperacionFila({
   const difCentavos = (f: FilaEditor) =>
     f.maestro ? (PATRON_BS.test(f.difBs) ? aCentavos(f.difBs) : DIF_DEFECTO) : 0;
 
+  const conAcciones = !!(onEditar || onQuitar);
+  const grilla = { display: 'grid', gridTemplateColumns: columnasOperacion(conAcciones), columnGap: '0.75rem' };
+
   const filasValidas = filas.every((f) => f.operarioId !== '' && entero(f.cantidad) >= 1);
 
   const onGuardar = async () => {
@@ -96,19 +106,26 @@ export function OperacionFila({
   };
 
   return (
-    <div className="border-b border-gray-100 px-5 py-3 last:border-0" style={{ background: vivo.estado === 'parcial' ? '#fffafa' : undefined }}>
-      <div className="flex items-center gap-3">
-        {manija && (
+    <div
+      className="border-b border-gray-100 px-5 py-2.5 last:border-0"
+      style={{ background: vivo.estado === 'parcial' ? '#fffafa' : undefined }}
+    >
+      <div className="items-center" style={grilla}>
+        {manija ? (
           <span
             {...manija}
-            className="-ml-2 flex-none cursor-grab text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
+            className="cursor-grab text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
           >
             ⠿
           </span>
+        ) : (
+          <span />
         )}
-        <span className="mono w-8 flex-none text-xs text-gray-400">{op.n ?? '—'}</span>
-        <span className="w-24 flex-none text-xs text-gray-500">{op.equipo}</span>
-        <span className="min-w-0 flex-1 text-sm font-medium">
+        <span className="mono text-xs text-gray-400">{op.n ?? '—'}</span>
+        <span className="truncate text-xs text-gray-500" title={op.equipo}>
+          {op.equipo}
+        </span>
+        <span className="min-w-0 text-sm font-medium">
           {op.proceso}
           {op.pieza && <span className="font-normal text-gray-500"> · {op.pieza}</span>}
           {op.esEmpaque && <MarcaEmpaque />}
@@ -130,18 +147,18 @@ export function OperacionFila({
             )
           )}
         </span>
-        <span className="mono w-20 flex-none text-right text-sm">Bs {formatBs(op.ct)}</span>
+        <span className="mono text-right text-sm">Bs {formatBs(op.ct)}</span>
         <span
-          className="w-28 flex-none rounded-full border px-2 py-0.5 text-center text-[11px] font-semibold"
+          className="rounded-full border px-2 py-0.5 text-center text-[11px] font-semibold"
           style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
         >
           {badge.texto}
         </span>
-        <span className="mono w-24 flex-none text-right text-sm font-semibold">
+        <span className="mono text-right text-sm font-semibold">
           Bs {formatBs(op.totalOperacion)}
         </span>
-        {(onEditar || onQuitar) && (
-          <span className="flex w-24 flex-none justify-end gap-2 text-[12px] font-medium">
+        {conAcciones && (
+          <span className="flex justify-end gap-2 text-[12px] font-medium">
             {onEditar && (
               <button onClick={onEditar} className="text-acento hover:underline">
                 Editar
@@ -165,80 +182,87 @@ export function OperacionFila({
         )}
       </div>
 
-      <div className="mt-2 space-y-1.5 pl-11">
+      <div className="mt-1.5 space-y-1">
         {filas.map((f, i) =>
           editable ? (
-            <div key={i} className="flex items-center gap-2">
-              <select
-                value={f.operarioId}
-                onChange={(e) => cambiar(i, { operarioId: e.target.value })}
-                className="w-44 rounded-md border border-gray-300 bg-white px-2 py-1 text-[13px] outline-none focus:border-acento"
-              >
-                <option value="">Operario…</option>
-                {operarios.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.nombre}
-                  </option>
-                ))}
-                {f.operarioId !== '' && !operarios.some((o) => o.id === f.operarioId) && (
-                  <option value={f.operarioId}>(operario de baja)</option>
-                )}
-              </select>
-              <input
-                value={f.cantidad}
-                onChange={(e) => cambiar(i, { cantidad: e.target.value.replace(/\D/g, '') })}
-                placeholder="piezas"
-                inputMode="numeric"
-                className="mono w-20 rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-acento"
-              />
-              <button
-                onClick={() => cambiar(i, { maestro: !f.maestro })}
-                title="Maestro externo (+diferencial por pieza)"
-                className="rounded-md border px-2 py-1 text-[11px] font-semibold"
-                style={
-                  f.maestro
-                    ? { color: '#2f6fe0', borderColor: '#2f6fe0', background: 'rgba(47,111,224,0.1)' }
-                    : { color: '#98a0ac', borderColor: '#d7dbe2', background: '#fff' }
-                }
-              >
-                maestro
-              </button>
-              {f.maestro && (
+            <div key={i} style={grilla}>
+              <div className="flex items-center gap-2" style={{ gridColumn: '4 / -1' }}>
+                <select
+                  value={f.operarioId}
+                  onChange={(e) => cambiar(i, { operarioId: e.target.value })}
+                  className="w-44 rounded-md border border-gray-300 bg-white px-2 py-1 text-[13px] outline-none focus:border-acento"
+                >
+                  <option value="">Operario…</option>
+                  {operarios.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.nombre}
+                    </option>
+                  ))}
+                  {f.operarioId !== '' && !operarios.some((o) => o.id === f.operarioId) && (
+                    <option value={f.operarioId}>(operario de baja)</option>
+                  )}
+                </select>
                 <input
-                  value={f.difBs}
-                  onChange={(e) => cambiar(i, { difBs: e.target.value })}
-                  placeholder="0.10"
-                  title="Diferencial Bs/pieza (vacío = el de configuración)"
-                  inputMode="decimal"
-                  className="mono w-16 rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-acento"
+                  value={f.cantidad}
+                  onChange={(e) => cambiar(i, { cantidad: e.target.value.replace(/\D/g, '') })}
+                  placeholder="piezas"
+                  inputMode="numeric"
+                  className="mono w-20 rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-acento"
                 />
-              )}
-              <span className="mono w-24 text-right text-[13px] text-gray-600">
-                Bs {formatBs(entero(f.cantidad) * (op.ct + difCentavos(f)))}
-              </span>
-              <button
-                onClick={() => {
-                  setFilas((fs) => fs.filter((_, j) => j !== i));
-                  setSucio(true);
-                }}
-                className="text-gray-400 hover:text-error"
-                title="Quitar operario"
-              >
-                ✕
-              </button>
+                <button
+                  onClick={() => cambiar(i, { maestro: !f.maestro })}
+                  title="Maestro externo (+diferencial por pieza)"
+                  className="rounded-md border px-2 py-1 text-[11px] font-semibold"
+                  style={
+                    f.maestro
+                      ? { color: '#2f6fe0', borderColor: '#2f6fe0', background: 'rgba(47,111,224,0.1)' }
+                      : { color: '#98a0ac', borderColor: '#d7dbe2', background: '#fff' }
+                  }
+                >
+                  maestro
+                </button>
+                {f.maestro && (
+                  <input
+                    value={f.difBs}
+                    onChange={(e) => cambiar(i, { difBs: e.target.value })}
+                    placeholder="0.10"
+                    title="Diferencial Bs/pieza (vacío = el de configuración)"
+                    inputMode="decimal"
+                    className="mono w-16 rounded-md border border-gray-300 px-2 py-1 text-[13px] outline-none focus:border-acento"
+                  />
+                )}
+                <span className="mono w-24 text-right text-[13px] text-gray-600">
+                  Bs {formatBs(entero(f.cantidad) * (op.ct + difCentavos(f)))}
+                </span>
+                <button
+                  onClick={() => {
+                    setFilas((fs) => fs.filter((_, j) => j !== i));
+                    setSucio(true);
+                  }}
+                  className="text-gray-400 hover:text-error"
+                  title="Quitar operario"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ) : (
-            <div key={i} className="flex items-center gap-2 text-[13px] text-gray-600">
-              <span className="w-44 font-medium text-gray-800">
-                {op.asignaciones[i]?.operarioNombre}
-              </span>
-              <span className="mono">{f.cantidad} pzas</span>
-              {f.maestro && (
-                <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-1.5 text-[10px] font-semibold text-acento">
-                  maestro +{f.difBs || '0.10'}
+            // operario debajo de la operación, piezas bajo el CT y monto bajo el total
+            <div key={i} className="items-center text-[13px] text-gray-600" style={grilla}>
+              <span className="flex items-center gap-2" style={{ gridColumn: '4' }}>
+                <span className="text-gray-300">└</span>
+                <span className="font-medium text-gray-800">
+                  {op.asignaciones[i]?.operarioNombre}
                 </span>
-              )}
-              <span className="mono ml-auto">
+                {f.maestro && (
+                  <span className="rounded-full bg-[rgba(47,111,224,0.1)] px-1.5 text-[10px] font-semibold text-acento">
+                    maestro +{f.difBs || '0.10'}
+                  </span>
+                )}
+              </span>
+              <span className="mono text-right">{f.cantidad} pzas</span>
+              <span />
+              <span className="mono text-right">
                 Bs {formatBs(op.asignaciones[i]?.total ?? 0)}
               </span>
             </div>
@@ -246,7 +270,7 @@ export function OperacionFila({
         )}
 
         {editable && (
-          <div className="flex items-center gap-3 pt-0.5">
+          <div className="flex items-center gap-3 pt-0.5" style={{ paddingLeft: 'calc(9.5rem + 2.25rem)' }}>
             {filas.length < 3 && (
               <button
                 onClick={() => {

@@ -249,8 +249,6 @@ export function CorteDetallePage() {
         .map((p) => ETIQUETA_PROCESO[p].toLowerCase())
         .join(', ')}`;
   const badge = badgeEstadoCorte(corte.estado);
-  const totalAsignado = corte.totalesPorOperario.reduce((a, t) => a + t.total, 0);
-  const maxPago = Math.max(1, ...corte.totalesPorOperario.map((t) => t.total));
   const costoExternos = SERVICIOS_EXTERNOS.reduce((a, s) => a + corte.costoExternos[s], 0);
 
   return (
@@ -441,7 +439,8 @@ export function CorteDetallePage() {
         <PasosCorte corteId={corte.id} paso={corte.paso} pasoDesde={corte.pasoDesde} />
       </div>
       <ServicioCorte corte={corte} />
-      <EnviosServicio corte={corte} />
+      {/* arriba, junto al servicio de corte: cuánto cobra cada uno de la costura */}
+      {corte.estado !== 'borrador' && <TotalPorOperario corte={corte} />}
 
       {corte.estado === 'borrador' ? (
         <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-sm text-gray-500">
@@ -457,11 +456,12 @@ export function CorteDetallePage() {
               modelo no se toca y cada cambio queda en el historial.
             </p>
           )}
-          {grupos.map(([grupo, ops]) => (
+          {grupos.map(([grupo, ops], indiceGrupo) => (
             <GrupoCorte
               key={grupo}
               corte={corte}
               grupo={grupo}
+              indiceGrupo={indiceGrupo}
               ops={ops}
               operarios={operarios ?? []}
               editable={editable}
@@ -508,49 +508,7 @@ export function CorteDetallePage() {
 
           <HistorialCambios cambios={corte.cambios} />
 
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-              <span className="text-sm font-semibold">Total por operario</span>
-              <span className="text-xs text-gray-500">
-                asignado <span className="mono font-semibold">Bs {formatBs(totalAsignado)}</span> de{' '}
-                <span className="mono font-semibold">Bs {formatBs(corte.costoTotalCorte)}</span>
-                {totalAsignado === corte.costoTotalCorte && (
-                  <span className="ml-1 font-semibold text-ok">✓ cuadra</span>
-                )}
-              </span>
-            </div>
-            <div className="space-y-2 px-5 py-3">
-              {corte.totalesPorOperario.map((t) => (
-                <div key={t.operarioId} className="flex items-center gap-3 text-sm">
-                  <span className="w-32 flex-none font-medium">
-                    {t.nombre}
-                    {t.incluyeMaestro && (
-                      <span className="ml-1 rounded-full bg-[rgba(47,111,224,0.1)] px-1.5 text-[10px] font-semibold text-acento">
-                        maestro
-                      </span>
-                    )}
-                  </span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-acento"
-                      style={{ width: `${Math.max(4, Math.round((t.total / maxPago) * 100))}%` }}
-                    />
-                  </div>
-                  <span className="mono w-16 flex-none text-right text-xs text-gray-500">
-                    {t.piezas} pzs
-                  </span>
-                  <span className="mono w-24 flex-none text-right font-semibold">
-                    Bs {formatBs(t.total)}
-                  </span>
-                </div>
-              ))}
-              {corte.totalesPorOperario.length === 0 && (
-                <div className="py-3 text-center text-sm text-gray-400">
-                  Todavía no hay asignaciones.
-                </div>
-              )}
-            </div>
-          </div>
+          <EnviosServicio corte={corte} />
         </div>
       )}
 
@@ -597,6 +555,58 @@ export function CorteDetallePage() {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+/** Lo que cobra cada operario por la costura de este corte. */
+function TotalPorOperario({ corte }: { corte: CorteDetalleDTO }) {
+  const totalAsignado = corte.totalesPorOperario.reduce((a, t) => a + t.total, 0);
+  const maxPago = Math.max(1, ...corte.totalesPorOperario.map((t) => t.total));
+
+  return (
+    <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+        <span className="text-sm font-semibold">Total por operario</span>
+        <span className="text-xs text-gray-500">
+          asignado <span className="mono font-semibold">Bs {formatBs(totalAsignado)}</span> de{' '}
+          <span className="mono font-semibold">Bs {formatBs(corte.costoTotalCorte)}</span>
+          {totalAsignado === corte.costoTotalCorte && (
+            <span className="ml-1 font-semibold text-ok">✓ cuadra</span>
+          )}
+        </span>
+      </div>
+      <div className="space-y-2 px-5 py-3">
+        {corte.totalesPorOperario.map((t) => (
+          <div key={t.operarioId} className="flex items-center gap-3 text-sm">
+            <span className="w-32 flex-none font-medium">
+              {t.nombre}
+              {t.incluyeMaestro && (
+                <span className="ml-1 rounded-full bg-[rgba(47,111,224,0.1)] px-1.5 text-[10px] font-semibold text-acento">
+                  maestro
+                </span>
+              )}
+            </span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-acento"
+                style={{ width: `${Math.max(4, Math.round((t.total / maxPago) * 100))}%` }}
+              />
+            </div>
+            <span className="mono w-16 flex-none text-right text-xs text-gray-500">
+              {t.piezas} pzs
+            </span>
+            <span className="mono w-24 flex-none text-right font-semibold">
+              Bs {formatBs(t.total)}
+            </span>
+          </div>
+        ))}
+        {corte.totalesPorOperario.length === 0 && (
+          <div className="py-3 text-center text-sm text-gray-400">
+            Todavía no hay asignaciones.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

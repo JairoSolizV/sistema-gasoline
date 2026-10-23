@@ -20,7 +20,18 @@ import { Modal } from '../../components/Modal';
 import { claseIndicador, useArrastrarOrden } from '../../lib/useArrastrarOrden';
 import { OperacionFormModal } from '../modelos/OperacionFormModal';
 import { etiquetaGrupo } from './estados';
-import { OperacionFila } from './OperacionFila';
+import { columnasOperacion, OperacionFila } from './OperacionFila';
+
+/** Un color por grupo (TRASEROS, DELANTEROS, ENSAMBLE, …) en el orden en que
+ *  aparecen, para distinguirlos de un vistazo. Solo visual. */
+const COLORES_GRUPO = [
+  { fuerte: '#2f6fe0', suave: '#eef3fd' }, // azul
+  { fuerte: '#2f8a55', suave: '#eef8f1' }, // verde
+  { fuerte: '#c27a12', suave: '#fdf5e8' }, // ámbar
+  { fuerte: '#7a4fd1', suave: '#f4effc' }, // violeta
+  { fuerte: '#0f8a8a', suave: '#e9f7f7' }, // turquesa
+  { fuerte: '#c2416b', suave: '#fcedf2' }, // rosa
+];
 
 export type ModalOperacion =
   | { tipo: 'agregar'; grupo?: string }
@@ -32,6 +43,7 @@ export type ModalOperacion =
 export function GrupoCorte({
   corte,
   grupo,
+  indiceGrupo,
   ops,
   operarios,
   editable,
@@ -45,6 +57,7 @@ export function GrupoCorte({
 }: {
   corte: CorteDetalleDTO;
   grupo: string;
+  indiceGrupo: number;
   ops: CorteOperacionDTO[];
   operarios: OperarioDTO[];
   editable: boolean;
@@ -62,12 +75,24 @@ export function GrupoCorte({
     onReordenar,
   );
 
+  const color = COLORES_GRUPO[indiceGrupo % COLORES_GRUPO.length];
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-5 py-2.5">
-        <button onClick={onPlegar} className="flex items-center gap-2 text-sm font-semibold">
+    <div
+      className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+      style={{ borderLeft: `5px solid ${color.fuerte}` }}
+    >
+      <div
+        className="flex items-center gap-3 border-b border-gray-200 px-5 py-3"
+        style={{ background: color.suave }}
+      >
+        <button
+          onClick={onPlegar}
+          className="flex items-center gap-2 text-[15px] font-bold tracking-wide uppercase"
+          style={{ color: color.fuerte }}
+        >
           <span
-            className="inline-block text-gray-400 transition-transform"
+            className="inline-block transition-transform"
             style={{ transform: plegado ? 'rotate(0deg)' : 'rotate(90deg)' }}
           >
             ▸
@@ -115,11 +140,29 @@ export function GrupoCorte({
       </div>
       {!plegado && (
         <div>
-          {ops.map((op) => (
+          <div
+            className="border-b border-gray-100 px-5 py-1.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: columnasOperacion(editable),
+              columnGap: '0.75rem',
+            }}
+          >
+            <span />
+            <span>N</span>
+            <span>Máquina</span>
+            <span>Operación · operarios</span>
+            <span className="text-right">CT / pzas</span>
+            <span className="text-center">Estado</span>
+            <span className="text-right">Total</span>
+            {editable && <span />}
+          </div>
+          {ops.map((op, i) => (
             <div
               key={op.id}
               {...(editable ? fila(op.id) : {})}
-              className={`${arrastrado === op.id ? 'opacity-40' : ''} ${claseIndicador(indicador(op.id))}`}
+              // filas alternadas para no perderse entre operaciones
+              className={`${i % 2 === 1 ? 'bg-gray-50/70' : ''} ${arrastrado === op.id ? 'opacity-40' : ''} ${claseIndicador(indicador(op.id))}`}
             >
               <OperacionFila
                 corteId={corte.id}
