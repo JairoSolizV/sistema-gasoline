@@ -95,6 +95,13 @@ export const costosRepository = {
   obtenerCompra(id: string) {
     return prisma.compraInsumo.findUnique({ where: { id } });
   },
+  actualizarCompra(id: string, data: Prisma.CompraInsumoUncheckedUpdateInput) {
+    return prisma.compraInsumo.update({
+      where: { id },
+      data,
+      include: { insumo: { select: { id: true, nombre: true, unidad: true } } },
+    });
+  },
   eliminarCompra(id: string) {
     return prisma.compraInsumo.delete({ where: { id } });
   },

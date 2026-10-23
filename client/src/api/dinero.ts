@@ -87,6 +87,7 @@ export function useMutacionDinero() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ejecutar,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['dinero'] }),
+    onSuccess: () =>
+      Promise.all([qc.invalidateQueries({ queryKey: ['dinero'] }), qc.invalidateQueries({ queryKey: ['caja'] })]),
   });
 }

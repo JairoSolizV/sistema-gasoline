@@ -14,6 +14,7 @@ import {
   precioUnitario,
   type CompraDTO,
   type CompraInput,
+  type EditarCompraInput,
   type EditarInsumoInput,
   type FichaCostoDetalleDTO,
   type FichaCostoInput,
@@ -101,6 +102,7 @@ function aCompraDTO(c: CompraConInsumo): CompraDTO {
     precioUnitarioBs: bsPorUnidad(c),
     codigoCorte: c.codigoCorte,
     condicion: c.condicion,
+    caja: c.caja,
     notas: c.notas,
   };
 }
@@ -300,9 +302,15 @@ export const costosService = {
       precioTotal: enDolares ? aBolivianos(input.montoUsd!, input.tasaCambio!) : input.precioTotal!,
       codigoCorte: input.codigoCorte ?? null,
       condicion: input.condicion,
+      caja: input.caja,
       notas: input.notas ?? null,
     });
     return aCompraDTO(compra);
+  },
+
+  async editarCompra(id: string, input: EditarCompraInput): Promise<CompraDTO> {
+    if (!(await costosRepository.obtenerCompra(id))) throw new AppError('NO_ENCONTRADO', 'Compra no encontrada', 404);
+    return aCompraDTO(await costosRepository.actualizarCompra(id, input));
   },
 
   async eliminarCompra(id: string): Promise<void> {

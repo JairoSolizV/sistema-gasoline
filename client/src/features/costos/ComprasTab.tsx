@@ -4,12 +4,14 @@ import {
   aCentavos,
   formatBs,
   ORIGENES_COMPRA,
+  type Caja,
   type CompraDTO,
   type OrigenCompra,
 } from '@taller/shared';
-import { useCompras, useCrearCompra, useEliminarCompra, useInsumos } from '../../api/costos';
+import { useCompras, useCrearCompra, useEditarCompra, useEliminarCompra, useInsumos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import {
@@ -35,6 +37,7 @@ export function ComprasTab() {
   const eliminar = useEliminarCompra();
   const [nueva, setNueva] = useState(false);
   const [quitar, setQuitar] = useState<CompraDTO | null>(null);
+  const [editar, setEditar] = useState<CompraDTO | null>(null);
 
   return (
     <>
@@ -108,8 +111,11 @@ export function ComprasTab() {
                   )}
                 </td>
                 <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bsUnitario(c.precioUnitarioBs)}</td>
-                <td className="px-3 py-2 text-right">
-                  <button onClick={() => setQuitar(c)} className="text-[13px] font-medium text-error hover:underline">
+                <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
+                  <button onClick={() => setEditar(c)} className="mr-3 text-acento hover:underline">
+                    Editar
+                  </button>
+                  <button onClick={() => setQuitar(c)} className="text-error hover:underline">
                     Quitar
                   </button>
                 </td>
@@ -126,6 +132,7 @@ export function ComprasTab() {
         </table>
       </div>
       {nueva && <ModalCompra insumoInicial={insumoId} onCerrar={() => setNueva(false)} />}
+      {editar && <ModalEditarCompra compra={editar} onCerrar={() => setEditar(null)} />}
       {quitar && (
         <Modal onCerrar={() => setQuitar(null)}>
           <h2 className="text-lg font-semibold">Quitar compra</h2>
@@ -174,6 +181,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
     tasa: '',
     codigoCorte: '',
     condicion: 'contado' as 'contado' | 'credito',
+    caja: 'efectivo' as Caja,
     notas: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -212,6 +220,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
         : { precioTotal: totalBs }),
       codigoCorte: v.codigoCorte.trim() || undefined,
       condicion: v.condicion,
+      caja: v.caja,
       notas: v.notas,
     });
     onCerrar();
@@ -328,6 +337,9 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
             />
           </div>
         )}
+        {v.condicion === 'contado' && (
+          <SelectorCaja valor={v.caja} onCambiar={(c) => cambiar('caja', c)} etiqueta="Pagado con" />
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium">Para el corte (código)</label>
           <input
@@ -361,6 +373,62 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
         >
           Registrar compra
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Corrige tienda, corte, contado/crédito y caja de una compra (no su precio
+ *  ni su cantidad: para eso se quita y se vuelve a cargar). */
+function ModalEditarCompra({ compra, onCerrar }: { compra: CompraDTO; onCerrar: () => void }) {
+  const editar = useEditarCompra();
+  const [v, setV] = useState({
+    tienda: compra.tienda,
+    codigoCorte: compra.codigoCorte ?? '',
+    condicion: compra.condicion,
+    caja: compra.caja,
+  });
+  const onGuardar = () =>
+    editar.mutate({ id: compra.id, input: { ...v, codigoCorte: v.codigoCorte.trim() || null } }, { onSuccess: onCerrar });
+  return (
+    <Modal onCerrar={onCerrar}>
+      <h2 className="text-lg font-semibold">Editar compra</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        {compra.insumo.nombre} del {fechaCorta(compra.fecha)} · Bs {formatBs(compra.precioTotal)}
+      </p>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium">Tienda / proveedor</label>
+          <input value={v.tienda} onChange={(e) => setV({ ...v, tienda: e.target.value })} className={claseInput} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Para el corte (código)</label>
+          <input value={v.codigoCorte} onChange={(e) => setV({ ...v, codigoCorte: e.target.value })} className={`mono ${claseInput}`} />
+        </div>
+        <div className="col-span-2 flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={v.condicion === 'contado'} onChange={() => setV({ ...v, condicion: 'contado' })} /> Al
+            contado
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={v.condicion === 'credito'} onChange={() => setV({ ...v, condicion: 'credito' })} /> A
+            crédito <span className="text-xs text-gray-500">(se la debés al proveedor)</span>
+          </label>
+        </div>
+        {v.condicion === 'contado' && <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />}
+      </div>
+      {editar.error != null && <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{mensaje(editar.error)}</p>}
+      <div className="mt-5 flex justify-end gap-2">
+        <button onClick={onCerrar} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button
+          onClick={onGuardar}
+          disabled={editar.isPending}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Guardar
         </button>
       </div>
     </Modal>

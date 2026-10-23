@@ -54,6 +54,7 @@ export interface CompraDTO {
   precioUnitarioBs: number; // solo para mostrar
   codigoCorte: string | null; // corte para el que se compró
   condicion: 'contado' | 'credito';
+  caja: 'efectivo' | 'banco';
   notas: string | null;
 }
 

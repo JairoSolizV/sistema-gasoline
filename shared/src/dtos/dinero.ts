@@ -57,6 +57,7 @@ export interface CobroDTO {
   fecha: string;
   monto: number;
   nota: string | null;
+  caja: 'efectivo' | 'banco';
 }
 
 export interface MovimientoProveedorDTO {

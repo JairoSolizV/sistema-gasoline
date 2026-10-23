@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
+import { cajaSchema } from './caja.js';
 
 // Tablero de dinero (docs/PLAN_TABLERO_DINERO.md): clientes, pedidos,
 // despachos, cobros y pagos a proveedores. Dinero en centavos.
@@ -80,6 +81,7 @@ export const cobroInputSchema = z.object({
   fecha: dia,
   monto,
   nota: texto(120).optional(),
+  caja: cajaSchema.default('efectivo'),
 });
 
 export const pagoProveedorInputSchema = z.object({
@@ -87,6 +89,7 @@ export const pagoProveedorInputSchema = z.object({
   fecha: dia,
   monto,
   nota: texto(120).optional(),
+  caja: cajaSchema.default('efectivo'),
 });
 
 export type ClienteInput = z.infer<typeof clienteInputSchema>;

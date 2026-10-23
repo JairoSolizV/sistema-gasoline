@@ -22,6 +22,7 @@ import { RendicionPage } from './features/rendicion/RendicionPage';
 import { ConfiguracionPage } from './features/configuracion/ConfiguracionPage';
 import { TableroPage } from './features/dinero/TableroPage';
 import { VentasPage } from './features/dinero/VentasPage';
+import { CajaPage } from './features/dinero/CajaPage';
 import { PantallaError } from './components/PantallaError';
 
 export const router = createBrowserRouter([
@@ -57,6 +58,7 @@ export const router = createBrowserRouter([
           { path: '/costos/fichas/:fichaId', element: <FichaCostoPage /> },
           { path: '/tablero', element: <TableroPage /> },
           { path: '/ventas', element: <VentasPage /> },
+          { path: '/caja', element: <CajaPage /> },
           { path: '/configuracion', element: <ConfiguracionPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],

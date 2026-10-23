@@ -4,6 +4,7 @@ import type {
   CompraGastoInput,
   CompraInput,
   ConteoInput,
+  EditarCompraInput,
   EditarGastoFijoInput,
   EditarInsumoInput,
   EditarPrestamoInput,
@@ -41,6 +42,9 @@ export const costosController = {
   },
   async crearCompra(req: Request, res: Response) {
     res.status(201).json({ data: await costosService.crearCompra(req.body as CompraInput) });
+  },
+  async editarCompra(req: Request, res: Response) {
+    res.json({ data: await costosService.editarCompra(id(req), req.body as EditarCompraInput) });
   },
   async eliminarCompra(req: Request, res: Response) {
     await costosService.eliminarCompra(id(req));

@@ -10,6 +10,7 @@ import type {
   PagoPrestamoInput,
   PrestamoInput,
   CompraInput,
+  EditarCompraInput,
   ConteoDTO,
   ConteoInput,
   CorteCostoDetalleDTO,
@@ -35,6 +36,7 @@ function useInvalidarCostos() {
     Promise.all([
       qc.invalidateQueries({ queryKey: ['costos'] }),
       qc.invalidateQueries({ queryKey: ['dinero'] }),
+      qc.invalidateQueries({ queryKey: ['caja'] }),
     ]);
 }
 
@@ -73,6 +75,15 @@ export function useCrearCompra() {
   return useMutation({
     mutationFn: (input: CompraInput) =>
       api<CompraDTO>('/costos/compras', { method: 'POST', body: JSON.stringify(input) }),
+    onSuccess,
+  });
+}
+
+export function useEditarCompra() {
+  const onSuccess = useInvalidarCostos();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: EditarCompraInput }) =>
+      api<CompraDTO>(`/costos/compras/${id}`, { method: 'PATCH', body: JSON.stringify(input) }),
     onSuccess,
   });
 }

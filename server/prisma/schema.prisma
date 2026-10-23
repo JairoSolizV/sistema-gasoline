@@ -263,6 +263,7 @@ model Anticipo {
   fecha      DateTime
   monto      Int // centavos; si supera el tope → advertencia, no bloqueo
   nota       String?
+  caja       Caja     @default(efectivo) // de qué caja salió (docs/PLAN_CAJA.md); no entra al cálculo
 
   @@index([operarioId, fecha])
 }
@@ -664,6 +665,7 @@ model CompraInsumo {
   tasaCambio   Int? // diezmilésimos: tasa oficial del día de la compra
   precioTotal  Int // centavos Bs (en dólares: montoUsd × tasa, redondeado una vez)
   condicion    CondicionCompra @default(contado) // a crédito: suma a la deuda con el proveedor (tablero)
+  caja         Caja            @default(efectivo) // al contado: de qué caja salió
   codigoCorte  String? // corte para el que se compró (texto: "28-1"; los cortes 25–32 no están en el sistema)
   notas        String?
   creadoEn     DateTime     @default(now())
@@ -788,6 +790,7 @@ model CompraGasto {
   fecha    DateTime  @db.Date
   monto    Int // centavos (total de la compra, antes del % del taller)
   nota     String?
+  caja     Caja      @default(efectivo)
   creadoEn DateTime  @default(now())
 
   @@index([gastoId, fecha])
@@ -815,6 +818,7 @@ model PagoPrestamo {
   mes        Int
   fecha      DateTime @db.Date
   monto      Int // centavos
+  caja       Caja     @default(efectivo)
 
   @@unique([prestamoId, anio, mes])
 }
@@ -830,6 +834,7 @@ model PagoProveedor {
   fecha     DateTime @db.Date
   monto     Int // centavos
   nota      String?
+  caja      Caja     @default(efectivo)
   creadoEn  DateTime @default(now())
 
   @@index([proveedor])
@@ -913,7 +918,76 @@ model Cobro {
   fecha     DateTime @db.Date
   monto     Int // centavos
   nota      String?
+  caja      Caja     @default(efectivo)
   creadoEn  DateTime @default(now())
 
   @@index([clienteId])
+}
+
+// ── Caja (docs/PLAN_CAJA.md) — no toca pagos ─────────────────────────────────
+
+enum Caja {
+  efectivo
+  banco // cuenta bancaria, transferencias y QR
+}
+
+// Desde cuándo se lleva cada caja y con cuánto empezó: lo anterior no cuenta.
+model CajaInicio {
+  caja         Caja     @id
+  desde        DateTime @db.Date
+  saldoInicial Int // centavos
+}
+
+enum TipoCategoriaCaja {
+  ingreso
+  egreso
+}
+
+// Categoría para clasificar ingresos y gastos. Las que tienen clave las usa el
+// sistema para lo que entra solo (cobros, compras, anticipos…): se pueden
+// renombrar pero no desactivar.
+model CategoriaCaja {
+  id          String            @id @default(uuid())
+  nombre      String            @unique
+  tipo        TipoCategoriaCaja
+  clave       String?           @unique
+  activo      Boolean           @default(true)
+  orden       Int               @default(0)
+  movimientos MovimientoCaja[]
+}
+
+enum TipoMovimientoCaja {
+  ingreso
+  egreso
+  transferencia // de una caja a la otra (ej. depositar efectivo en el banco)
+}
+
+// Movimiento anotado a mano (lo que no se registra en otra pantalla).
+model MovimientoCaja {
+  id          String             @id @default(uuid())
+  tipo        TipoMovimientoCaja
+  caja        Caja // de dónde sale o adónde entra
+  cajaDestino Caja? // solo transferencias
+  fecha       DateTime           @db.Date
+  monto       Int // centavos
+  categoria   CategoriaCaja?     @relation(fields: [categoriaId], references: [id])
+  categoriaId String? // null en transferencias
+  descripcion String
+  creadoEn    DateTime           @default(now())
+
+  @@index([fecha])
+}
+
+// Conteo de la plata real: la diferencia con el sistema queda como ajuste.
+model ArqueoCaja {
+  id         String   @id @default(uuid())
+  caja       Caja
+  fecha      DateTime @db.Date
+  contado    Int // centavos
+  sistema    Int // lo que decía el sistema ese día (foto)
+  diferencia Int // contado − sistema (positivo = sobrante)
+  nota       String?
+  creadoEn   DateTime @default(now())
+
+  @@index([caja, fecha])
 }

@@ -131,6 +131,9 @@ export function Layout() {
           <ItemMenu a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
             Ventas y cobros
           </ItemMenu>
+          <ItemMenu a="/caja" icono={<Icono d="M3 7h18v12H3zM3 11h18M7 15h3" />}>
+            Caja
+          </ItemMenu>
 
           <TituloSeccion>Costos</TituloSeccion>
           <ItemMenu

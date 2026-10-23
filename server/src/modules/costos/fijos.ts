@@ -222,6 +222,7 @@ export const fijosService = {
       fecha: diaADate(input.fecha),
       monto: input.monto,
       nota: input.nota ?? null,
+      caja: input.caja,
     });
   },
 
@@ -255,7 +256,7 @@ export const fijosService = {
   /** Marca la cuota del mes como pagada (otra vez = corrige fecha y monto). */
   async pagarCuota(id: string, input: PagoPrestamoInput): Promise<void> {
     await prestamoOError(id);
-    await fijosRepository.guardarPago(id, input.anio, input.mes, diaADate(input.fecha), input.monto);
+    await fijosRepository.guardarPago(id, input.anio, input.mes, diaADate(input.fecha), input.monto, input.caja);
   },
 
   async quitarPago(id: string, anio: number, mes: number): Promise<void> {

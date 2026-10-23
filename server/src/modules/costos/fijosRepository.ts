@@ -1,6 +1,6 @@
 // Acceso a Prisma de los costos fijos del taller (docs/PLAN_COSTOS.md §7c).
 // Solo consulta: nada de esto entra a los pagos.
-import type { Prisma } from '@prisma/client';
+import type { Caja, Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { rangoMesUTC } from '../liquidacion/repository.js';
 
@@ -71,11 +71,11 @@ export const fijosRepository = {
   eliminarPrestamo(id: string) {
     return prisma.prestamo.delete({ where: { id } }); // pagos en cascada
   },
-  guardarPago(prestamoId: string, anio: number, mes: number, fecha: Date, monto: number) {
+  guardarPago(prestamoId: string, anio: number, mes: number, fecha: Date, monto: number, caja: Caja) {
     return prisma.pagoPrestamo.upsert({
       where: { prestamoId_anio_mes: { prestamoId, anio, mes } },
-      create: { prestamoId, anio, mes, fecha, monto },
-      update: { fecha, monto },
+      create: { prestamoId, anio, mes, fecha, monto, caja },
+      update: { fecha, monto, caja },
     });
   },
   eliminarPago(prestamoId: string, anio: number, mes: number) {

@@ -3,6 +3,7 @@ import {
   compraGastoInputSchema,
   compraInputSchema,
   conteoInputSchema,
+  editarCompraSchema,
   editarGastoFijoSchema,
   editarInsumoSchema,
   editarPrestamoSchema,
@@ -29,6 +30,7 @@ costosRouter.delete('/insumos/:id', costosController.eliminarInsumo);
 
 costosRouter.get('/compras', validar(listarComprasQuerySchema, 'query'), costosController.listarCompras);
 costosRouter.post('/compras', validar(compraInputSchema), costosController.crearCompra);
+costosRouter.patch('/compras/:id', validar(editarCompraSchema), costosController.editarCompra);
 costosRouter.delete('/compras/:id', costosController.eliminarCompra);
 
 costosRouter.get('/fichas', costosController.listarFichas);

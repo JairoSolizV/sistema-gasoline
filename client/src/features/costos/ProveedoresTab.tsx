@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { aCentavos, formatBs } from '@taller/shared';
+import { aCentavos, formatBs, type Caja } from '@taller/shared';
 import { useMutacionDinero, useProveedores } from '../../api/dinero';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { fechaCorta, PATRON_BS } from './formato';
@@ -150,7 +151,7 @@ function ModalPago({
   onCerrar: () => void;
 }) {
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ proveedor, fecha: hoyLocalISO(), monto: '', nota: '' });
+  const [v, setV] = useState({ proveedor, fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
   const [error, setError] = useState<string | null>(null);
   const onGuardar = async () => {
     setError(null);
@@ -159,7 +160,13 @@ function ModalPago({
     try {
       await mutar.mutateAsync({
         tipo: 'pagarProveedor',
-        input: { proveedor: v.proveedor, fecha: v.fecha, monto: aCentavos(v.monto.trim().replace(',', '.')), nota: v.nota },
+        input: {
+          proveedor: v.proveedor,
+          fecha: v.fecha,
+          monto: aCentavos(v.monto.trim().replace(',', '.')),
+          nota: v.nota,
+          caja: v.caja,
+        },
       });
       onCerrar();
     } catch (e) {
@@ -198,6 +205,7 @@ function ModalPago({
           <label className="mb-1 block text-sm font-medium">Nota</label>
           <input value={v.nota} onChange={(e) => setV({ ...v, nota: e.target.value })} placeholder="opcional" className={claseInput} />
         </div>
+        <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />
       </div>
       {error && <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">

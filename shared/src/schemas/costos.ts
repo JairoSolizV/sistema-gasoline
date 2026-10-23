@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
+import { cajaSchema } from './caja.js';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Unidades en shared/costos.ts:
 // cantidades en milésimas, dinero en centavos, tasa en diezmilésimos.
@@ -63,6 +64,7 @@ export const compraInputSchema = z
     tasaCambio: entero(1, 'Tasa de cambio inválida').optional(), // diezmilésimos
     codigoCorte: texto(20).optional(), // corte para el que se compró (ej. "28-1")
     condicion: z.enum(['contado', 'credito']).default('contado'), // a crédito: deuda con el proveedor
+    caja: cajaSchema.default('efectivo'), // al contado: de qué caja salió
     notas: texto(200).optional(),
   })
   .refine((c) => c.moneda !== 'BOB' || c.precioTotal != null, {
@@ -115,9 +117,22 @@ export const fichaCostoInputSchema = z.object({
 
 export const listarComprasQuerySchema = z.object({ insumoId: z.uuid().optional() });
 
+/** Datos de una compra que se pueden corregir sin tocar su precio ni cantidad:
+ *  la tienda, el corte, si fue al contado o a crédito y de qué caja salió. */
+export const editarCompraSchema = z
+  .object({
+    tienda: z.string().trim().min(1, 'Indicá la tienda o proveedor').max(80),
+    codigoCorte: texto(20),
+    condicion: z.enum(['contado', 'credito']),
+    caja: cajaSchema,
+  })
+  .partial()
+  .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
+
 export type InsumoInput = z.infer<typeof insumoInputSchema>;
 export type EditarInsumoInput = z.infer<typeof editarInsumoSchema>;
 export type CompraInput = z.infer<typeof compraInputSchema>;
+export type EditarCompraInput = z.infer<typeof editarCompraSchema>;
 export type LineaCostoInput = z.infer<typeof lineaCostoInputSchema>;
 export type FichaCostoInput = z.infer<typeof fichaCostoInputSchema>;
 
@@ -192,6 +207,7 @@ export const compraGastoInputSchema = z.object({
   fecha: dia,
   monto: z.number().int().min(1, 'El monto debe ser mayor a 0').max(100_000_000),
   nota: texto(120).optional(),
+  caja: cajaSchema.default('efectivo'),
 });
 
 export const prestamoInputSchema = z.object({
@@ -211,6 +227,7 @@ export const pagoPrestamoInputSchema = z.object({
   mes: z.number().int().min(1).max(12),
   fecha: dia,
   monto: z.number().int().min(1).max(100_000_000),
+  caja: cajaSchema.default('efectivo'),
 });
 
 export type GastoFijoInput = z.infer<typeof gastoFijoInputSchema>;

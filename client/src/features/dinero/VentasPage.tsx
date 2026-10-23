@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   aCentavos,
   formatBs,
+  type Caja,
   type ClienteDTO,
   type EstadoPedido,
   type PedidoDTO,
@@ -19,6 +20,7 @@ import { useFichasCosto } from '../../api/costos';
 import { useCortes } from '../../api/cortes';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { fechaCorta } from '../costos/formato';
@@ -638,7 +640,7 @@ function CobrosTab() {
 function ModalCobro({ onCerrar }: { onCerrar: () => void }) {
   const { data: clientes } = useClientes();
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ clienteId: '', fecha: hoyLocalISO(), monto: '', nota: '' });
+  const [v, setV] = useState({ clienteId: '', fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
   const [error, setError] = useState<string | null>(null);
   const cliente = clientes?.find((c) => c.id === v.clienteId);
   const onGuardar = async () => {
@@ -646,7 +648,7 @@ function ModalCobro({ onCerrar }: { onCerrar: () => void }) {
     if (!v.clienteId) return setError('Elegí el cliente');
     if (!PATRON_BS.test(v.monto.trim()) || aCent(v.monto) <= 0) return setError('Monto inválido (ej. 1500)');
     try {
-      await mutar.mutateAsync({ tipo: 'crearCobro', input: { clienteId: v.clienteId, fecha: v.fecha, monto: aCent(v.monto), nota: v.nota } });
+      await mutar.mutateAsync({ tipo: 'crearCobro', input: { clienteId: v.clienteId, fecha: v.fecha, monto: aCent(v.monto), nota: v.nota, caja: v.caja } });
       onCerrar();
     } catch (e) {
       setError(mensaje(e));
@@ -673,8 +675,9 @@ function ModalCobro({ onCerrar }: { onCerrar: () => void }) {
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Nota</label>
-          <input value={v.nota} onChange={(e) => setV({ ...v, nota: e.target.value })} placeholder="ej. transferencia, efectivo" className={claseInput} />
+          <input value={v.nota} onChange={(e) => setV({ ...v, nota: e.target.value })} placeholder="opcional" className={claseInput} />
         </div>
+        <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Entró a" />
       </div>
       <PieModal onCerrar={onCerrar} onGuardar={() => void onGuardar()} texto="Registrar cobro" error={error} pendiente={mutar.isPending} />
     </Modal>

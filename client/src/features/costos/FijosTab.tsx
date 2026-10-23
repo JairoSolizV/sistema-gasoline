@@ -7,11 +7,13 @@ import {
   type GastoFijoMesDTO,
   type GrupoGastoFijo,
   type PrestamoMesDTO,
+  type Caja,
 } from '@taller/shared';
 import { useCostosFijos, useMutacionFijos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
 import { HojaOficio } from '../../components/HojaOficio';
 import { Modal } from '../../components/Modal';
+import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { MESES } from '../../lib/meses';
@@ -435,7 +437,7 @@ function Prestamos({ d, onModal }: { d: CostosFijosMesDTO; onModal: (m: ModalFij
                       mutar.mutate({
                         tipo: 'pagar',
                         id: p.id,
-                        input: { anio: d.anio, mes: d.mes, fecha: hoyLocalISO(), monto: p.cuota },
+                        input: { anio: d.anio, mes: d.mes, fecha: hoyLocalISO(), monto: p.cuota, caja: 'efectivo' }, // se cambia en Caja
                       })
                     }
                     className="text-acento hover:underline"
@@ -624,11 +626,12 @@ function ModalCompra({ gasto, onCerrar }: { gasto: GastoFijoMesDTO; onCerrar: ()
   const [fecha, setFecha] = useState(hoyLocalISO());
   const [montoBs, setMontoBs] = useState('');
   const [nota, setNota] = useState('');
+  const [caja, setCaja] = useState<Caja>('efectivo');
   const [error, setError] = useState<string | null>(null);
   const guardar = async () => {
     setError(null);
     if (!PATRON_BS.test(montoBs.trim()) || bs(montoBs) <= 0) return setError('Monto inválido (ej. 85.50)');
-    await mutar.mutateAsync({ tipo: 'compra', id: gasto.id, input: { fecha, monto: bs(montoBs), nota } });
+    await mutar.mutateAsync({ tipo: 'compra', id: gasto.id, input: { fecha, monto: bs(montoBs), nota, caja } });
     onCerrar();
   };
   return (
@@ -646,10 +649,11 @@ function ModalCompra({ gasto, onCerrar }: { gasto: GastoFijoMesDTO; onCerrar: ()
           <label className="mb-1 block text-sm font-medium">Monto (Bs)</label>
           <input value={montoBs} onChange={(e) => setMontoBs(e.target.value)} inputMode="decimal" className={`mono ${claseInput}`} />
         </div>
-        <div className="col-span-2">
+        <div>
           <label className="mb-1 block text-sm font-medium">Qué fue</label>
-          <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="ej. verduras de la semana, pan, carne" className={claseInput} />
+          <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="ej. verduras, pan, carne" className={claseInput} />
         </div>
+        <SelectorCaja valor={caja} onCambiar={setCaja} />
       </div>
       {(error || mutar.error != null) && (
         <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{error ?? mensaje(mutar.error)}</p>

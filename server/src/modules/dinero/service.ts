@@ -365,6 +365,7 @@ export const dineroService = {
       fecha: dateADia(c.fecha),
       monto: c.monto,
       nota: c.nota,
+      caja: c.caja,
     }));
   },
 
@@ -375,8 +376,9 @@ export const dineroService = {
       fecha: diaADate(input.fecha),
       monto: input.monto,
       nota: input.nota ?? null,
+      caja: input.caja,
     });
-    return { id: c.id, cliente: c.cliente, fecha: dateADia(c.fecha), monto: c.monto, nota: c.nota };
+    return { id: c.id, cliente: c.cliente, fecha: dateADia(c.fecha), monto: c.monto, nota: c.nota, caja: c.caja };
   },
 
   async eliminarCobro(id: string): Promise<void> {
@@ -426,6 +428,7 @@ export const dineroService = {
       fecha: diaADate(input.fecha),
       monto: input.monto,
       nota: input.nota ?? null,
+      caja: input.caja,
     });
     return this.proveedores();
   },
