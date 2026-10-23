@@ -62,6 +62,7 @@ export const compraInputSchema = z
     montoUsd: centavos.optional(), // USD
     tasaCambio: entero(1, 'Tasa de cambio inválida').optional(), // diezmilésimos
     codigoCorte: texto(20).optional(), // corte para el que se compró (ej. "28-1")
+    condicion: z.enum(['contado', 'credito']).default('contado'), // a crédito: deuda con el proveedor
     notas: texto(200).optional(),
   })
   .refine((c) => c.moneda !== 'BOB' || c.precioTotal != null, {

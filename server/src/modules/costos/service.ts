@@ -100,6 +100,7 @@ function aCompraDTO(c: CompraConInsumo): CompraDTO {
     precioTotal: c.precioTotal,
     precioUnitarioBs: bsPorUnidad(c),
     codigoCorte: c.codigoCorte,
+    condicion: c.condicion,
     notas: c.notas,
   };
 }
@@ -298,6 +299,7 @@ export const costosService = {
       tasaCambio: enDolares ? input.tasaCambio! : null,
       precioTotal: enDolares ? aBolivianos(input.montoUsd!, input.tasaCambio!) : input.precioTotal!,
       codigoCorte: input.codigoCorte ?? null,
+      condicion: input.condicion,
       notas: input.notas ?? null,
     });
     return aCompraDTO(compra);
@@ -342,6 +344,10 @@ export const costosService = {
   async eliminarFicha(id: string): Promise<void> {
     if (!(await costosRepository.obtenerFicha(id))) {
       throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
+    }
+    const pedidos = await costosRepository.pedidosDeFicha(id);
+    if (pedidos > 0) {
+      throw new AppError('EN_USO', `La ficha tiene ${pedidos} pedido(s) de clientes: no se puede eliminar`, 409);
     }
     await costosRepository.eliminarFicha(id);
   },

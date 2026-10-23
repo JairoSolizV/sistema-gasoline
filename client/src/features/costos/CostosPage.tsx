@@ -8,6 +8,7 @@ import { CortesCostoTab } from './CortesCostoTab';
 import { FijosTab } from './FijosTab';
 import { InsumosTab } from './InsumosTab';
 import { ProyeccionTab } from './ProyeccionTab';
+import { ProveedoresTab } from './ProveedoresTab';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Solo consulta: nada de esto toca
 // los pagos. Pestañas: fichas de costo por modelo, insumos y compras.
@@ -16,6 +17,7 @@ const PESTANAS = [
   { clave: 'fichas', etiqueta: 'Fichas de costo' },
   { clave: 'insumos', etiqueta: 'Insumos' },
   { clave: 'compras', etiqueta: 'Compras' },
+  { clave: 'proveedores', etiqueta: 'Deudas a proveedores' },
   { clave: 'cortes', etiqueta: 'Costo real de cortes' },
   { clave: 'proyeccion', etiqueta: 'Proyección del mes' },
   { clave: 'fijos', etiqueta: 'Costos fijos' },
@@ -57,6 +59,7 @@ export function CostosPage() {
         {activa === 'fichas' && <FichasTab />}
         {activa === 'insumos' && <InsumosTab />}
         {activa === 'compras' && <ComprasTab />}
+        {activa === 'proveedores' && <ProveedoresTab />}
         {activa === 'cortes' && <CortesCostoTab />}
         {activa === 'proyeccion' && <ProyeccionTab />}
         {activa === 'fijos' && <FijosTab />}

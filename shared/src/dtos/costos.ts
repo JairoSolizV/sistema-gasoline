@@ -53,6 +53,7 @@ export interface CompraDTO {
   precioTotal: number; // centavos Bs
   precioUnitarioBs: number; // solo para mostrar
   codigoCorte: string | null; // corte para el que se compró
+  condicion: 'contado' | 'credito';
   notas: string | null;
 }
 

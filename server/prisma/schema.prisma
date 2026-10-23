@@ -179,6 +179,8 @@ model Corte {
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
   operaciones     CorteOperacion[]
   cambios         CorteCambio[]
+  pedidos         Pedido[] // tablero de dinero: pedidos que se producen con este corte
+  despachos       DespachoLinea[] // prendas de este corte que salieron del depósito
 
   @@index([estado, fechaCierre])
 }
@@ -601,6 +603,11 @@ enum CategoriaInsumo {
   otro
 }
 
+enum CondicionCompra {
+  contado
+  credito
+}
+
 enum OrigenCompra {
   fabrica
   mayorista
@@ -656,6 +663,7 @@ model CompraInsumo {
   montoUsd     Int? // centavos de $us (compra en dólares)
   tasaCambio   Int? // diezmilésimos: tasa oficial del día de la compra
   precioTotal  Int // centavos Bs (en dólares: montoUsd × tasa, redondeado una vez)
+  condicion    CondicionCompra @default(contado) // a crédito: suma a la deuda con el proveedor (tablero)
   codigoCorte  String? // corte para el que se compró (texto: "28-1"; los cortes 25–32 no están en el sistema)
   notas        String?
   creadoEn     DateTime     @default(now())
@@ -680,6 +688,8 @@ model FichaCosto {
   actualizadoEn        DateTime     @updatedAt
   lineas               LineaCosto[]
   planes               PlanProduccion[]
+  pedidos              Pedido[]
+  despachos            DespachoLinea[]
 }
 
 model LineaCosto {
@@ -807,4 +817,103 @@ model PagoPrestamo {
   monto      Int // centavos
 
   @@unique([prestamoId, anio, mes])
+}
+
+// ── Tablero de dinero (docs/PLAN_TABLERO_DINERO.md) — no toca pagos ───────────
+
+// Pago a un proveedor de insumos (ej. la tela a crédito). La deuda de cada
+// proveedor = compras a crédito − pagos; el proveedor es el nombre de la tienda
+// de la compra, normalizado (mayúsculas, sin espacios de más).
+model PagoProveedor {
+  id        String   @id @default(uuid())
+  proveedor String
+  fecha     DateTime @db.Date
+  monto     Int // centavos
+  nota      String?
+  creadoEn  DateTime @default(now())
+
+  @@index([proveedor])
+}
+
+model Cliente {
+  id        String     @id @default(uuid())
+  nombre    String     @unique
+  celular   String?
+  notas     String?
+  activo    Boolean    @default(true)
+  creadoEn  DateTime   @default(now())
+  pedidos   Pedido[]
+  despachos Despacho[]
+  cobros    Cobro[]
+}
+
+enum EstadoPedido {
+  pendiente // en puerta: todavía no se cortó
+  en_produccion // ya tiene corte
+  entregado
+  cancelado
+}
+
+// Pedido de un cliente: "modelos en puerta". El precio se copia del precio de
+// venta de la ficha y se puede cambiar.
+model Pedido {
+  id           String       @id @default(uuid())
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  clienteId    String
+  ficha        FichaCosto   @relation(fields: [fichaId], references: [id])
+  fichaId      String
+  prendas      Int
+  precioPrenda Int // centavos
+  fechaEntrega DateTime?    @db.Date
+  estado       EstadoPedido @default(pendiente)
+  corte        Corte?       @relation(fields: [corteId], references: [id])
+  corteId      String?
+  notas        String?
+  creadoEn     DateTime     @default(now())
+
+  @@index([estado])
+}
+
+// Prendas que salen del depósito hacia un cliente. Se cobra con Cobro.
+model Despacho {
+  id        String          @id @default(uuid())
+  cliente   Cliente         @relation(fields: [clienteId], references: [id])
+  clienteId String
+  fecha     DateTime        @db.Date
+  notas     String?
+  creadoEn  DateTime        @default(now())
+  lineas    DespachoLinea[]
+
+  @@index([fecha])
+}
+
+// Una línea es de un corte (descuenta su depósito) o de una ficha (prendas que
+// no pasaron por el sistema). costoPrenda es una FOTO al despachar (costo real
+// del corte o de la ficha, sin costos fijos): el resultado de meses pasados no
+// cambia si después cambian los precios.
+model DespachoLinea {
+  id           String      @id @default(uuid())
+  despacho     Despacho    @relation(fields: [despachoId], references: [id], onDelete: Cascade)
+  despachoId   String
+  corte        Corte?      @relation(fields: [corteId], references: [id])
+  corteId      String?
+  ficha        FichaCosto? @relation(fields: [fichaId], references: [id])
+  fichaId      String?
+  descripcion  String
+  prendas      Int
+  precioPrenda Int // centavos
+  costoPrenda  Int // centavos (foto)
+  total        Int // centavos = prendas × precioPrenda
+}
+
+model Cobro {
+  id        String   @id @default(uuid())
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  clienteId String
+  fecha     DateTime @db.Date
+  monto     Int // centavos
+  nota      String?
+  creadoEn  DateTime @default(now())
+
+  @@index([clienteId])
 }

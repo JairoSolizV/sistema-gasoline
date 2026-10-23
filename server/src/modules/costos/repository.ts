@@ -62,6 +62,9 @@ export const costosRepository = {
     }
     return mapa;
   },
+  pedidosDeFicha(fichaId: string) {
+    return prisma.pedido.count({ where: { fichaId } });
+  },
   obtenerInsumo(id: string): Promise<InsumoConCompra | null> {
     return prisma.insumo.findUnique({ where: { id }, include: incluirInsumo });
   },
@@ -184,7 +187,7 @@ export const costosRepository = {
           },
         },
         trabajos: { select: { total: true } },
-        envios: { select: { total: true, fechaDevolucion: true } },
+        envios: { select: { total: true, fechaDevolucion: true, servicio: true } },
       },
     });
   },

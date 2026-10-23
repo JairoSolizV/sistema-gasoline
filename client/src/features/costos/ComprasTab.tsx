@@ -98,6 +98,9 @@ export function ComprasTab() {
                 </td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap">
                   Bs {formatBs(c.precioTotal)}
+                  {c.condicion === 'credito' && (
+                    <span className="ml-1 rounded-full bg-error-suave px-1.5 text-[10px] font-semibold text-error">crédito</span>
+                  )}
                   {c.moneda === 'USD' && (
                     <div className="text-[11px] text-gray-400">
                       $us {formatBs(c.montoUsd!)} × {(c.tasaCambio! / 10_000).toLocaleString('es-BO')}
@@ -170,6 +173,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
     montoUsd: '',
     tasa: '',
     codigoCorte: '',
+    condicion: 'contado' as 'contado' | 'credito',
     notas: '',
   });
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +211,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
         ? { montoUsd: aCentavos(v.montoUsd.trim().replace(',', '.')), tasaCambio: aDiezmilesimos(v.tasa) }
         : { precioTotal: totalBs }),
       codigoCorte: v.codigoCorte.trim() || undefined,
+      condicion: v.condicion,
       notas: v.notas,
     });
     onCerrar();
@@ -271,6 +276,16 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
             placeholder="ej. paquete de 144"
             className={claseInput}
           />
+        </div>
+        <div className="col-span-2 flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={v.condicion === 'contado'} onChange={() => cambiar('condicion', 'contado')} /> Al
+            contado
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={v.condicion === 'credito'} onChange={() => cambiar('condicion', 'credito')} /> A
+            crédito <span className="text-xs text-gray-500">(queda como deuda con el proveedor)</span>
+          </label>
         </div>
         <div className="col-span-2 flex gap-4 text-sm">
           <label className="flex items-center gap-1.5">

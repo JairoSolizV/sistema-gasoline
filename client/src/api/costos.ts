@@ -30,7 +30,12 @@ import { api } from './client';
 
 function useInvalidarCostos() {
   const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: ['costos'] });
+  // el tablero de dinero usa compras, stock, fichas y costos fijos
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['costos'] }),
+      qc.invalidateQueries({ queryKey: ['dinero'] }),
+    ]);
 }
 
 export function useInsumos() {

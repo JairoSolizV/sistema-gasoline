@@ -124,6 +124,14 @@ export function Layout() {
             Rendición de cuentas
           </ItemMenu>
 
+          <TituloSeccion>Dinero</TituloSeccion>
+          <ItemMenu a="/tablero" icono={<Icono d="M4 19V10M10 19V5M16 19v-7M22 19H2" />}>
+            Tablero de dinero
+          </ItemMenu>
+          <ItemMenu a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
+            Ventas y cobros
+          </ItemMenu>
+
           <TituloSeccion>Costos</TituloSeccion>
           <ItemMenu
             a="/costos"
