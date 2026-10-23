@@ -4,11 +4,17 @@ import { esDiaValido } from '../dias.js';
 // Caja (docs/PLAN_CAJA.md): efectivo y banco, categorías, movimientos a mano y
 // arqueos. Dinero en centavos.
 
-export const CAJAS = ['efectivo', 'banco'] as const;
+export const CAJAS = ['efectivo', 'banco', 'dolares'] as const;
 export type Caja = (typeof CAJAS)[number];
-export const ETIQUETA_CAJA: Record<Caja, string> = { efectivo: 'Efectivo', banco: 'Banco / QR' };
+/** Las cajas en bolivianos (la de dólares lleva su saldo en $us). */
+export const CAJAS_BS = ['efectivo', 'banco'] as const;
+export type CajaBs = (typeof CAJAS_BS)[number];
+export const ETIQUETA_CAJA: Record<Caja, string> = { efectivo: 'Efectivo', banco: 'Banco / QR', dolares: 'Dólares ($us)' };
+/** Moneda de cada caja. */
+export const MONEDA_CAJA: Record<Caja, 'BOB' | 'USD'> = { efectivo: 'BOB', banco: 'BOB', dolares: 'USD' };
 
 export const cajaSchema = z.enum(CAJAS);
+export const cajaBsSchema = z.enum(CAJAS_BS);
 
 /** Lo que entra solo a la caja: de qué registro viene. */
 export const ORIGENES_CAJA = [
@@ -40,6 +46,8 @@ export const movimientoCajaInputSchema = z
     monto,
     categoriaId: z.uuid().optional(),
     descripcion: z.string().trim().min(1, 'Describí el movimiento').max(120),
+    // cambio de dólares: Bs por $us de ese día (diezmilésimos)
+    tasaCambio: z.number().int().min(1, 'Indicá el tipo de cambio').max(10_000_000).optional(),
   })
   .refine((m) => m.tipo !== 'transferencia' || (m.cajaDestino != null && m.cajaDestino !== m.caja), {
     path: ['cajaDestino'],
@@ -48,7 +56,15 @@ export const movimientoCajaInputSchema = z
   .refine((m) => m.tipo === 'transferencia' || m.categoriaId != null, {
     path: ['categoriaId'],
     message: 'Elegí la categoría',
-  });
+  })
+  .refine(
+    (m) =>
+      m.tipo !== 'transferencia' ||
+      m.cajaDestino == null ||
+      (m.caja === 'dolares') === (m.cajaDestino === 'dolares') ||
+      m.tasaCambio != null,
+    { path: ['tasaCambio'], message: 'Para cambiar dólares indicá el tipo de cambio' },
+  );
 
 export const cambiarCajaSchema = z.object({ caja: cajaSchema });
 

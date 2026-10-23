@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { formatBs } from '@taller/shared';
+import { formatBs, usdABs } from '@taller/shared';
 import { useCuentasPorCobrar } from '../../api/dinero';
 import { TABLA } from '../../components/tabla';
 import { ModalCobro } from './VentasPage';
 
 // Cuentas por cobrar (docs/PLAN_TABLERO_DINERO.md): despachos que los clientes
 // todavía no terminaron de pagar, por fecha de cobro. Los cobros de un cliente
-// cancelan primero sus despachos más viejos.
+// cancelan primero sus despachos más viejos. Todo en $us, como se vende
+// (docs/PLAN_DOLARES.md); el equivalente en Bs, al último tipo de cambio.
 
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const usd = (c: number) => `$us ${formatBs(c)}`;
 const fechaCorta = (dia: string) => dia.split('-').reverse().join('/');
 const dias = (hoy: string, vence: string) =>
   Math.round((Date.parse(`${vence}T00:00:00Z`) - Date.parse(`${hoy}T00:00:00Z`)) / 86_400_000);
@@ -19,7 +21,8 @@ export function CuentasPorCobrarPage() {
   const tarjeta = (titulo: string, monto: number, clase: string, ayuda: string) => (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">{titulo}</div>
-      <div className={`mono mt-1 text-xl font-semibold ${clase}`}>{bs(monto)}</div>
+      <div className={`mono mt-1 text-xl font-semibold ${clase}`}>{usd(monto)}</div>
+      <div className="mono text-xs text-gray-500">≈ {bs(usdABs(monto, d!.tasaCambio))}</div>
       <div className="text-[11px] text-gray-400">{ayuda}</div>
     </div>
   );
@@ -27,8 +30,8 @@ export function CuentasPorCobrarPage() {
   const porCliente = new Map<string, { nombre: string; celular: string | null; total: number; vencido: number }>();
   for (const i of d?.items ?? []) {
     const c = porCliente.get(i.cliente.id) ?? { nombre: i.cliente.nombre, celular: i.cliente.celular, total: 0, vencido: 0 };
-    c.total += i.pendiente;
-    if (i.vence < d!.hoy) c.vencido += i.pendiente;
+    c.total += i.pendienteUsd;
+    if (i.vence < d!.hoy) c.vencido += i.pendienteUsd;
     porCliente.set(i.cliente.id, c);
   }
 
@@ -44,9 +47,9 @@ export function CuentasPorCobrarPage() {
       {d && (
         <>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {tarjeta('Vencido', d.vencido, d.vencido > 0 ? 'text-error' : '', 'ya tendrían que haberte pagado')}
-            {tarjeta('Cobrar esta semana', d.semana, d.semana > 0 ? 'text-amber-700' : '', 'vence en los próximos 7 días')}
-            {tarjeta('Total que te deben', d.total, 'text-acento', `${porCliente.size} cliente(s)`)}
+            {tarjeta('Vencido', d.vencidoUsd, d.vencidoUsd > 0 ? 'text-error' : '', 'ya tendrían que haberte pagado')}
+            {tarjeta('Cobrar esta semana', d.semanaUsd, d.semanaUsd > 0 ? 'text-amber-700' : '', 'vence en los próximos 7 días')}
+            {tarjeta('Total que te deben', d.totalUsd, 'text-acento', `${porCliente.size} cliente(s)`)}
           </div>
 
           {porCliente.size > 0 && (
@@ -61,8 +64,8 @@ export function CuentasPorCobrarPage() {
                   >
                     <div className="font-medium">{c.nombre}</div>
                     <div className="mono text-xs">
-                      debe {formatBs(c.total)}
-                      {c.vencido > 0 && <span className="ml-1 text-error">· vencido {formatBs(c.vencido)}</span>}
+                      debe {usd(c.total)}
+                      {c.vencido > 0 && <span className="ml-1 text-error">· vencido {usd(c.vencido)}</span>}
                     </div>
                     {c.celular && <div className="text-[11px] text-gray-400">{c.celular}</div>}
                   </button>
@@ -77,9 +80,9 @@ export function CuentasPorCobrarPage() {
                   <th className="px-3 py-2.5">Vence</th>
                   <th className="px-3 py-2.5">Cliente</th>
                   <th className="px-3 py-2.5">Despacho</th>
-                  <th className="px-3 py-2.5 text-right">Total</th>
-                  <th className="px-3 py-2.5 text-right">Ya pagó</th>
-                  <th className="px-3 py-2.5 text-right">Falta</th>
+                  <th className="px-3 py-2.5 text-right">Total $us</th>
+                  <th className="px-3 py-2.5 text-right">Ya pagó $us</th>
+                  <th className="px-3 py-2.5 text-right">Falta $us</th>
                   <th className="px-3 py-2.5" />
                 </tr>
               </thead>
@@ -105,9 +108,9 @@ export function CuentasPorCobrarPage() {
                         <span className="text-xs text-gray-400">{fechaCorta(i.fecha)} · </span>
                         {i.detalle}
                       </td>
-                      <td className="mono px-3 py-2 text-right whitespace-nowrap">{bs(i.total)}</td>
-                      <td className="mono px-3 py-2 text-right whitespace-nowrap text-ok">{i.cobrado > 0 ? bs(i.cobrado) : '—'}</td>
-                      <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bs(i.pendiente)}</td>
+                      <td className="mono px-3 py-2 text-right whitespace-nowrap">{usd(i.totalUsd)}</td>
+                      <td className="mono px-3 py-2 text-right whitespace-nowrap text-ok">{i.cobradoUsd > 0 ? usd(i.cobradoUsd) : '—'}</td>
+                      <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{usd(i.pendienteUsd)}</td>
                       <td className="px-3 py-2 text-right text-[13px] font-medium">
                         <button onClick={() => setCobrar(i.cliente.id)} className="text-acento hover:underline">
                           Cobrar
@@ -129,7 +132,7 @@ export function CuentasPorCobrarPage() {
           {d.adelantos.length > 0 && (
             <p className="mt-3 text-xs text-gray-600">
               Pagaron de más (a cuenta de lo próximo):{' '}
-              {d.adelantos.map((a) => `${a.nombre} ${formatBs(a.monto)}`).join(' · ')}
+              {d.adelantos.map((a) => `${a.nombre} ${usd(a.montoUsd)}`).join(' · ')}
             </p>
           )}
         </>

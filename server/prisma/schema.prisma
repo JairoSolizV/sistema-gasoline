@@ -698,6 +698,7 @@ model FichaCosto {
   empaque              Int? // idem
   servicioCorteInterno Boolean      @default(true) // suma las tarifas del servicio de corte
   margen               Int? // centésimas de %; null = el general de Configuración
+  precioDocenaUsd      Int? // precio fijo de la docena en $us (centavos); null = costo + margen
   notas                String?
   // catálogo de productos: lo que se le muestra al cliente
   tallas               String? // ej. "28 al 38"
@@ -849,11 +850,12 @@ model PagoPrestamo {
 model PagoProveedor {
   id        String   @id @default(uuid())
   proveedor String
-  fecha     DateTime @db.Date
-  monto     Int // centavos
+  fecha     DateTime     @db.Date
+  moneda    MonedaCompra @default(BOB) // en $us sale de la caja de dólares (docs/PLAN_DOLARES.md)
+  monto     Int // centavos de su moneda
   nota      String?
-  caja      Caja     @default(efectivo)
-  creadoEn  DateTime @default(now())
+  caja      Caja         @default(efectivo)
+  creadoEn  DateTime     @default(now())
 
   @@index([proveedor])
 }
@@ -886,10 +888,10 @@ model Pedido {
   clienteId    String
   ficha        FichaCosto   @relation(fields: [fichaId], references: [id])
   fichaId      String
-  prendas      Int
-  precioPrenda Int // centavos
-  fechaEntrega DateTime?    @db.Date
-  estado       EstadoPedido @default(pendiente)
+  prendas         Int
+  precioDocenaUsd Int // centavos de $us por docena (docs/PLAN_DOLARES.md)
+  fechaEntrega    DateTime?    @db.Date
+  estado          EstadoPedido @default(pendiente)
   corte        Corte?       @relation(fields: [corteId], references: [id])
   corteId      String?
   notas        String?
@@ -904,8 +906,9 @@ model Despacho {
   cliente   Cliente         @relation(fields: [clienteId], references: [id])
   clienteId String
   fecha     DateTime        @db.Date
-  vence     DateTime        @db.Date // cuándo lo tiene que pagar (fecha + plazo del cliente, editable)
-  notas     String?
+  vence      DateTime        @db.Date // cuándo lo tiene que pagar (fecha + plazo del cliente, editable)
+  tasaCambio Int // diezmilésimos: Bs por $us del día (para la ganancia en Bs)
+  notas      String?
   creadoEn  DateTime        @default(now())
   lineas    DespachoLinea[]
 
@@ -926,21 +929,26 @@ model DespachoLinea {
   fichaId      String?
   descripcion  String
   detalle      String? // talla y color cuando no va surtido (ej. "12 de la 30 negro")
-  prendas      Int
-  precioPrenda Int // centavos
-  costoPrenda  Int // centavos (foto)
-  total        Int // centavos = prendas × precioPrenda
+  prendas         Int
+  precioDocenaUsd Int // centavos de $us por docena
+  totalUsd        Int // centavos de $us = prendas × precio docena ÷ 12 (un redondeo)
+  totalBs         Int // centavos de Bs = totalUsd × tasa del despacho (para la ganancia)
+  costoPrenda     Int // centavos de Bs (foto)
 }
 
 model Cobro {
   id        String   @id @default(uuid())
   cliente   Cliente  @relation(fields: [clienteId], references: [id])
-  clienteId String
-  fecha     DateTime @db.Date
-  monto     Int // centavos
-  nota      String?
-  caja      Caja     @default(efectivo)
-  creadoEn  DateTime @default(now())
+  clienteId  String
+  fecha      DateTime     @db.Date
+  moneda     MonedaCompra @default(USD) // casi siempre en dólares (docs/PLAN_DOLARES.md)
+  monto      Int // centavos de su moneda
+  tasaCambio Int // diezmilésimos del día
+  usd        Int // equivalente en $us (lo que descuenta de la deuda del cliente)
+  bs         Int // equivalente en Bs
+  nota       String?
+  caja       Caja         @default(dolares) // en $us: la caja de dólares
+  creadoEn   DateTime     @default(now())
 
   @@index([clienteId])
 }
@@ -950,6 +958,7 @@ model Cobro {
 enum Caja {
   efectivo
   banco // cuenta bancaria, transferencias y QR
+  dolares // cobros en $us; de acá se paga la tela en $us (docs/PLAN_DOLARES.md)
 }
 
 // Desde cuándo se lleva cada caja y con cuánto empezó: lo anterior no cuenta.
@@ -990,7 +999,11 @@ model MovimientoCaja {
   caja        Caja // de dónde sale o adónde entra
   cajaDestino Caja? // solo transferencias
   fecha       DateTime           @db.Date
-  monto       Int // centavos
+  monto       Int // centavos de la moneda de `caja`
+  // cambio de dólares (transferencia entre la caja de $us y una de Bs): lo que
+  // entra en la otra moneda y a qué tipo de cambio
+  montoDestino Int?
+  tasaCambio   Int?
   categoria   CategoriaCaja?     @relation(fields: [categoriaId], references: [id])
   categoriaId String? // null en transferencias
   descripcion String

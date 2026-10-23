@@ -10,4 +10,11 @@ export const configuracionRepository = {
   actualizar(data: Prisma.ConfiguracionUpdateInput) {
     return prisma.configuracion.update({ where: { id: 1 }, data });
   },
+
+  /** El tipo de cambio que se acaba de escribir pasa a ser "el último", el que
+   *  el sistema propone (docs/PLAN_DOLARES.md). */
+  async recordarTasa(tasa: number | undefined) {
+    if (tasa == null) return;
+    await prisma.configuracion.updateMany({ where: { id: 1, NOT: { tasaCambioUsd: tasa } }, data: { tasaCambioUsd: tasa } });
+  },
 };

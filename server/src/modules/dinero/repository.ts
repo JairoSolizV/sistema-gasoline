@@ -46,16 +46,16 @@ export const dineroRepository = {
   eliminarCliente(id: string) {
     return prisma.cliente.delete({ where: { id } });
   },
-  /** Σ despachado y Σ cobrado por cliente. */
+  /** Σ despachado y Σ cobrado por cliente, en $us. */
   async totalesPorCliente(): Promise<Map<string, { despachado: number; cobrado: number }>> {
     const [lineas, cobros] = await Promise.all([
-      prisma.despachoLinea.findMany({ select: { total: true, despacho: { select: { clienteId: true } } } }),
-      prisma.cobro.groupBy({ by: ['clienteId'], _sum: { monto: true } }),
+      prisma.despachoLinea.findMany({ select: { totalUsd: true, despacho: { select: { clienteId: true } } } }),
+      prisma.cobro.groupBy({ by: ['clienteId'], _sum: { usd: true } }),
     ]);
     const mapa = new Map<string, { despachado: number; cobrado: number }>();
     const de = (id: string) => mapa.get(id) ?? mapa.set(id, { despachado: 0, cobrado: 0 }).get(id)!;
-    for (const l of lineas) de(l.despacho.clienteId).despachado += l.total;
-    for (const c of cobros) de(c.clienteId).cobrado += c._sum.monto ?? 0;
+    for (const l of lineas) de(l.despacho.clienteId).despachado += l.totalUsd;
+    for (const c of cobros) de(c.clienteId).cobrado += c._sum.usd ?? 0;
     return mapa;
   },
 
@@ -91,7 +91,7 @@ export const dineroRepository = {
     return prisma.despacho.findUnique({ where: { id }, include: incluirDespacho });
   },
   crearDespacho(
-    data: { clienteId: string; fecha: Date; vence: Date; notas: string | null },
+    data: { clienteId: string; fecha: Date; vence: Date; tasaCambio: number; notas: string | null },
     lineas: Omit<Prisma.DespachoLineaCreateManyInput, 'despachoId'>[],
   ) {
     return prisma.despacho.create({
@@ -145,6 +145,8 @@ export const dineroRepository = {
         fecha: true,
         vence: true,
         tienda: true,
+        moneda: true,
+        montoUsd: true,
         precioTotal: true,
         codigoCorte: true,
         insumo: { select: { nombre: true } },

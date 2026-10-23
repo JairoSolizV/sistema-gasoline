@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { aCentavos, formatBs, type Caja } from '@taller/shared';
+import { aCentavos, formatBs, type CajaBs, type Moneda } from '@taller/shared';
 import { useMutacionDinero, useProveedores } from '../../api/dinero';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
@@ -10,9 +10,12 @@ import { fechaCorta, PATRON_BS } from './formato';
 
 // Deudas con proveedores de insumos (docs/PLAN_TABLERO_DINERO.md): compras
 // marcadas "a crédito" − pagos anotados acá. El proveedor es la tienda de la
-// compra (en mayúsculas, sin espacios de más).
+// compra (en mayúsculas, sin espacios de más). Lo comprado en $us (la tela de
+// Nancy) se debe y se paga en $us: una fila por proveedor y moneda
+// (docs/PLAN_DOLARES.md).
 
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const plata = (c: number, moneda: Moneda) => (moneda === 'USD' ? `$us ${formatBs(c)}` : bs(c));
 const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
 
@@ -20,18 +23,20 @@ export function ProveedoresTab() {
   const { data: proveedores, isLoading } = useProveedores();
   const mutar = useMutacionDinero();
   const [abierto, setAbierto] = useState<string | null>(null);
-  const [pagar, setPagar] = useState<string | null>(null); // proveedor ('' = elegir)
-  const total = (proveedores ?? []).reduce((a, p) => a + p.deuda, 0);
+  const [pagar, setPagar] = useState<{ proveedor: string; moneda: Moneda } | null>(null); // proveedor '' = elegir
+  const total = (moneda: Moneda) => (proveedores ?? []).filter((p) => p.moneda === moneda).reduce((a, p) => a + p.deuda, 0);
+  const clave = (p: { proveedor: string; moneda: Moneda }) => `${p.proveedor}|${p.moneda}`;
 
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-gray-600">
           Lo que debés por compras <strong>a crédito</strong> (se marcan al registrar la compra). Total:{' '}
-          <span className="mono font-semibold text-error">{bs(total)}</span>
+          <span className="mono font-semibold text-error">{plata(total('USD'), 'USD')}</span> y{' '}
+          <span className="mono font-semibold text-error">{bs(total('BOB'))}</span>
         </p>
         <button
-          onClick={() => setPagar('')}
+          onClick={() => setPagar({ proveedor: '', moneda: 'USD' })}
           className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2]"
         >
           + Registrar pago
@@ -58,11 +63,11 @@ export function ProveedoresTab() {
             )}
             {proveedores?.map((p) => (
               <FilaProveedor
-                key={p.proveedor}
+                key={clave(p)}
                 p={p}
-                abierto={abierto === p.proveedor}
-                onAbrir={() => setAbierto(abierto === p.proveedor ? null : p.proveedor)}
-                onPagar={() => setPagar(p.proveedor)}
+                abierto={abierto === clave(p)}
+                onAbrir={() => setAbierto(abierto === clave(p) ? null : clave(p))}
+                onPagar={() => setPagar({ proveedor: p.proveedor, moneda: p.moneda })}
                 onQuitarPago={(id) => mutar.mutate({ tipo: 'quitarPago', id })}
               />
             ))}
@@ -78,8 +83,9 @@ export function ProveedoresTab() {
       </div>
       {pagar != null && (
         <ModalPago
-          proveedor={pagar}
-          proveedores={(proveedores ?? []).map((p) => p.proveedor)}
+          proveedor={pagar.proveedor}
+          moneda={pagar.moneda}
+          proveedores={[...new Set((proveedores ?? []).map((p) => p.proveedor))]}
           onCerrar={() => setPagar(null)}
         />
       )}
@@ -107,11 +113,14 @@ function FilaProveedor({
           <button onClick={onAbrir} className="font-medium text-acento hover:underline">
             {p.proveedor} {abierto ? '▴' : '▾'}
           </button>
+          {p.moneda === 'USD' && (
+            <span className="ml-2 rounded-full bg-ok-suave px-2 py-0.5 text-[11px] font-semibold text-ok">en dólares</span>
+          )}
         </td>
-        <td className="mono px-3 py-2 text-right whitespace-nowrap">{bs(p.comprasCredito)}</td>
-        <td className="mono px-3 py-2 text-right whitespace-nowrap text-ok">{bs(p.pagado)}</td>
+        <td className="mono px-3 py-2 text-right whitespace-nowrap">{plata(p.comprasCredito, p.moneda)}</td>
+        <td className="mono px-3 py-2 text-right whitespace-nowrap text-ok">{plata(p.pagado, p.moneda)}</td>
         <td className={`mono px-3 py-2 text-right font-semibold whitespace-nowrap ${p.deuda > 0 ? 'text-error' : 'text-gray-400'}`}>
-          {bs(p.deuda)}
+          {plata(p.deuda, p.moneda)}
         </td>
         <td className="px-3 py-2 text-right text-[13px] font-medium">
           <button onClick={onPagar} className="text-acento hover:underline">
@@ -125,8 +134,8 @@ function FilaProveedor({
             <td className="py-1.5 pr-3 pl-8 text-gray-600">
               {fechaCorta(m.fecha)} · {m.tipo === 'compra' ? 'compra' : 'pago'} · {m.detalle}
             </td>
-            <td className="mono px-3 py-1.5 text-right">{m.tipo === 'compra' ? bs(m.monto) : ''}</td>
-            <td className="mono px-3 py-1.5 text-right text-ok">{m.tipo === 'pago' ? bs(m.monto) : ''}</td>
+            <td className="mono px-3 py-1.5 text-right">{m.tipo === 'compra' ? plata(m.monto, p.moneda) : ''}</td>
+            <td className="mono px-3 py-1.5 text-right text-ok">{m.tipo === 'pago' ? plata(m.monto, p.moneda) : ''}</td>
             <td />
             <td className="px-3 py-1.5 text-right">
               {m.tipo === 'pago' && (
@@ -143,15 +152,18 @@ function FilaProveedor({
 
 function ModalPago({
   proveedor,
+  moneda,
   proveedores,
   onCerrar,
 }: {
   proveedor: string;
+  moneda: Moneda;
   proveedores: string[];
   onCerrar: () => void;
 }) {
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ proveedor, fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
+  const [v, setV] = useState({ proveedor, fecha: hoyLocalISO(), moneda, monto: '', nota: '', caja: 'efectivo' as CajaBs });
+  const enUsd = v.moneda === 'USD';
   const [error, setError] = useState<string | null>(null);
   const onGuardar = async () => {
     setError(null);
@@ -163,6 +175,7 @@ function ModalPago({
         input: {
           proveedor: v.proveedor,
           fecha: v.fecha,
+          moneda: v.moneda,
           monto: aCentavos(v.monto.trim().replace(',', '.')),
           nota: v.nota,
           caja: v.caja,
@@ -191,13 +204,30 @@ function ModalPago({
             ))}
           </datalist>
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">¿En qué le pagás?</label>
+          <div className="flex gap-2">
+            {(['USD', 'BOB'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setV({ ...v, moneda: m })}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                  v.moneda === m ? 'border-acento bg-[rgba(47,111,224,0.08)] font-semibold text-acento' : 'border-gray-300'
+                }`}
+              >
+                {m === 'USD' ? '💵 Dólares ($us)' : 'Bolivianos (Bs)'}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-gray-500">Paga la deuda en esa moneda (la tela en $us se paga en $us).</p>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium">Fecha</label>
             <input type="date" value={v.fecha} onChange={(e) => setV({ ...v, fecha: e.target.value })} className={claseInput} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Monto (Bs)</label>
+            <label className="mb-1 block text-sm font-medium">Monto ({enUsd ? '$us' : 'Bs'})</label>
             <input value={v.monto} onChange={(e) => setV({ ...v, monto: e.target.value })} inputMode="decimal" className={`mono ${claseInput}`} />
           </div>
         </div>
@@ -205,7 +235,11 @@ function ModalPago({
           <label className="mb-1 block text-sm font-medium">Nota</label>
           <input value={v.nota} onChange={(e) => setV({ ...v, nota: e.target.value })} placeholder="opcional" className={claseInput} />
         </div>
-        <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />
+        {enUsd ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">Sale de la caja de dólares.</p>
+        ) : (
+          <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />
+        )}
       </div>
       {error && <p className="mt-3 rounded-lg bg-error-suave px-3 py-2 text-xs text-error">{error}</p>}
       <div className="mt-5 flex justify-end gap-2">

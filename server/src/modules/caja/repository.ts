@@ -98,6 +98,28 @@ export const cajaRepository = {
     return prisma.arqueoCaja.delete({ where: { id } });
   },
 
+  /** En qué moneda está un registro que entra solo: 'ambas' si tiene su
+   *  equivalente en Bs y en $us (cobros, compras en $us); null si no existe. */
+  async monedaDe(origen: OrigenCaja, id: string): Promise<'USD' | 'BOB' | 'ambas' | null> {
+    const donde = { where: { id } };
+    switch (origen) {
+      case 'cobro':
+        return (await prisma.cobro.findUnique(donde)) ? 'ambas' : null;
+      case 'pago_proveedor':
+        return (await prisma.pagoProveedor.findUnique(donde))?.moneda ?? null;
+      case 'compra': {
+        const c = await prisma.compraInsumo.findUnique(donde);
+        return c ? (c.moneda === 'USD' ? 'ambas' : 'BOB') : null;
+      }
+      case 'compra_gasto':
+        return (await prisma.compraGasto.findUnique(donde)) ? 'BOB' : null;
+      case 'pago_prestamo':
+        return (await prisma.pagoPrestamo.findUnique(donde)) ? 'BOB' : null;
+      case 'anticipo':
+        return (await prisma.anticipo.findUnique(donde)) ? 'BOB' : null;
+    }
+  },
+
   /** Cambia de qué caja salió (o entró) un registro que entra solo. */
   async cambiarCaja(origen: OrigenCaja, id: string, caja: Caja): Promise<boolean> {
     const donde = { where: { id }, data: { caja } };

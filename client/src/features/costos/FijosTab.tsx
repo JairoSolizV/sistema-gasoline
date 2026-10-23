@@ -7,7 +7,7 @@ import {
   type GastoFijoMesDTO,
   type GrupoGastoFijo,
   type PrestamoMesDTO,
-  type Caja,
+  type CajaBs,
 } from '@taller/shared';
 import { useCostosFijos, useMutacionFijos } from '../../api/costos';
 import { ErrorApi } from '../../api/client';
@@ -622,7 +622,7 @@ function ModalCompra({ gasto, onCerrar }: { gasto: GastoFijoMesDTO; onCerrar: ()
   const [fecha, setFecha] = useState(hoyLocalISO());
   const [montoBs, setMontoBs] = useState('');
   const [nota, setNota] = useState('');
-  const [caja, setCaja] = useState<Caja>('efectivo');
+  const [caja, setCaja] = useState<CajaBs>('efectivo');
   const [error, setError] = useState<string | null>(null);
   const guardar = async () => {
     setError(null);

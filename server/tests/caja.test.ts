@@ -29,7 +29,7 @@ async function limpiar() {
 }
 
 const caja = async () => (await request(app).get('/api/v1/caja?anio=2035&mes=3')).body.data as CajaMesDTO;
-const resumen = (d: CajaMesDTO, c: 'efectivo' | 'banco') => d.cajas.find((x) => x.caja === c)!;
+const resumen = (d: CajaMesDTO, c: 'efectivo' | 'banco' | 'dolares') => d.cajas.find((x) => x.caja === c)!;
 const categoria = (d: CajaMesDTO, clave: string) => d.categorias.find((c) => c.clave === clave)!;
 const mover = (body: Record<string, unknown>) => request(app).post('/api/v1/caja/movimientos').send(body);
 
@@ -50,9 +50,11 @@ afterAll(async () => {
 
 describe('lo registrado entra solo y lo demás se anota a mano', () => {
   test('cobros, compras al contado (no a crédito), pagos a proveedores, gastos y transferencias', async () => {
-    const cobro = await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: dia(5), monto: 50_000 });
+    const cobrar = (body: Record<string, unknown>) =>
+      request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, moneda: 'BOB', ...body });
+    const cobro = await cobrar({ fecha: dia(5), monto: 50_000 });
     ids.COBRO = cobro.body.data.id;
-    await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: dia(6), monto: 20_000, caja: 'banco' });
+    await cobrar({ fecha: dia(6), monto: 20_000, caja: 'banco' });
     const comprar = (condicion: string, precioTotal: number) =>
       request(app)
         .post('/api/v1/costos/compras')
@@ -133,5 +135,28 @@ describe('arqueo y cambio de caja', () => {
     expect(resumen(await caja(), 'efectivo').saldoFinal).toBe(37_000 - 50_000 + 30_000);
     const prov = (await request(app).get('/api/v1/dinero/proveedores')).body.data.find((p: { proveedor: string }) => p.proveedor === 'TEST CAJA PROV');
     expect(prov).toMatchObject({ comprasCredito: 70_000, pagado: 10_000, deuda: 60_000 });
+  });
+});
+
+describe('caja de dólares (docs/PLAN_DOLARES.md)', () => {
+  test('cobros en $us entran, la tela en $us sale y cambiar dólares pasa Bs a efectivo', async () => {
+    await request(app).put('/api/v1/caja/inicio/dolares').send({ desde: dia(1), saldoInicial: 0 });
+    const antes = resumen(await caja(), 'efectivo').saldoFinal;
+    const cobro = await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: dia(12), monto: 10_000, tasaCambio: 69_600 });
+    expect(cobro.body.data.caja).toBe('dolares');
+    await request(app).post('/api/v1/dinero/proveedores/pagos').send({ proveedor: 'TEST CAJA PROV', fecha: dia(13), moneda: 'USD', monto: 4000 });
+    // $us 30.00 a 6.96 = Bs 208.80 al efectivo
+    const cambio = await mover({ tipo: 'transferencia', caja: 'dolares', cajaDestino: 'efectivo', fecha: dia(14), monto: 3000, descripcion: 'Cambio' });
+    expect(cambio.status).toBe(400); // sin tipo de cambio
+    expect((await mover({ tipo: 'transferencia', caja: 'dolares', cajaDestino: 'efectivo', fecha: dia(14), monto: 3000, tasaCambio: 69_600, descripcion: 'Cambio' })).status).toBe(201);
+    const d = await caja();
+    expect(resumen(d, 'dolares')).toMatchObject({ ingresos: 10_000, egresos: 7000, saldoFinal: 3000 });
+    expect(resumen(d, 'efectivo').saldoFinal).toBe(antes + 20_880);
+    // por categoría todo en Bs: el cobro en $us suma su equivalente
+    const cobros = d.porCategoria.find((p) => p.categoria.id === categoria(d, 'cobros').id)!;
+    expect(cobros.monto).toBe(70_000 + 69_600);
+    // un pago en $us no se pasa a una caja en Bs
+    const pago = d.movimientos.find((m) => m.origen === 'pago_proveedor' && m.caja === 'dolares')!;
+    expect((await request(app).patch(`/api/v1/caja/origen/pago_proveedor/${pago.origenId}`).send({ caja: 'efectivo' })).status).toBe(400);
   });
 });

@@ -50,7 +50,8 @@ export interface CorteEnCaminoDTO {
   invertido: number; // ya está puesto (centavos)
   falta: number; // falta poner para terminar
   desglose: DesgloseFaltaDTO;
-  vale: number | null; // a precio de venta
+  vale: number | null; // Bs, a precio de venta (al último tipo de cambio)
+  valeUsd: number | null;
 }
 
 export interface PasoCaminoDTO {
@@ -59,14 +60,17 @@ export interface PasoCaminoDTO {
   invertido: number;
   falta: number;
   vale: number;
+  valeUsd: number;
   cortes: CorteEnCaminoDTO[];
 }
 
 export interface CaminoDTO {
-  pedidos: { cantidad: number; prendas: number; necesitas: number; vale: number };
+  tasaCambio: number;
+  pedidos: { cantidad: number; prendas: number; necesitas: number; vale: number; valeUsd: number };
   pasos: PasoCaminoDTO[];
-  porCobrar: { total: number; vencido: number; clientes: number };
-  cobradoMes: number;
+  porCobrar: { totalUsd: number; total: number; vencidoUsd: number; clientes: number };
+  cobradoMes: number; // Bs
+  cobradoMesUsd: number;
   resumen: { invertido: number; falta: number; desglose: DesgloseFaltaDTO };
   avisos: string[];
 }

@@ -108,14 +108,15 @@ const AYUDAS: Record<string, TextoAyuda> = {
     titulo: 'Ventas y cobros',
     sirve: 'Tus clientes, lo que te encargan (pedidos), lo que les entregás (despachos) y lo que te pagan (cobros).',
     pasos: [
-      'Pedido: lo que te encargaron.',
-      'Despacho: lo que llevaste, en docenas.',
-      'Cobro: la plata que te dieron (efectivo o banco).',
+      'Pedido: lo que te encargaron, al precio de la docena en dólares.',
+      'Despacho: lo que llevaste, en docenas, con el tipo de cambio de ese día.',
+      'Cobro: la plata que te dieron. Si fue en dólares, entra a la caja de dólares; si fue en Bs, a efectivo o banco.',
     ],
+    ejemplo: '10 docenas a $us 30 la docena = $us 300. Si ese día el dólar está a 6.96, son Bs 2 088.',
   },
   '/cuentas-por-cobrar': {
     titulo: 'Cuentas por cobrar',
-    sirve: 'Lo que te deben tus clientes, despacho por despacho, y cuándo te lo tienen que pagar.',
+    sirve: 'Lo que te deben tus clientes en dólares, despacho por despacho, y cuándo te lo tienen que pagar.',
     pasos: ['Lo rojo ya venció: hay que llamar al cliente.', '"Cobrar" anota el pago de ese cliente.'],
   },
   '/mi-plata': {
@@ -133,9 +134,11 @@ const AYUDAS: Record<string, TextoAyuda> = {
   },
   '/caja': {
     titulo: 'Caja',
-    sirve: 'Cuánta plata hay en efectivo y en el banco, y en qué se gasta.',
+    sirve: 'Cuánta plata hay en efectivo, en el banco y en dólares, y en qué se gasta.',
     pasos: [
       'Lo que anotás en otras pantallas (cobros, compras, anticipos) entra solo.',
+      'Los cobros en dólares entran a la caja de dólares y de ahí se le paga la tela a Nancy.',
+      '"Cambiar dólares": lo que cambiás a bolivianos sale de dólares y entra al efectivo.',
       'A mano solo va lo demás: luz, agua, transporte, retiros para la casa.',
       '"Contar la plata" (arqueo): contás el efectivo y el sistema dice si sobra o falta.',
     ],

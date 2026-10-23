@@ -55,7 +55,7 @@ export interface CompraDTO {
   precioUnitarioBs: number; // solo para mostrar
   codigoCorte: string | null; // corte para el que se compró
   condicion: 'contado' | 'credito';
-  caja: 'efectivo' | 'banco';
+  caja: 'efectivo' | 'banco' | 'dolares'; // en $us al contado: la caja de dólares
   vence: string | null; // a crédito: 'aaaa-mm-dd'
   notas: string | null;
 }
@@ -84,9 +84,10 @@ export interface FichaCostoResumenDTO {
   modelo: { id: string; nombre: string } | null;
   total: number; // centavos por prenda
   precioVenta: number;
-  // por docena en $us (centavos de $us) con el tipo de cambio de Configuración; solo para mostrar
+  // por docena en $us (centavos de $us) con el último tipo de cambio
   costoDocenaUsd: number;
-  ventaDocenaUsd: number;
+  ventaDocenaUsd: number; // el precio fijo de la docena si lo tiene; si no, el calculado
+  precioDocenaFijo: boolean;
   incompleto: boolean;
   actualizadoEn: string;
 }

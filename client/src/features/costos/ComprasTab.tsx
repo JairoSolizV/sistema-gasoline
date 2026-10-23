@@ -3,8 +3,9 @@ import {
   aBolivianos,
   aCentavos,
   formatBs,
+  CAJAS,
   ORIGENES_COMPRA,
-  type Caja,
+  type CajaBs,
   type CompraDTO,
   type OrigenCompra,
 } from '@taller/shared';
@@ -187,7 +188,7 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
     tasa: '',
     codigoCorte: '',
     condicion: 'contado' as 'contado' | 'credito',
-    caja: 'efectivo' as Caja,
+    caja: 'efectivo' as CajaBs,
     vence: '',
     notas: '',
   });
@@ -345,7 +346,9 @@ function ModalCompra({ insumoInicial, onCerrar }: { insumoInicial: string; onCer
             />
           </div>
         )}
-        {v.condicion === 'contado' ? (
+        {v.condicion === 'contado' && enDolares ? (
+          <p className="self-end rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">Sale de la caja de dólares.</p>
+        ) : v.condicion === 'contado' ? (
           <SelectorCaja valor={v.caja} onCambiar={(c) => cambiar('caja', c)} etiqueta="Pagado con" />
         ) : (
           <div>
@@ -442,7 +445,13 @@ function ModalEditarCompra({ compra, onCerrar }: { compra: CompraDTO; onCerrar: 
           </label>
         </div>
         {v.condicion === 'contado' ? (
-          <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Pagado con" />
+          // una compra en $us puede salir de la caja de dólares o de una en Bs
+          <SelectorCaja
+            valor={v.caja}
+            onCambiar={(caja) => setV({ ...v, caja })}
+            etiqueta="Pagado con"
+            cajas={compra.moneda === 'USD' ? CAJAS : (['efectivo', 'banco'] as const)}
+          />
         ) : (
           <div>
             <label className="mb-1 block text-sm font-medium">Hay que pagarla el</label>

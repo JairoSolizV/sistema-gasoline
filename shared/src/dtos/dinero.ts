@@ -1,6 +1,11 @@
-// Tablero de dinero (docs/PLAN_TABLERO_DINERO.md). Dinero en centavos.
+// Tablero de dinero (docs/PLAN_TABLERO_DINERO.md). Dinero en centavos; los
+// campos que terminan en Usd son centavos de $us, los demás de Bs
+// (docs/PLAN_DOLARES.md).
 import type { Cuenta } from '../cuentas.js';
 import type { EstadoPedido } from '../schemas/dinero.js';
+import type { Caja } from '../schemas/caja.js';
+
+export type Moneda = 'USD' | 'BOB';
 
 export interface ClienteDTO {
   id: string;
@@ -9,9 +14,9 @@ export interface ClienteDTO {
   notas: string | null;
   plazoDias: number; // días para pagar un despacho
   activo: boolean;
-  despachado: number; // Σ despachos
-  cobrado: number; // Σ cobros
-  porCobrar: number; // despachado − cobrado (negativo = pagó de más / adelanto)
+  despachadoUsd: number; // Σ despachos
+  cobradoUsd: number; // Σ cobros (los de Bs, a su equivalente en $us)
+  porCobrarUsd: number; // despachado − cobrado (negativo = pagó de más / adelanto)
   tieneMovimientos: boolean;
 }
 
@@ -20,10 +25,10 @@ export interface PedidoDTO {
   cliente: { id: string; nombre: string };
   ficha: { id: string; codigo: string | null; nombre: string };
   prendas: number;
-  precioPrenda: number;
-  costoPrenda: number; // costo de hoy de la ficha, sin costos fijos
-  venta: number; // prendas × precio
-  costo: number; // prendas × costo
+  precioDocenaUsd: number;
+  costoPrenda: number; // Bs: costo de hoy de la ficha, sin costos fijos
+  ventaUsd: number; // prendas × precio de la docena ÷ 12
+  costo: number; // Bs: prendas × costo
   fechaEntrega: string | null;
   estado: EstadoPedido;
   corte: { id: string; codigo: number } | null;
@@ -37,9 +42,10 @@ export interface DespachoLineaDTO {
   descripcion: string;
   detalle: string | null; // talla y color si no fue surtido
   prendas: number;
-  precioPrenda: number;
-  costoPrenda: number; // foto al despachar
-  total: number;
+  precioDocenaUsd: number;
+  costoPrenda: number; // Bs, foto al despachar
+  totalUsd: number;
+  totalBs: number; // a la tasa del despacho
 }
 
 export interface DespachoDTO {
@@ -47,20 +53,26 @@ export interface DespachoDTO {
   cliente: { id: string; nombre: string };
   fecha: string;
   vence: string; // cuándo lo tiene que pagar
+  tasaCambio: number; // diezmilésimos del día
   notas: string | null;
   lineas: DespachoLineaDTO[];
   prendas: number;
-  total: number;
-  costo: number;
+  totalUsd: number;
+  totalBs: number;
+  costo: number; // Bs
 }
 
 export interface CobroDTO {
   id: string;
   cliente: { id: string; nombre: string };
   fecha: string;
-  monto: number;
+  moneda: Moneda;
+  monto: number; // en su moneda
+  tasaCambio: number;
+  usd: number; // equivalente en $us
+  bs: number; // equivalente en Bs
   nota: string | null;
-  caja: 'efectivo' | 'banco';
+  caja: Caja;
 }
 
 export interface MovimientoProveedorDTO {
@@ -68,11 +80,13 @@ export interface MovimientoProveedorDTO {
   id: string;
   fecha: string;
   detalle: string;
-  monto: number;
+  monto: number; // en la moneda de la deuda
 }
 
+/** Deuda con un proveedor en una moneda (la tela de Nancy va en $us). */
 export interface ProveedorDeudaDTO {
   proveedor: string;
+  moneda: Moneda;
   comprasCredito: number;
   pagado: number;
   deuda: number; // compras a crédito − pagos
@@ -90,10 +104,11 @@ export interface CorteDineroDTO {
   prendas: number; // del corte
   despachadas: number;
   disponibles: number; // prendas − despachadas
-  costoPrenda: number; // costo real del corte por prenda (sin costos fijos)
-  precioPrenda: number | null; // del pedido vinculado o de la ficha; null = sin ficha
-  costo: number; // de las prendas disponibles
-  venta: number | null;
+  costoPrenda: number; // Bs: costo real del corte por prenda (sin costos fijos)
+  precioDocenaUsd: number | null; // del pedido vinculado o de la ficha; null = sin ficha
+  costo: number; // Bs, de las prendas disponibles
+  ventaUsd: number | null;
+  venta: number | null; // Bs, al último tipo de cambio
   faltaPagar: number; // costura/empaque al cerrar + envíos sin devolver
   serviciosPendientes: string[]; // ej. ['lavanderia']
 }
@@ -104,15 +119,17 @@ export interface TableroItemDTO {
   detalle: string | null;
   prendas: number;
   costo: number;
-  venta: number | null;
+  venta: number | null; // Bs
+  ventaUsd: number | null;
   faltaPagar: number;
 }
 
 export interface EtapaDineroDTO {
   prendas: number;
   costo: number;
-  venta: number; // solo de lo que tiene precio
-  ganancia: number; // venta − costo, solo de lo que tiene precio
+  venta: number; // Bs, solo de lo que tiene precio
+  ventaUsd: number;
+  ganancia: number; // Bs: venta − costo, solo de lo que tiene precio
   sinPrecio: number; // cuántos ítems no tienen precio de venta (modelo sin ficha)
   faltaPagar: number;
   items: TableroItemDTO[];
@@ -125,18 +142,19 @@ export interface CuentaPorCobrarDTO {
   fecha: string;
   vence: string;
   detalle: string; // qué se le despachó
-  total: number;
-  cobrado: number; // lo que ya pagó de este despacho (los cobros van a los más viejos)
-  pendiente: number;
+  totalUsd: number;
+  cobradoUsd: number; // lo que ya pagó de este despacho (los cobros van a los más viejos)
+  pendienteUsd: number;
 }
 
 export interface CuentasPorCobrarDTO {
   hoy: string;
+  tasaCambio: number; // la última, para mostrar el equivalente en Bs
   items: CuentaPorCobrarDTO[]; // por fecha de vencimiento
-  total: number;
-  vencido: number;
-  semana: number; // vence en los próximos 7 días
-  adelantos: { id: string; nombre: string; monto: number }[]; // clientes que pagaron de más
+  totalUsd: number;
+  vencidoUsd: number;
+  semanaUsd: number; // vence en los próximos 7 días
+  adelantos: { id: string; nombre: string; montoUsd: number }[]; // clientes que pagaron de más
 }
 
 /** Algo que hay que pagar (cuentas por pagar). */
@@ -145,17 +163,21 @@ export interface CuentaPorPagarDTO {
   tipo: 'proveedor' | 'servicio' | 'operarios' | 'banco';
   acreedor: string; // a quién
   detalle: string;
-  monto: number; // lo que falta pagar
+  moneda: Moneda;
+  monto: number; // lo que falta pagar, en su moneda
+  montoBs: number; // su equivalente en Bs (los $us, al último tipo de cambio)
   vence: string | null; // 'aaaa-mm-dd'; null = sin fecha acordada
   enlace: string; // dónde se paga en el sistema
 }
 
 export interface CuentasPorPagarDTO {
   hoy: string;
+  tasaCambio: number; // la última
   items: CuentaPorPagarDTO[]; // por fecha de vencimiento (sin fecha al final)
-  total: number;
-  vencido: number; // ya pasó la fecha
-  semana: number; // vence en los próximos 7 días
+  total: number; // Bs (los $us convertidos)
+  totalUsd: number; // solo lo que se debe en $us
+  vencido: number; // Bs: ya pasó la fecha
+  semana: number; // Bs: vence en los próximos 7 días
 }
 
 export interface TableroDTO {
@@ -165,12 +187,13 @@ export interface TableroDTO {
   enProduccion: EtapaDineroDTO; // cortes abiertos
   enServicios: EtapaDineroDTO; // cerrados con envíos sin devolver
   deposito: EtapaDineroDTO; // listos para despachar
-  porCobrar: { total: number; clientes: { id: string; nombre: string; monto: number }[] };
+  tasaCambio: number; // la última, para pasar $us a Bs
+  porCobrar: { total: number; totalUsd: number; clientes: { id: string; nombre: string; montoUsd: number }[] };
   insumos: { valor: number; sinPrecio: number }; // sinPrecio: insumos con stock y sin compras
   anticiposAdelantados: number; // anticipos por trabajo todavía no ganado (saldos negativos)
   tenes: number; // insumos + producción + servicios + depósito (a costo) + por cobrar + anticipos adelantados
   deudas: {
-    proveedores: { total: number; lista: { proveedor: string; monto: number }[] };
+    proveedores: { total: number; lista: { proveedor: string; moneda: Moneda; monto: number; montoBs: number }[] };
     servicios: { total: number; porCuenta: { cuenta: Cuenta; monto: number }[] };
     operarios: number; // saldos a favor de los operarios (cuentas internas)
     total: number;
@@ -181,14 +204,16 @@ export interface TableroDTO {
     prestamos: { banco: string; cuota: number; cuotasRestantes: number | null; pagadaEsteMes: boolean }[];
   };
   resultadoMes: {
-    ventas: number; // despachado en el mes
+    ventas: number; // Bs: despachado en el mes (a la tasa de cada despacho)
+    ventasUsd: number;
     costoVendido: number;
     margen: number; // ventas − costo
     gastosFijos: number; // costos fijos del taller (sin la deuda)
     operativo: number; // margen − gastos fijos
     cuotaBanco: number;
     queda: number; // operativo − cuota del banco
-    cobrado: number; // cobros del mes (plata que entró)
+    cobrado: number; // Bs: cobros del mes (plata que entró)
+    cobradoUsd: number;
     prendasDespachadas: number;
   };
   avisos: string[];

@@ -99,7 +99,13 @@ export function useMutacionDinero() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ejecutar,
+    // el tipo de cambio que se escribe pasa a ser el último (Configuración, fichas)
     onSuccess: () =>
-      Promise.all([qc.invalidateQueries({ queryKey: ['dinero'] }), qc.invalidateQueries({ queryKey: ['caja'] })]),
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ['dinero'] }),
+        qc.invalidateQueries({ queryKey: ['caja'] }),
+        qc.invalidateQueries({ queryKey: ['configuracion'] }),
+        qc.invalidateQueries({ queryKey: ['costos'] }),
+      ]),
   });
 }

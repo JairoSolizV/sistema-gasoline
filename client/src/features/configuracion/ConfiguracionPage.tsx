@@ -222,11 +222,11 @@ export function ConfiguracionPage() {
           </div>
 
           <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <label className="mb-1 block text-sm font-medium">Tipo de cambio para precios en dólares</label>
+            <label className="mb-1 block text-sm font-medium">Último tipo de cambio del dólar</label>
             <p className="mb-2 text-xs text-gray-500">
-              Bs por cada $us. Se usa solo para mostrar el costo y la venta <strong>por docena en
-              dólares</strong> en las fichas de costo. Cambialo cuando se mueva el dólar; las compras en
-              $us guardan su propia tasa del día.
+              Bs por cada $us. Cada despacho, cobro, compra y cambio de dólares guarda el de su día; el
+              último que escribiste queda acá y se propone en el siguiente. También pasa a Bs los precios
+              de la docena en dólares de las fichas y lo que te deben.
             </p>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500">Bs</span>

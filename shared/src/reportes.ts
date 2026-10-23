@@ -13,9 +13,19 @@ export type RangoReporte = z.infer<typeof rangoReporteSchema>;
 export const calcularMargen = (ganancia: number, venta: number) => (venta ? Math.round((ganancia * 10_000) / venta) : 0);
 
 export interface VentasReporteDTO {
-  meses: { mes: string; prendas: number; vendido: number; costo: number; ganancia: number; cobrado: number }[];
-  clientes: { id: string; nombre: string; prendas: number; vendido: number; cobrado: number; debeHoy: number }[];
-  modelos: { modelo: string; prendas: number; vendido: number }[];
+  // vendido/cobrado en Bs a la tasa de cada movimiento; *Usd en dólares
+  meses: {
+    mes: string;
+    prendas: number;
+    vendidoUsd: number;
+    vendido: number;
+    costo: number;
+    ganancia: number;
+    cobradoUsd: number;
+    cobrado: number;
+  }[];
+  clientes: { id: string; nombre: string; prendas: number; vendidoUsd: number; cobradoUsd: number; debeHoyUsd: number }[];
+  modelos: { modelo: string; prendas: number; vendidoUsd: number }[];
 }
 
 export interface ProduccionReporteDTO {
@@ -44,11 +54,22 @@ export interface GananciaModeloDTO {
   vendidos: {
     modelo: string;
     prendas: number;
-    vendido: number;
+    vendidoUsd: number;
+    vendido: number; // Bs
     costo: number;
     ganancia: number;
-    porPrenda: number; // ganancia por prenda
+    porPrenda: number; // ganancia por prenda (Bs)
     margen: number; // centésimas de % sobre lo vendido
   }[];
-  fichas: { id: string; nombre: string; costo: number; precio: number; ganancia: number; margen: number }[]; // hoy, por prenda
+  // hoy, por prenda en Bs; y la docena en $us
+  fichas: {
+    id: string;
+    nombre: string;
+    costo: number;
+    precio: number;
+    ganancia: number;
+    margen: number;
+    docenaUsd: number;
+    docenaFija: boolean; // el precio de la docena en $us está fijado en la ficha
+  }[];
 }

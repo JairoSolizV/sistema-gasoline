@@ -58,15 +58,18 @@ export const reportesService = {
     const meses = mesesDe(r).map((mes) => {
       const ds = despachos.filter((d) => mesDe(d.fecha) === mes);
       const lineas = ds.flatMap((d) => d.lineas);
-      const vendido = lineas.reduce((a, l) => a + l.total, 0);
+      const vendido = lineas.reduce((a, l) => a + l.totalBs, 0);
       const costo = lineas.reduce((a, l) => a + l.prendas * l.costoPrenda, 0);
+      const cs = cobros.filter((c) => mesDe(c.fecha) === mes);
       return {
         mes,
         prendas: lineas.reduce((a, l) => a + l.prendas, 0),
+        vendidoUsd: lineas.reduce((a, l) => a + l.totalUsd, 0),
         vendido,
         costo,
         ganancia: vendido - costo,
-        cobrado: cobros.filter((c) => mesDe(c.fecha) === mes).reduce((a, c) => a + c.monto, 0),
+        cobradoUsd: cs.reduce((a, c) => a + c.usd, 0),
+        cobrado: cs.reduce((a, c) => a + c.bs, 0),
       };
     });
     const porCliente = clientes
@@ -76,25 +79,25 @@ export const reportesService = {
           id: c.id,
           nombre: c.nombre,
           prendas: lineas.reduce((a, l) => a + l.prendas, 0),
-          vendido: lineas.reduce((a, l) => a + l.total, 0),
-          cobrado: cobros.filter((x) => x.clienteId === c.id).reduce((a, x) => a + x.monto, 0),
-          debeHoy: c.porCobrar,
+          vendidoUsd: lineas.reduce((a, l) => a + l.totalUsd, 0),
+          cobradoUsd: cobros.filter((x) => x.clienteId === c.id).reduce((a, x) => a + x.usd, 0),
+          debeHoyUsd: c.porCobrarUsd,
         };
       })
-      .filter((c) => c.vendido > 0 || c.cobrado > 0 || c.debeHoy !== 0)
-      .sort((a, b) => b.vendido - a.vendido);
-    const modelos = new Map<string, { prendas: number; vendido: number }>();
+      .filter((c) => c.vendidoUsd > 0 || c.cobradoUsd > 0 || c.debeHoyUsd !== 0)
+      .sort((a, b) => b.vendidoUsd - a.vendidoUsd);
+    const modelos = new Map<string, { prendas: number; vendidoUsd: number }>();
     for (const l of despachos.flatMap((d) => d.lineas)) {
       const k = modeloDeLinea(l);
-      const x = modelos.get(k) ?? { prendas: 0, vendido: 0 };
+      const x = modelos.get(k) ?? { prendas: 0, vendidoUsd: 0 };
       x.prendas += l.prendas;
-      x.vendido += l.total;
+      x.vendidoUsd += l.totalUsd;
       modelos.set(k, x);
     }
     return {
       meses,
       clientes: porCliente,
-      modelos: [...modelos].map(([modelo, x]) => ({ modelo, ...x })).sort((a, b) => b.vendido - a.vendido),
+      modelos: [...modelos].map(([modelo, x]) => ({ modelo, ...x })).sort((a, b) => b.vendidoUsd - a.vendidoUsd),
     };
   },
 
@@ -173,7 +176,7 @@ export const reportesService = {
       const tela = suma((c) => c.insumo.categoria === 'tela');
       const empaque = suma((c) => c.insumo.categoria !== 'tela' && esInsumoDeEmpaque(c.insumo.categoria, c.insumo.nombre));
       const costura = suma((c) => c.insumo.categoria !== 'tela' && !esInsumoDeEmpaque(c.insumo.categoria, c.insumo.nombre));
-      const otrosGastos = otros.filter((m) => m.fecha.startsWith(mes)).reduce((a, m) => a + m.monto, 0);
+      const otrosGastos = otros.filter((m) => m.fecha.startsWith(mes)).reduce((a, m) => a + m.montoBs, 0);
       return { mes, tela, insumosCostura: costura, insumosEmpaque: empaque, otrosGastos, total: tela + costura + empaque + otrosGastos };
     });
     const proveedores = new Map<string, { total: number; aCredito: number; compras: number }>();
@@ -187,7 +190,7 @@ export const reportesService = {
     }
     const categorias = new Map<string, number>();
     for (const m of movs.filter((x) => x.tipo === 'egreso' && x.categoria)) {
-      categorias.set(m.categoria!.nombre, (categorias.get(m.categoria!.nombre) ?? 0) + m.monto);
+      categorias.set(m.categoria!.nombre, (categorias.get(m.categoria!.nombre) ?? 0) + m.montoBs);
     }
     return {
       meses,
@@ -204,12 +207,13 @@ export const reportesService = {
       costosRepository.listarFichas(),
       costoFijoPorPrenda(config),
     ]);
-    const modelos = new Map<string, { prendas: number; vendido: number; costo: number }>();
+    const modelos = new Map<string, { prendas: number; vendidoUsd: number; vendido: number; costo: number }>();
     for (const l of despachos.flatMap((d) => d.lineas)) {
       const k = modeloDeLinea(l);
-      const x = modelos.get(k) ?? { prendas: 0, vendido: 0, costo: 0 };
+      const x = modelos.get(k) ?? { prendas: 0, vendidoUsd: 0, vendido: 0, costo: 0 };
       x.prendas += l.prendas;
-      x.vendido += l.total;
+      x.vendidoUsd += l.totalUsd;
+      x.vendido += l.totalBs;
       x.costo += l.prendas * l.costoPrenda;
       modelos.set(k, x);
     }
@@ -230,7 +234,16 @@ export const reportesService = {
         .map((f) => {
           const c = calcularFicha(f, config, fijo);
           const ganancia = c.precioVenta - c.total;
-          return { id: f.id, nombre: f.nombre, costo: c.total, precio: c.precioVenta, ganancia, margen: calcularMargen(ganancia, c.precioVenta) };
+          return {
+            id: f.id,
+            nombre: f.nombre,
+            costo: c.total,
+            precio: c.precioVenta,
+            ganancia,
+            margen: calcularMargen(ganancia, c.precioVenta),
+            docenaUsd: c.ventaDocenaUsd,
+            docenaFija: c.precioDocenaFijo,
+          };
         })
         .sort((a, b) => b.ganancia - a.ganancia),
     };

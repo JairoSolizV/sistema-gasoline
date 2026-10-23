@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
-import { cajaSchema } from './caja.js';
+import { cajaBsSchema, cajaSchema } from './caja.js';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Unidades en shared/costos.ts:
 // cantidades en milésimas, dinero en centavos, tasa en diezmilésimos.
@@ -112,6 +112,7 @@ export const fichaCostoInputSchema = z.object({
   empaque: centavos.nullable().optional(),
   servicioCorteInterno: z.boolean().default(true),
   margen: z.number().int().min(0).max(100_000).nullable().optional(), // null = el general
+  precioDocenaUsd: centavos.nullable().optional(), // precio fijo de la docena en $us (null = costo + margen)
   notas: texto(500).optional(),
   lineas: z.array(lineaCostoInputSchema).max(60).default([]),
 });
@@ -209,7 +210,7 @@ export const compraGastoInputSchema = z.object({
   fecha: dia,
   monto: z.number().int().min(1, 'El monto debe ser mayor a 0').max(100_000_000),
   nota: texto(120).optional(),
-  caja: cajaSchema.default('efectivo'),
+  caja: cajaBsSchema.default('efectivo'),
 });
 
 export const prestamoInputSchema = z.object({
@@ -229,7 +230,7 @@ export const pagoPrestamoInputSchema = z.object({
   mes: z.number().int().min(1).max(12),
   fecha: dia,
   monto: z.number().int().min(1).max(100_000_000),
-  caja: cajaSchema.default('efectivo'),
+  caja: cajaBsSchema.default('efectivo'),
 });
 
 export type GastoFijoInput = z.infer<typeof gastoFijoInputSchema>;

@@ -50,6 +50,18 @@ export function docenaEnDolares(centavosBsPorPrenda: number, tasaDiezmilesimos: 
   return redondear(fr(centavosBsPorPrenda * 12 * TASA_ESCALA, tasaDiezmilesimos));
 }
 
+// ── Dólares (docs/PLAN_DOLARES.md): cada conversión redondea una sola vez ──
+
+/** Centavos de $us → centavos de Bs, a una tasa (diezmilésimos). */
+export const usdABs = (centavosUsd: number, tasa: number) => redondear(fr(centavosUsd * tasa, TASA_ESCALA));
+/** Centavos de Bs → centavos de $us. */
+export const bsAUsd = (centavosBs: number, tasa: number) => redondear(fr(centavosBs * TASA_ESCALA, tasa));
+/** Total en $us de unas prendas a un precio por docena: prendas × docena ÷ 12. */
+export const totalPorDocena = (prendas: number, centavosDocena: number) => redondear(fr(prendas * centavosDocena, 12));
+/** Precio por prenda en Bs de una docena en $us: docena × tasa ÷ 12. */
+export const prendaBsDeDocenaUsd = (centavosDocenaUsd: number, tasa: number) =>
+  redondear(fr(centavosDocenaUsd * tasa, 12 * TASA_ESCALA));
+
 /** Precio unitario exacto (centavos por 1 unidad) de una compra. */
 export function precioUnitario(compra: { precioTotal: number; cantidad: number }): Fraccion {
   // cantidad en milésimas: precioTotal / (cantidad / 1000)

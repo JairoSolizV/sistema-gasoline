@@ -29,8 +29,8 @@ beforeAll(async () => {
   ids.FICHA = f.body.data.id;
   await request(app)
     .post('/api/v1/dinero/despachos')
-    .send({ clienteId: ids.CLI, fecha: '2035-05-10', lineas: [{ fichaId: ids.FICHA, prendas: 24, precioPrenda: 1500 }] });
-  await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: '2035-05-20', monto: 20_000 });
+    .send({ clienteId: ids.CLI, fecha: '2035-05-10', tasaCambio: 70_000, lineas: [{ fichaId: ids.FICHA, prendas: 24, precioDocenaUsd: 2500 }] });
+  await request(app).post('/api/v1/dinero/cobros').send({ clienteId: ids.CLI, fecha: '2035-05-20', monto: 3000, tasaCambio: 70_000 });
   const tela = await request(app).post('/api/v1/costos/insumos').send({ nombre: 'TEST REP TELA', categoria: 'tela', unidad: 'metro' });
   const bolsa = await request(app).post('/api/v1/costos/insumos').send({ nombre: 'TEST REP BOLSA', categoria: 'bolsa', unidad: 'unidad' });
   const comprar = (insumoId: string, precioTotal: number, condicion = 'contado') =>
@@ -51,11 +51,12 @@ describe('reportes', () => {
     const r = (await request(app).get(`/api/v1/reportes/ventas?${rango}`)).body.data;
     expect(r.meses.map((m: { mes: string }) => m.mes)).toEqual(['2035-04', '2035-05']);
     expect(r.meses[0]).toMatchObject({ vendido: 0, cobrado: 0 });
+    // 24 prendas a $us 25.00 la docena = $us 50.00 = Bs 350.00; cobrado $us 30.00 = Bs 210.00
     const mayo = r.meses[1];
-    expect(mayo).toMatchObject({ prendas: 24, vendido: 36_000, cobrado: 20_000 });
+    expect(mayo).toMatchObject({ prendas: 24, vendidoUsd: 5000, vendido: 35_000, cobradoUsd: 3000, cobrado: 21_000 });
     expect(mayo.ganancia).toBe(mayo.vendido - mayo.costo);
-    expect(r.clientes.find((c: { id: string }) => c.id === ids.CLI)).toMatchObject({ vendido: 36_000, cobrado: 20_000, debeHoy: 16_000 });
-    expect(r.modelos).toContainEqual({ modelo: 'TEST REP JEAN', prendas: 24, vendido: 36_000 });
+    expect(r.clientes.find((c: { id: string }) => c.id === ids.CLI)).toMatchObject({ vendidoUsd: 5000, cobradoUsd: 3000, debeHoyUsd: 2000 });
+    expect(r.modelos).toContainEqual({ modelo: 'TEST REP JEAN', prendas: 24, vendidoUsd: 5000 });
   });
 
   test('compras: tela, insumos de empaque y proveedor (con lo comprado a crédito)', async () => {
@@ -67,7 +68,7 @@ describe('reportes', () => {
   test('ganancia por modelo: lo vendido menos el costo de esas prendas', async () => {
     const r = (await request(app).get(`/api/v1/reportes/ganancia?${rango}`)).body.data;
     const jean = r.vendidos.find((m: { modelo: string }) => m.modelo === 'TEST REP JEAN');
-    expect(jean.vendido).toBe(36_000);
+    expect(jean).toMatchObject({ vendidoUsd: 5000, vendido: 35_000 });
     expect(jean.ganancia).toBe(jean.vendido - jean.costo);
     expect(jean.porPrenda).toBe(Math.round(jean.ganancia / 24));
     expect(r.fichas.some((f: { id: string }) => f.id === ids.FICHA)).toBe(true);

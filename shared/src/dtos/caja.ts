@@ -20,7 +20,8 @@ export interface MovimientoCajaDTO {
   tipo: 'ingreso' | 'egreso';
   categoria: { id: string; nombre: string } | null;
   descripcion: string;
-  monto: number; // siempre positivo; el tipo dice si suma o resta
+  monto: number; // siempre positivo, en la moneda de la caja; el tipo dice si suma o resta
+  montoBs: number; // su equivalente en Bs (para sumar por categoría; en Bs, igual a monto)
 }
 
 export interface ResumenCajaDTO {

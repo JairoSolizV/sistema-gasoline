@@ -1,7 +1,8 @@
-// Caja (docs/PLAN_CAJA.md): efectivo y banco. Lo que ya se registra (cobros,
-// compras al contado, pagos a proveedores, comida, cuota del banco, anticipos,
-// lo pagado al cerrar el mes) entra solo; lo demás se anota a mano. El arqueo
-// deja la diferencia con lo contado como ajuste. NO toca ningún pago.
+// Caja (docs/PLAN_CAJA.md): efectivo, banco y dólares (docs/PLAN_DOLARES.md).
+// Lo que ya se registra (cobros, compras al contado, pagos a proveedores,
+// comida, cuota del banco, anticipos, lo pagado al cerrar el mes) entra solo;
+// lo demás se anota a mano. El arqueo deja la diferencia con lo contado como
+// ajuste. Cada caja lleva su saldo en su moneda. NO toca ningún pago.
 import type { Caja } from '@prisma/client';
 import {
   CAJAS,
@@ -9,7 +10,10 @@ import {
   diaADate,
   ETIQUETA_CAJA,
   ETIQUETA_CUENTA,
+  MONEDA_CAJA,
   SERVICIOS_EXTERNOS,
+  bsAUsd,
+  usdABs,
   type ArqueoInput,
   type CajaMesDTO,
   type CategoriaCajaDTO,
@@ -24,6 +28,7 @@ import {
 } from '@taller/shared';
 import { diaEnBolivia } from '../../lib/hoy.js';
 import { AppError } from '../../middleware/errors.js';
+import { configuracionRepository } from '../configuracion/repository.js';
 import { cajaRepository } from './repository.js';
 
 /** Día siguiente ('aaaa-mm-dd'). */
@@ -54,14 +59,15 @@ const aCategoriaDTO = (c: Awaited<ReturnType<typeof cajaRepository.categorias>>[
   activo: c.activo,
 });
 
-/** Todos los movimientos de las dos cajas con fecha en [desde, hasta). */
+/** Todos los movimientos de las cajas con fecha en [desde, hasta). */
 export async function movimientos(desde: string, hasta: string): Promise<MovimientoCajaDTO[]> {
   const rango = { gte: diaADate(desde), lt: diaADate(hasta) };
   // instantes (anticipos, cierre de mes): un día de margen y se filtra por día de Bolivia
   const amplio = { gte: diaADate(sumarDias(desde, -1)), lt: diaADate(sumarDias(hasta, 1)) };
   const enRango = (dia: string) => dia >= desde && dia < hasta;
-  const [categorias, cobros, pagos, compras, comprasGasto, cuotas, anticipos, cierres, manuales, arqueos] =
+  const [config, categorias, cobros, pagos, compras, comprasGasto, cuotas, anticipos, cierres, manuales, arqueos] =
     await Promise.all([
+      configuracionRepository.obtener(),
       cajaRepository.categorias(),
       cajaRepository.cobros(rango),
       cajaRepository.pagosProveedor(rango),
@@ -78,6 +84,9 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
     return c ? { id: c.id, nombre: c.nombre } : null;
   };
   const deCuenta = (cuenta: Cuenta) => cat(externas.has(cuenta) ? 'servicios_externos' : 'operarios');
+  // lo de la caja de dólares se suma por categoría en Bs: con su propio
+  // equivalente si lo tiene, si no al último tipo de cambio
+  const enBs = (caja: Caja, monto: number) => (caja === 'dolares' ? usdABs(monto, config.tasaCambioUsd) : monto);
   const auto = (
     origen: OrigenCaja,
     r: { id: string; caja: Caja },
@@ -86,14 +95,37 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
     clave: string | null,
     descripcion: string,
     monto: number,
-    categoria = clave ? cat(clave) : null,
-  ): MovimientoCajaDTO => ({ id: `${origen}:${r.id}`, origen, origenId: r.id, caja: r.caja, fecha, tipo, categoria, descripcion, monto });
+    extra: { categoria?: { id: string; nombre: string } | null; montoBs?: number } = {},
+  ): MovimientoCajaDTO => ({
+    id: `${origen}:${r.id}`,
+    origen,
+    origenId: r.id,
+    caja: r.caja,
+    fecha,
+    tipo,
+    categoria: extra.categoria !== undefined ? extra.categoria : clave ? cat(clave) : null,
+    descripcion,
+    monto,
+    montoBs: extra.montoBs ?? enBs(r.caja, monto),
+  });
 
   const lista: MovimientoCajaDTO[] = [
-    ...cobros.map((c) => auto('cobro', c, dateADia(c.fecha), 'ingreso', 'cobros', `Cobro a ${c.cliente.nombre}${c.nota ? ` · ${c.nota}` : ''}`, c.monto)),
+    // un cobro guarda su equivalente en las dos monedas: entra en la de su caja
+    ...cobros.map((c) =>
+      auto('cobro', c, dateADia(c.fecha), 'ingreso', 'cobros', `Cobro a ${c.cliente.nombre}${c.nota ? ` · ${c.nota}` : ''}`, c.caja === 'dolares' ? c.usd : c.bs, { montoBs: c.bs }),
+    ),
     ...pagos.map((p) => auto('pago_proveedor', p, dateADia(p.fecha), 'egreso', 'insumos', `Pago a ${p.proveedor}${p.nota ? ` · ${p.nota}` : ''}`, p.monto)),
     ...compras.map((c) =>
-      auto('compra', c, dateADia(c.fecha), 'egreso', 'insumos', `${c.insumo.nombre} · ${c.tienda}${c.codigoCorte ? ` · COD ${c.codigoCorte}` : ''}`, c.precioTotal),
+      auto(
+        'compra',
+        c,
+        dateADia(c.fecha),
+        'egreso',
+        'insumos',
+        `${c.insumo.nombre} · ${c.tienda}${c.codigoCorte ? ` · COD ${c.codigoCorte}` : ''}`,
+        c.caja === 'dolares' ? (c.montoUsd ?? 0) : c.precioTotal,
+        { montoBs: c.precioTotal },
+      ),
     ),
     ...comprasGasto.map((c) =>
       auto('compra_gasto', c, dateADia(c.fecha), 'egreso', CLAVE_GRUPO[c.gasto.grupo] ?? 'otros_egreso', `${c.gasto.nombre}${c.nota ? ` · ${c.nota}` : ''}`, c.monto),
@@ -102,7 +134,7 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
     ...anticipos
       .filter((a) => enRango(diaEnBolivia(a.fecha)))
       .map((a) =>
-        auto('anticipo', a, diaEnBolivia(a.fecha), 'egreso', null, `Anticipo a ${a.operario.nombre} (${ETIQUETA_CUENTA[a.cuenta].toLowerCase()})`, a.monto, deCuenta(a.cuenta)),
+        auto('anticipo', a, diaEnBolivia(a.fecha), 'egreso', null, `Anticipo a ${a.operario.nombre} (${ETIQUETA_CUENTA[a.cuenta].toLowerCase()})`, a.monto, { categoria: deCuenta(a.cuenta) }),
       ),
   ];
 
@@ -123,8 +155,10 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
       categoria: deCuenta(l.cuenta),
       descripcion: `Pago del cierre de ${l.periodo.mes}/${l.periodo.anio} · ${externo ? 'servicios externos' : 'operarios'}`,
       monto: 0,
+      montoBs: 0,
     };
     m.monto += l.pagado;
+    m.montoBs += l.pagado;
     porCierre.set(k, m);
   }
   lista.push(...porCierre.values());
@@ -132,10 +166,13 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
   for (const m of manuales) {
     const fecha = dateADia(m.fecha);
     if (m.tipo === 'transferencia') {
-      const base = { origen: 'transferencia' as const, origenId: m.id, fecha, categoria: null, monto: m.monto };
+      // cambio de dólares: sale en una moneda y entra en la otra (montoDestino)
+      const entra = m.montoDestino ?? m.monto;
+      const montoBs = m.caja === 'dolares' ? entra : m.monto;
+      const base = { origen: 'transferencia' as const, origenId: m.id, fecha, categoria: null, montoBs };
       lista.push(
-        { ...base, id: `transferencia:${m.id}:sale`, caja: m.caja, tipo: 'egreso', descripcion: `${m.descripcion} (a ${ETIQUETA_CAJA[m.cajaDestino!].toLowerCase()})` },
-        { ...base, id: `transferencia:${m.id}:entra`, caja: m.cajaDestino!, tipo: 'ingreso', descripcion: `${m.descripcion} (de ${ETIQUETA_CAJA[m.caja].toLowerCase()})` },
+        { ...base, id: `transferencia:${m.id}:sale`, caja: m.caja, tipo: 'egreso', monto: m.monto, descripcion: `${m.descripcion} (a ${ETIQUETA_CAJA[m.cajaDestino!].toLowerCase()})` },
+        { ...base, id: `transferencia:${m.id}:entra`, caja: m.cajaDestino!, tipo: 'ingreso', monto: entra, descripcion: `${m.descripcion} (de ${ETIQUETA_CAJA[m.caja].toLowerCase()})` },
       );
     } else {
       lista.push({
@@ -148,6 +185,7 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
         categoria: m.categoria,
         descripcion: m.descripcion,
         monto: m.monto,
+        montoBs: enBs(m.caja, m.monto),
       });
     }
   }
@@ -163,6 +201,7 @@ export async function movimientos(desde: string, hasta: string): Promise<Movimie
       categoria: null,
       descripcion: `Arqueo: ${a.diferencia > 0 ? 'sobrante' : 'faltante'}${a.nota ? ` · ${a.nota}` : ''}`,
       monto: Math.abs(a.diferencia),
+      montoBs: enBs(a.caja, Math.abs(a.diferencia)),
     });
   }
   return lista.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.id.localeCompare(b.id));
@@ -224,13 +263,13 @@ export const cajaService = {
       });
     }
 
-    // por categoría: sin transferencias ni arqueos (no son gastos ni ingresos)
+    // por categoría, en Bs: sin transferencias ni arqueos (no son gastos ni ingresos)
     const porCategoria = new Map<string, CajaMesDTO['porCategoria'][number]>();
     for (const m of delMes) {
       if (!m.categoria) continue;
       const k = `${m.tipo}:${m.categoria.id}`;
       const x = porCategoria.get(k) ?? { categoria: m.categoria, tipo: m.tipo, monto: 0 };
-      x.monto += m.monto;
+      x.monto += m.montoBs;
       porCategoria.set(k, x);
     }
     return {
@@ -260,15 +299,25 @@ export const cajaService = {
         throw new AppError('VALIDACION', `"${c.nombre}" es una categoría de ${c.tipo === 'ingreso' ? 'ingresos' : 'gastos'}`, 400);
       }
     }
+    // cambiar dólares: lo que entra en la otra moneda, a la tasa del día (un redondeo)
+    const destino = input.tipo === 'transferencia' ? input.cajaDestino! : null;
+    const cambio = destino != null && MONEDA_CAJA[destino] !== MONEDA_CAJA[input.caja] ? input.tasaCambio! : null;
+    if (destino && !(await inicioDe(destino))) {
+      throw new AppError('CAJA_SIN_INICIO', `Configurá primero el inicio de la caja ${ETIQUETA_CAJA[destino].toLowerCase()}`, 409);
+    }
     await cajaRepository.crearMovimiento({
       tipo: input.tipo,
       caja: input.caja,
-      cajaDestino: input.tipo === 'transferencia' ? input.cajaDestino! : null,
+      cajaDestino: destino,
       fecha: diaADate(input.fecha),
       monto: input.monto,
+      montoDestino:
+        cambio == null ? null : input.caja === 'dolares' ? usdABs(input.monto, cambio) : bsAUsd(input.monto, cambio),
+      tasaCambio: cambio,
       categoriaId: input.tipo === 'transferencia' ? null : input.categoriaId!,
       descripcion: input.descripcion,
     });
+    if (cambio != null) await configuracionRepository.recordarTasa(cambio);
   },
 
   async eliminarMovimiento(id: string): Promise<void> {
@@ -276,7 +325,18 @@ export const cajaService = {
     await cajaRepository.eliminarMovimiento(id);
   },
 
+  /** Lo que está solo en $us va en la caja de dólares; lo que está solo en Bs,
+   *  en efectivo o banco. Cobros y compras en $us pueden ir en cualquiera. */
   async cambiarCaja(origen: OrigenCaja, id: string, caja: Caja): Promise<void> {
+    const moneda = await cajaRepository.monedaDe(origen, id);
+    if (moneda == null) throw new AppError('NO_ENCONTRADO', 'Registro no encontrado', 404);
+    if (moneda !== 'ambas' && moneda !== MONEDA_CAJA[caja]) {
+      throw new AppError(
+        'VALIDACION',
+        moneda === 'USD' ? 'Es un pago en dólares: va en la caja de dólares' : 'Es en bolivianos: va en efectivo o banco',
+        400,
+      );
+    }
     if (!(await cajaRepository.cambiarCaja(origen, id, caja))) {
       throw new AppError('NO_ENCONTRADO', 'Registro no encontrado', 404);
     }

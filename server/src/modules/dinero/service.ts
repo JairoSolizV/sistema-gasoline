@@ -3,6 +3,7 @@
 // despachos, cobros y pagos a proveedores.
 import type { Configuracion } from '@prisma/client';
 import {
+  bsAUsd,
   costoDeCantidad,
   dateADia,
   diaADate,
@@ -31,12 +32,15 @@ import {
   type EditarClienteInput,
   type EditarPedidoInput,
   type EtapaDineroDTO,
+  type Moneda,
   type PagoProveedorInput,
   type PedidoDTO,
   type PedidoInput,
   type ProveedorDeudaDTO,
   type TableroDTO,
   type TableroItemDTO,
+  totalPorDocena,
+  usdABs,
 } from '@taller/shared';
 import { hoyEnBolivia } from '../../lib/hoy.js';
 import { AppError } from '../../middleware/errors.js';
@@ -58,10 +62,15 @@ const sumarDias = (dia: string, n: number) => {
 };
 
 /** Costo por prenda de una ficha SIN costos fijos (esos se restan una vez en el
- *  resultado del mes) y precio de venta tal como lo muestra la ficha. */
+ *  resultado del mes) y precio de la docena en $us tal como lo muestra la ficha
+ *  (el fijo, o el calculado al último tipo de cambio). */
 function precioYCosto(f: FichaConDatos, config: Configuracion, fijo: ReturnType<typeof fr>) {
-  return { costo: calcularFicha(f, config).total, precio: calcularFicha(f, config, fijo).precioVenta };
+  return { costo: calcularFicha(f, config).total, docenaUsd: calcularFicha(f, config, fijo).ventaDocenaUsd };
 }
+
+/** Monto de una compra a crédito en la moneda en que se debe. */
+const montoCompra = (c: { moneda: Moneda; montoUsd: number | null; precioTotal: number }) =>
+  c.moneda === 'USD' ? (c.montoUsd ?? 0) : c.precioTotal;
 
 async function contexto() {
   const config = await configuracionRepository.obtener();
@@ -79,7 +88,7 @@ async function cortesDinero(): Promise<CorteDineroDTO[]> {
     dineroRepository.listarPedidos(),
   ]);
   const precioPedido = new Map(
-    pedidos.filter((p) => p.corteId && p.estado !== 'cancelado').map((p) => [p.corteId!, p.precioPrenda]),
+    pedidos.filter((p) => p.corteId && p.estado !== 'cancelado').map((p) => [p.corteId!, p.precioDocenaUsd]),
   );
   return cortes.map((c) => {
     const f = fichaDeCorte(c, fichas);
@@ -93,7 +102,8 @@ async function cortesDinero(): Promise<CorteDineroDTO[]> {
     const enviosPendientes = sinDevolver.reduce((a, e) => a + e.total, 0);
     const vendidas = despachadas.get(c.id) ?? 0;
     const disponibles = Math.max(0, c.cantidadTotal - vendidas);
-    const precio = precioPedido.get(c.id) ?? (f ? precioYCosto(f, config, fijo).precio : null);
+    const docena = precioPedido.get(c.id) ?? (f ? precioYCosto(f, config, fijo).docenaUsd : null);
+    const ventaUsd = docena != null ? totalPorDocena(disponibles, docena) : null;
     return {
       corteId: c.id,
       codigo: c.codigo,
@@ -103,10 +113,11 @@ async function cortesDinero(): Promise<CorteDineroDTO[]> {
       despachadas: vendidas,
       disponibles,
       costoPrenda: d.realPorPrenda,
-      precioPrenda: precio,
+      precioDocenaUsd: docena,
       // costo de las disponibles: costo real × disponibles ÷ prendas, un redondeo
       costo: redondear({ num: BigInt(d.realTotal * disponibles), den: BigInt(c.cantidadTotal) }),
-      venta: precio != null ? precio * disponibles : null,
+      ventaUsd,
+      venta: ventaUsd != null ? usdABs(ventaUsd, config.tasaCambioUsd) : null,
       faltaPagar: (abierto ? manoDeObra : 0) + enviosPendientes,
       serviciosPendientes: [...new Set(sinDevolver.map((e) => e.servicio))],
     };
@@ -122,6 +133,7 @@ function etapa(items: TableroItemDTO[]): EtapaDineroDTO {
     prendas: items.reduce((a, i) => a + i.prendas, 0),
     costo: items.reduce((a, i) => a + i.costo, 0),
     venta,
+    ventaUsd: conPrecio.reduce((a, i) => a + (i.ventaUsd ?? 0), 0),
     ganancia: venta - conPrecio.reduce((a, i) => a + i.costo, 0),
     sinPrecio: items.length - conPrecio.length,
     faltaPagar: items.reduce((a, i) => a + i.faltaPagar, 0),
@@ -141,6 +153,7 @@ const itemCorte = (c: CorteDineroDTO): TableroItemDTO => ({
   prendas: c.disponibles,
   costo: c.costo,
   venta: c.venta,
+  ventaUsd: c.ventaUsd,
   faltaPagar: c.faltaPagar,
 });
 
@@ -152,9 +165,9 @@ function aPedidoDTO(p: PedidoConDatos, costoPrenda: number): PedidoDTO {
     cliente: p.cliente,
     ficha: p.ficha,
     prendas: p.prendas,
-    precioPrenda: p.precioPrenda,
+    precioDocenaUsd: p.precioDocenaUsd,
     costoPrenda,
-    venta: p.prendas * p.precioPrenda,
+    ventaUsd: totalPorDocena(p.prendas, p.precioDocenaUsd),
     costo: p.prendas * costoPrenda,
     fechaEntrega: p.fechaEntrega ? dateADia(p.fechaEntrega) : null,
     estado: p.estado,
@@ -169,6 +182,7 @@ function aDespachoDTO(d: DespachoConDatos): DespachoDTO {
     cliente: d.cliente,
     fecha: dateADia(d.fecha),
     vence: dateADia(d.vence),
+    tasaCambio: d.tasaCambio,
     notas: d.notas,
     lineas: d.lineas.map((l) => ({
       id: l.id,
@@ -177,13 +191,30 @@ function aDespachoDTO(d: DespachoConDatos): DespachoDTO {
       descripcion: l.descripcion,
       detalle: l.detalle,
       prendas: l.prendas,
-      precioPrenda: l.precioPrenda,
+      precioDocenaUsd: l.precioDocenaUsd,
       costoPrenda: l.costoPrenda,
-      total: l.total,
+      totalUsd: l.totalUsd,
+      totalBs: l.totalBs,
     })),
     prendas: d.lineas.reduce((a, l) => a + l.prendas, 0),
-    total: d.lineas.reduce((a, l) => a + l.total, 0),
+    totalUsd: d.lineas.reduce((a, l) => a + l.totalUsd, 0),
+    totalBs: d.lineas.reduce((a, l) => a + l.totalBs, 0),
     costo: d.lineas.reduce((a, l) => a + l.prendas * l.costoPrenda, 0),
+  };
+}
+
+function aCobroDTO(c: Awaited<ReturnType<typeof dineroRepository.crearCobro>>): CobroDTO {
+  return {
+    id: c.id,
+    cliente: c.cliente,
+    fecha: dateADia(c.fecha),
+    moneda: c.moneda,
+    monto: c.monto,
+    tasaCambio: c.tasaCambio,
+    usd: c.usd,
+    bs: c.bs,
+    nota: c.nota,
+    caja: c.caja,
   };
 }
 
@@ -214,9 +245,9 @@ export const dineroService = {
         notas: c.notas,
         plazoDias: c.plazoDias,
         activo: c.activo,
-        despachado: t.despachado,
-        cobrado: t.cobrado,
-        porCobrar: t.despachado - t.cobrado,
+        despachadoUsd: t.despachado,
+        cobradoUsd: t.cobrado,
+        porCobrarUsd: t.despachado - t.cobrado,
         tieneMovimientos: c._count.pedidos + c._count.despachos + c._count.cobros > 0,
       };
     });
@@ -261,12 +292,12 @@ export const dineroService = {
     const { config, fichas, fijo } = await contexto();
     const f = fichas.find((x) => x.id === input.fichaId);
     if (!f) throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
-    const { costo, precio } = precioYCosto(f, config, fijo);
+    const { costo, docenaUsd } = precioYCosto(f, config, fijo);
     const p = await dineroRepository.crearPedido({
       clienteId: input.clienteId,
       fichaId: input.fichaId,
       prendas: input.prendas,
-      precioPrenda: input.precioPrenda ?? precio,
+      precioDocenaUsd: input.precioDocenaUsd ?? docenaUsd,
       fechaEntrega: input.fechaEntrega ? diaADate(input.fechaEntrega) : null,
       notas: input.notas ?? null,
     });
@@ -285,7 +316,7 @@ export const dineroService = {
       input.estado ?? (input.corteId && actual.estado === 'pendiente' ? 'en_produccion' : undefined);
     await dineroRepository.actualizarPedido(id, {
       ...(input.prendas !== undefined ? { prendas: input.prendas } : {}),
-      ...(input.precioPrenda !== undefined ? { precioPrenda: input.precioPrenda } : {}),
+      ...(input.precioDocenaUsd !== undefined ? { precioDocenaUsd: input.precioDocenaUsd } : {}),
       ...(input.fechaEntrega !== undefined
         ? { fechaEntrega: input.fechaEntrega ? diaADate(input.fechaEntrega) : null }
         : {}),
@@ -314,10 +345,16 @@ export const dineroService = {
   },
 
   /** Cada línea guarda la FOTO del costo por prenda (corte real o ficha, sin
-   *  costos fijos). Un corte tiene que estar cerrado y no se despacha de más. */
+   *  costos fijos) y su total en $us (prendas × docena ÷ 12) y en Bs a la tasa
+   *  del día. Un corte tiene que estar cerrado y no se despacha de más. */
   async crearDespacho(input: DespachoInput): Promise<DespachoDTO> {
     const cliente = await clienteOError(input.clienteId);
     const [{ config, fichas, fijo }, cortes] = await Promise.all([contexto(), cortesDinero()]);
+    const tasa = input.tasaCambio ?? config.tasaCambioUsd;
+    const totales = (prendas: number, docena: number) => {
+      const totalUsd = totalPorDocena(prendas, docena);
+      return { precioDocenaUsd: docena, totalUsd, totalBs: usdABs(totalUsd, tasa) };
+    };
     const pedidas = new Map<string, number>(); // prendas pedidas por corte en este despacho
     const lineas = input.lineas.map((l) => {
       if (l.corteId) {
@@ -335,8 +372,8 @@ export const dineroService = {
           );
         }
         pedidas.set(c.corteId, total);
-        const precio = l.precioPrenda ?? c.precioPrenda;
-        if (precio == null) {
+        const docena = l.precioDocenaUsd ?? c.precioDocenaUsd;
+        if (docena == null) {
           throw new AppError('SIN_PRECIO', `Indicá el precio del COD ${c.codigo}: su modelo no tiene ficha`, 400);
         }
         return {
@@ -345,24 +382,21 @@ export const dineroService = {
           descripcion: `COD ${c.codigo} · ${c.modeloNombre}`,
           detalle: l.detalle ?? null,
           prendas: l.prendas,
-          precioPrenda: precio,
           costoPrenda: c.costoPrenda,
-          total: l.prendas * precio,
+          ...totales(l.prendas, docena),
         };
       }
       const f = fichas.find((x) => x.id === l.fichaId);
       if (!f) throw new AppError('NO_ENCONTRADO', 'Ficha de costo no encontrada', 404);
-      const { costo, precio } = precioYCosto(f, config, fijo);
-      const precioFinal = l.precioPrenda ?? precio;
+      const { costo, docenaUsd } = precioYCosto(f, config, fijo);
       return {
         corteId: null,
         fichaId: f.id,
         descripcion: f.nombre,
         detalle: l.detalle ?? null,
         prendas: l.prendas,
-        precioPrenda: precioFinal,
         costoPrenda: costo,
-        total: l.prendas * precioFinal,
+        ...totales(l.prendas, l.precioDocenaUsd ?? docenaUsd),
       };
     });
     const d = await dineroRepository.crearDespacho(
@@ -370,10 +404,12 @@ export const dineroService = {
         clienteId: input.clienteId,
         fecha: diaADate(input.fecha),
         vence: diaADate(input.vence ?? sumarDias(input.fecha, cliente.plazoDias)),
+        tasaCambio: tasa,
         notas: input.notas ?? null,
       },
       lineas,
     );
+    await configuracionRepository.recordarTasa(input.tasaCambio);
     return aDespachoDTO(d);
   },
 
@@ -386,26 +422,30 @@ export const dineroService = {
 
   // ── Cobros ──
   async listarCobros(): Promise<CobroDTO[]> {
-    return (await dineroRepository.listarCobros()).map((c) => ({
-      id: c.id,
-      cliente: c.cliente,
-      fecha: dateADia(c.fecha),
-      monto: c.monto,
-      nota: c.nota,
-      caja: c.caja,
-    }));
+    return (await dineroRepository.listarCobros()).map(aCobroDTO);
   },
 
+  /** Guarda el monto en su moneda y sus dos equivalentes, calculados una vez a
+   *  la tasa del día: en $us descuenta la deuda del cliente; en Bs, la ganancia.
+   *  En $us entra a la caja de dólares. */
   async crearCobro(input: CobroInput): Promise<CobroDTO> {
     await clienteOError(input.clienteId);
+    const config = await configuracionRepository.obtener();
+    const tasa = input.tasaCambio ?? config.tasaCambioUsd;
+    const enUsd = input.moneda === 'USD';
     const c = await dineroRepository.crearCobro({
       clienteId: input.clienteId,
       fecha: diaADate(input.fecha),
+      moneda: input.moneda,
       monto: input.monto,
+      tasaCambio: tasa,
+      usd: enUsd ? input.monto : bsAUsd(input.monto, tasa),
+      bs: enUsd ? usdABs(input.monto, tasa) : input.monto,
       nota: input.nota ?? null,
-      caja: input.caja,
+      caja: enUsd ? 'dolares' : input.caja,
     });
-    return { id: c.id, cliente: c.cliente, fecha: dateADia(c.fecha), monto: c.monto, nota: c.nota, caja: c.caja };
+    await configuracionRepository.recordarTasa(input.tasaCambio);
+    return aCobroDTO(c);
   },
 
   async eliminarCobro(id: string): Promise<void> {
@@ -419,25 +459,27 @@ export const dineroService = {
       dineroRepository.comprasCredito(),
       dineroRepository.pagosProveedor(),
     ]);
+    // una deuda por proveedor y moneda: lo de $us se debe y se paga en $us
     const mapa = new Map<string, ProveedorDeudaDTO>();
-    const de = (nombre: string) => {
-      const k = normalizarProveedor(nombre);
-      if (!mapa.has(k)) mapa.set(k, { proveedor: k, comprasCredito: 0, pagado: 0, deuda: 0, movimientos: [] });
+    const de = (nombre: string, moneda: Moneda) => {
+      const proveedor = normalizarProveedor(nombre);
+      const k = `${proveedor}|${moneda}`;
+      if (!mapa.has(k)) mapa.set(k, { proveedor, moneda, comprasCredito: 0, pagado: 0, deuda: 0, movimientos: [] });
       return mapa.get(k)!;
     };
     for (const c of compras) {
-      const p = de(c.tienda);
-      p.comprasCredito += c.precioTotal;
+      const p = de(c.tienda, c.moneda);
+      p.comprasCredito += montoCompra(c);
       p.movimientos.push({
         tipo: 'compra',
         id: c.id,
         fecha: dateADia(c.fecha),
         detalle: `${c.insumo.nombre}${c.codigoCorte ? ` · COD ${c.codigoCorte}` : ''}`,
-        monto: c.precioTotal,
+        monto: montoCompra(c),
       });
     }
     for (const x of pagos) {
-      const p = de(x.proveedor);
+      const p = de(x.proveedor, x.moneda);
       p.pagado += x.monto;
       p.movimientos.push({ tipo: 'pago', id: x.id, fecha: dateADia(x.fecha), detalle: x.nota ?? 'pago', monto: x.monto });
     }
@@ -446,16 +488,19 @@ export const dineroService = {
       deuda: p.comprasCredito - p.pagado,
       movimientos: p.movimientos.sort((a, b) => b.fecha.localeCompare(a.fecha)),
     }));
-    return lista.sort((a, b) => b.deuda - a.deuda || a.proveedor.localeCompare(b.proveedor, 'es'));
+    return lista.sort(
+      (a, b) => a.moneda.localeCompare(b.moneda) * -1 || b.deuda - a.deuda || a.proveedor.localeCompare(b.proveedor, 'es'),
+    );
   },
 
   async crearPagoProveedor(input: PagoProveedorInput): Promise<ProveedorDeudaDTO[]> {
     await dineroRepository.crearPagoProveedor({
       proveedor: input.proveedor,
       fecha: diaADate(input.fecha),
+      moneda: input.moneda,
       monto: input.monto,
       nota: input.nota ?? null,
-      caja: input.caja,
+      caja: input.moneda === 'USD' ? 'dolares' : input.caja,
     });
     return this.proveedores();
   },
@@ -485,8 +530,9 @@ export const dineroService = {
       dineroRepository.listarCobros({ desde, hasta }),
     ]);
     const precioPedido = new Map(
-      pedidos.filter((p) => p.corte && p.estado !== 'cancelado').map((p) => [p.corte!.id, p.precioPrenda]),
+      pedidos.filter((p) => p.corte && p.estado !== 'cancelado').map((p) => [p.corte!.id, p.precioDocenaUsd]),
     );
+    const tasa = config.tasaCambioUsd;
     const orden: Record<PasoCorte, number> = { mesa: 0, costura: 1, lavanderia: 2, empaque: 3, deposito: 4 };
     const avisos: string[] = [];
     const lista: CorteEnCaminoDTO[] = [];
@@ -510,7 +556,8 @@ export const dineroService = {
       const falta = desglose.insumosCostura + desglose.insumosEmpaque + desglose.manoDeObra + desglose.servicios;
       // en depósito solo cuenta lo que queda sin entregar
       const parte = (x: number) => (c.paso === 'deposito' ? Math.round((x * disponibles) / c.cantidadTotal) : x);
-      const precio = precioPedido.get(c.id) ?? (f ? calcularFicha(f, config, fijo).precioVenta : null);
+      const docena = precioPedido.get(c.id) ?? (f ? calcularFicha(f, config, fijo).ventaDocenaUsd : null);
+      const valeUsd = docena != null ? totalPorDocena(c.paso === 'deposito' ? disponibles : c.cantidadTotal, docena) : null;
       const dias = Math.max(0, Math.floor((Date.now() - c.pasoDesde.getTime()) / 86_400_000));
       if (!f) avisos.push(`COD ${c.codigo}: su modelo no tiene ficha de costo, faltan los insumos y el precio.`);
       lista.push({
@@ -524,7 +571,8 @@ export const dineroService = {
         invertido: parte(total - falta),
         falta,
         desglose,
-        vale: precio != null ? precio * (c.paso === 'deposito' ? disponibles : c.cantidadTotal) : null,
+        vale: valeUsd != null ? usdABs(valeUsd, tasa) : null,
+        valeUsd,
       });
     }
     const pasos = PASOS_CORTE.map((paso) => {
@@ -535,25 +583,31 @@ export const dineroService = {
         invertido: cs.reduce((a, x) => a + x.invertido, 0),
         falta: cs.reduce((a, x) => a + x.falta, 0),
         vale: cs.reduce((a, x) => a + (x.vale ?? 0), 0),
+        valeUsd: cs.reduce((a, x) => a + (x.valeUsd ?? 0), 0),
         cortes: cs,
       };
     });
     const enPuerta = pedidos.filter((p) => p.estado === 'pendiente');
     const sumaDesglose = (k: keyof CorteEnCaminoDTO['desglose']) => lista.reduce((a, x) => a + x.desglose[k], 0);
+    const pedidosUsd = enPuerta.reduce((a, p) => a + p.ventaUsd, 0);
     return {
+      tasaCambio: tasa,
       pedidos: {
         cantidad: enPuerta.length,
         prendas: enPuerta.reduce((a, p) => a + p.prendas, 0),
         necesitas: enPuerta.reduce((a, p) => a + p.costo, 0),
-        vale: enPuerta.reduce((a, p) => a + p.venta, 0),
+        vale: usdABs(pedidosUsd, tasa),
+        valeUsd: pedidosUsd,
       },
       pasos,
       porCobrar: {
-        total: cxc.total,
-        vencido: cxc.vencido,
+        totalUsd: cxc.totalUsd,
+        total: usdABs(cxc.totalUsd, tasa),
+        vencidoUsd: cxc.vencidoUsd,
         clientes: new Set(cxc.items.map((i) => i.cliente.id)).size,
       },
-      cobradoMes: cobrosMes.reduce((a, c) => a + c.monto, 0),
+      cobradoMes: cobrosMes.reduce((a, c) => a + c.bs, 0),
+      cobradoMesUsd: cobrosMes.reduce((a, c) => a + c.usd, 0),
       resumen: {
         invertido: pasos.reduce((a, p) => a + p.invertido, 0),
         falta: pasos.reduce((a, p) => a + p.falta, 0),
@@ -580,21 +634,23 @@ export const dineroService = {
    *  lo que queda de cada despacho vence en su fecha. */
   async cuentasPorCobrar(): Promise<CuentasPorCobrarDTO> {
     const hoy = hoyEnBolivia();
-    const [despachos, cobros, clientes] = await Promise.all([
+    const [despachos, cobros, clientes, config] = await Promise.all([
       dineroRepository.listarDespachos(),
       dineroRepository.listarCobros(),
       dineroRepository.listarClientes(),
+      configuracionRepository.obtener(),
     ]);
     const celular = new Map(clientes.map((c) => [c.id, c.celular]));
+    // todo en $us: un cobro en Bs descuenta su equivalente
     const cobrado = new Map<string, number>();
-    for (const c of cobros) cobrado.set(c.clienteId, (cobrado.get(c.clienteId) ?? 0) + c.monto);
+    for (const c of cobros) cobrado.set(c.clienteId, (cobrado.get(c.clienteId) ?? 0) + c.usd);
 
     const items: CuentaPorCobrarDTO[] = [];
     const viejosPrimero = [...despachos].sort(
       (a, b) => a.fecha.getTime() - b.fecha.getTime() || a.creadoEn.getTime() - b.creadoEn.getTime(),
     );
     for (const d of viejosPrimero) {
-      const total = d.lineas.reduce((a, l) => a + l.total, 0);
+      const total = d.lineas.reduce((a, l) => a + l.totalUsd, 0);
       const disponible = cobrado.get(d.clienteId) ?? 0;
       const aplicado = Math.min(disponible, total);
       cobrado.set(d.clienteId, disponible - aplicado);
@@ -606,25 +662,26 @@ export const dineroService = {
         fecha: dateADia(d.fecha),
         vence: dateADia(d.vence),
         detalle: `${d.lineas.map((l) => l.descripcion).join(', ')} · ${prendas} prendas`,
-        total,
-        cobrado: aplicado,
-        pendiente: total - aplicado,
+        totalUsd: total,
+        cobradoUsd: aplicado,
+        pendienteUsd: total - aplicado,
       });
     }
-    items.sort((a, b) => a.vence.localeCompare(b.vence) || b.pendiente - a.pendiente);
+    items.sort((a, b) => a.vence.localeCompare(b.vence) || b.pendienteUsd - a.pendienteUsd);
     const enSemana = sumarDias(hoy, 7);
-    const suma = (xs: CuentaPorCobrarDTO[]) => xs.reduce((a, x) => a + x.pendiente, 0);
+    const suma = (xs: CuentaPorCobrarDTO[]) => xs.reduce((a, x) => a + x.pendienteUsd, 0);
     const nombres = new Map(clientes.map((c) => [c.id, c.nombre]));
     return {
       hoy,
+      tasaCambio: config.tasaCambioUsd,
       items,
-      total: suma(items),
-      vencido: suma(items.filter((x) => x.vence < hoy)),
-      semana: suma(items.filter((x) => x.vence >= hoy && x.vence <= enSemana)),
+      totalUsd: suma(items),
+      vencidoUsd: suma(items.filter((x) => x.vence < hoy)),
+      semanaUsd: suma(items.filter((x) => x.vence >= hoy && x.vence <= enSemana)),
       // lo que sobra de los cobros: el cliente pagó de más (adelanto)
       adelantos: [...cobrado]
         .filter(([, m]) => m > 0)
-        .map(([id, monto]) => ({ id, nombre: nombres.get(id) ?? '', monto })),
+        .map(([id, montoUsd]) => ({ id, nombre: nombres.get(id) ?? '', montoUsd })),
     };
   },
 
@@ -636,29 +693,38 @@ export const dineroService = {
     const hoy = hoyEnBolivia();
     const [anio, mes] = hoy.split('-').map(Number);
     const finMes = dateADia(new Date(Date.UTC(anio, mes, 0)));
-    const [compras, pagos, consolidado, fijos] = await Promise.all([
+    const [compras, pagos, consolidado, fijos, config] = await Promise.all([
       dineroRepository.comprasCredito(),
       dineroRepository.pagosProveedor(),
       liquidacionService.consolidado(anio, mes),
       fijosService.mes(anio, mes),
+      configuracionRepository.obtener(),
     ]);
+    const tasa = config.tasaCambioUsd;
     const items: CuentaPorPagarDTO[] = [];
+    const enBs = (monto: number) => ({ moneda: 'BOB' as const, monto, montoBs: monto });
 
+    // los pagos en $us cancelan las compras en $us; los de Bs, las de Bs
     const pagado = new Map<string, number>();
-    for (const p of pagos) pagado.set(normalizarProveedor(p.proveedor), (pagado.get(normalizarProveedor(p.proveedor)) ?? 0) + p.monto);
+    const clave = (proveedor: string, moneda: Moneda) => `${normalizarProveedor(proveedor)}|${moneda}`;
+    for (const p of pagos) pagado.set(clave(p.proveedor, p.moneda), (pagado.get(clave(p.proveedor, p.moneda)) ?? 0) + p.monto);
     const viejasPrimero = [...compras].sort((a, b) => a.fecha.getTime() - b.fecha.getTime());
     for (const c of viejasPrimero) {
-      const prov = normalizarProveedor(c.tienda);
-      const disponible = pagado.get(prov) ?? 0;
-      const cubierto = Math.min(disponible, c.precioTotal);
-      pagado.set(prov, disponible - cubierto);
-      if (c.precioTotal - cubierto <= 0) continue;
+      const k = clave(c.tienda, c.moneda);
+      const monto = montoCompra(c);
+      const disponible = pagado.get(k) ?? 0;
+      const cubierto = Math.min(disponible, monto);
+      pagado.set(k, disponible - cubierto);
+      if (monto - cubierto <= 0) continue;
+      const falta = monto - cubierto;
       items.push({
         id: `compra:${c.id}`,
         tipo: 'proveedor',
-        acreedor: prov,
+        acreedor: normalizarProveedor(c.tienda),
         detalle: `${c.insumo.nombre} del ${dateADia(c.fecha).split('-').reverse().join('/')}${c.codigoCorte ? ` · COD ${c.codigoCorte}` : ''}${cubierto > 0 ? ' (pagada en parte)' : ''}`,
-        monto: c.precioTotal - cubierto,
+        moneda: c.moneda,
+        monto: falta,
+        montoBs: c.moneda === 'USD' ? usdABs(falta, tasa) : falta,
         vence: c.vence ? dateADia(c.vence) : null,
         enlace: '/compras?tab=proveedores',
       });
@@ -676,7 +742,7 @@ export const dineroService = {
               tipo: 'servicio',
               acreedor: f.nombre,
               detalle: ETIQUETA_CUENTA[cuenta.cuenta],
-              monto: f.saldoPeriodo,
+              ...enBs(f.saldoPeriodo),
               vence: finMes,
               enlace: `/liquidacion?cuenta=${cuenta.cuenta}`,
             });
@@ -692,7 +758,7 @@ export const dineroService = {
         tipo: 'operarios',
         acreedor: 'Operarios',
         detalle: `${ETIQUETA_CUENTA[cuenta]} · saldo a favor del mes`,
-        monto,
+        ...enBs(monto),
         vence: finMes,
         enlace: `/liquidacion?cuenta=${cuenta}`,
       });
@@ -704,19 +770,21 @@ export const dineroService = {
         tipo: 'banco',
         acreedor: p.banco,
         detalle: `Cuota de ${mes}/${anio}${p.cuotasRestantes != null ? ` · quedan ${p.cuotasRestantes} cuotas` : ''}`,
-        monto: p.cuota,
+        ...enBs(p.cuota),
         vence: p.vence,
         enlace: '/costos-fijos',
       });
     }
 
-    items.sort((a, b) => (a.vence ?? '9999').localeCompare(b.vence ?? '9999') || b.monto - a.monto);
+    items.sort((a, b) => (a.vence ?? '9999').localeCompare(b.vence ?? '9999') || b.montoBs - a.montoBs);
     const enSemana = sumarDias(hoy, 7);
-    const suma = (xs: CuentaPorPagarDTO[]) => xs.reduce((a, x) => a + x.monto, 0);
+    const suma = (xs: CuentaPorPagarDTO[]) => xs.reduce((a, x) => a + x.montoBs, 0);
     return {
       hoy,
+      tasaCambio: tasa,
       items,
       total: suma(items),
+      totalUsd: items.filter((x) => x.moneda === 'USD').reduce((a, x) => a + x.monto, 0),
       vencido: suma(items.filter((x) => x.vence != null && x.vence < hoy)),
       semana: suma(items.filter((x) => x.vence != null && x.vence >= hoy && x.vence <= enSemana)),
     };
@@ -727,7 +795,7 @@ export const dineroService = {
     const hoy = hoyEnBolivia();
     const [anio, mes] = hoy.split('-').map(Number);
     const { inicio: desde, fin: hasta } = rangoMesUTC(anio, mes);
-    const [cortes, pedidos, clientes, insumos, stock, consolidado, fijos, proveedores, despachosMes, cobrosMes] =
+    const [cortes, pedidos, clientes, insumos, stock, consolidado, fijos, proveedores, despachosMes, cobrosMes, config] =
       await Promise.all([
         cortesDinero(),
         this.listarPedidos(),
@@ -739,7 +807,9 @@ export const dineroService = {
         this.proveedores(),
         dineroRepository.listarDespachos({ desde, hasta }),
         dineroRepository.listarCobros({ desde, hasta }),
+        configuracionRepository.obtener(),
       ]);
+    const tasa = config.tasaCambioUsd;
     const avisos: string[] = [];
 
     // etapas del producto
@@ -752,7 +822,8 @@ export const dineroService = {
           detalle: `${p.cliente.nombre}${p.fechaEntrega ? ` · entrega ${p.fechaEntrega.split('-').reverse().join('/')}` : ''}`,
           prendas: p.prendas,
           costo: p.costo,
-          venta: p.venta,
+          venta: usdABs(p.ventaUsd, tasa),
+          ventaUsd: p.ventaUsd,
           faltaPagar: p.costo, // todavía no se invirtió nada
         })),
     );
@@ -760,7 +831,7 @@ export const dineroService = {
     const enProduccion = etapa(vivos.filter((c) => c.etapa === 'produccion').map(itemCorte));
     const enServicios = etapa(vivos.filter((c) => c.etapa === 'servicios').map(itemCorte));
     const deposito = etapa(vivos.filter((c) => c.etapa === 'deposito').map(itemCorte));
-    if (vivos.some((c) => c.precioPrenda == null)) {
+    if (vivos.some((c) => c.precioDocenaUsd == null)) {
       avisos.push(
         'Hay cortes cuyo modelo no tiene ficha de costo vinculada: su precio de venta no se conoce y no entran en la ganancia. Vinculá la ficha en Costos.',
       );
@@ -771,12 +842,13 @@ export const dineroService = {
       );
     }
 
-    // por cobrar
+    // por cobrar (en $us; en Bs al último tipo de cambio)
     const deudores = clientes
-      .filter((c) => c.porCobrar !== 0)
-      .map((c) => ({ id: c.id, nombre: c.nombre, monto: c.porCobrar }))
-      .sort((a, b) => b.monto - a.monto);
-    const porCobrar = { total: deudores.reduce((a, c) => a + c.monto, 0), clientes: deudores };
+      .filter((c) => c.porCobrarUsd !== 0)
+      .map((c) => ({ id: c.id, nombre: c.nombre, montoUsd: c.porCobrarUsd }))
+      .sort((a, b) => b.montoUsd - a.montoUsd);
+    const porCobrarUsd = deudores.reduce((a, c) => a + c.montoUsd, 0);
+    const porCobrar = { total: usdABs(Math.max(0, porCobrarUsd), tasa), totalUsd: porCobrarUsd, clientes: deudores };
 
     // insumos en depósito: stock × precio de la última compra
     let sinPrecio = 0;
@@ -815,15 +887,23 @@ export const dineroService = {
     }
     const servicios = [...porCuenta].filter(([, m]) => m > 0).map(([cuenta, monto]) => ({ cuenta, monto }));
     const deudaServicios = servicios.reduce((a, s) => a + s.monto, 0);
-    const deudaProveedores = proveedores.filter((p) => p.deuda !== 0);
-    const totalProveedores = deudaProveedores.reduce((a, p) => a + p.deuda, 0);
+    const deudaProveedores = proveedores
+      .filter((p) => p.deuda !== 0)
+      .map((p) => ({
+        proveedor: p.proveedor,
+        moneda: p.moneda,
+        monto: p.deuda,
+        montoBs: p.moneda === 'USD' ? Math.sign(p.deuda) * usdABs(Math.abs(p.deuda), tasa) : p.deuda,
+      }));
+    const totalProveedores = deudaProveedores.reduce((a, p) => a + p.montoBs, 0);
     const totalDeudas = totalProveedores + deudaServicios + operarios;
 
     const tenes =
       insumosValor + enProduccion.costo + enServicios.costo + deposito.costo + porCobrar.total + adelantado;
 
     // resultado del mes
-    const ventas = despachosMes.reduce((a, d) => a + d.lineas.reduce((x, l) => x + l.total, 0), 0);
+    const ventas = despachosMes.reduce((a, d) => a + d.lineas.reduce((x, l) => x + l.totalBs, 0), 0);
+    const ventasUsd = despachosMes.reduce((a, d) => a + d.lineas.reduce((x, l) => x + l.totalUsd, 0), 0);
     const costoVendido = despachosMes.reduce(
       (a, d) => a + d.lineas.reduce((x, l) => x + l.prendas * l.costoPrenda, 0),
       0,
@@ -839,6 +919,7 @@ export const dineroService = {
       enProduccion,
       enServicios,
       deposito,
+      tasaCambio: tasa,
       porCobrar,
       insumos: { valor: insumosValor, sinPrecio },
       anticiposAdelantados: adelantado,
@@ -846,7 +927,7 @@ export const dineroService = {
       deudas: {
         proveedores: {
           total: totalProveedores,
-          lista: deudaProveedores.map((p) => ({ proveedor: p.proveedor, monto: p.deuda })),
+          lista: deudaProveedores,
         },
         servicios: { total: deudaServicios, porCuenta: servicios },
         operarios,
@@ -864,13 +945,15 @@ export const dineroService = {
       },
       resultadoMes: {
         ventas,
+        ventasUsd,
         costoVendido,
         margen,
         gastosFijos: fijos.totalGastos,
         operativo,
         cuotaBanco: fijos.totalDeuda,
         queda: operativo - fijos.totalDeuda,
-        cobrado: cobrosMes.reduce((a, c) => a + c.monto, 0),
+        cobrado: cobrosMes.reduce((a, c) => a + c.bs, 0),
+        cobradoUsd: cobrosMes.reduce((a, c) => a + c.usd, 0),
         prendasDespachadas: despachosMes.reduce((a, d) => a + d.lineas.reduce((x, l) => x + l.prendas, 0), 0),
       },
       avisos,

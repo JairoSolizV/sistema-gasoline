@@ -2,10 +2,14 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   aCentavos,
+  bsAUsd,
   formatBs,
-  type Caja,
+  totalPorDocena,
+  usdABs,
+  type CajaBs,
   type ClienteDTO,
   type EstadoPedido,
+  type Moneda,
   type PedidoDTO,
 } from '@taller/shared';
 import {
@@ -23,10 +27,13 @@ import { Modal } from '../../components/Modal';
 import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
+import { CampoTasa, tasaTexto, useTasa } from '../../components/CampoTasa';
 import { enDocenas, fechaCorta } from '../costos/formato';
 
 // Ventas (docs/PLAN_TABLERO_DINERO.md): pedidos de clientes (modelos en puerta),
-// despachos desde el depósito, cobros y clientes. No toca ningún pago.
+// despachos desde el depósito, cobros y clientes. Se vende por docena en $us; cada
+// despacho y cobro guarda el tipo de cambio del día (docs/PLAN_DOLARES.md). No
+// toca ningún pago.
 
 const PESTANAS = [
   { clave: 'pedidos', etiqueta: 'Pedidos' },
@@ -38,6 +45,7 @@ type Pestana = (typeof PESTANAS)[number]['clave'];
 
 const PATRON_BS = /^\d+([.,]\d{1,2})?$/;
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const usd = (c: number) => `$us ${formatBs(c)}`;
 const aCent = (s: string) => aCentavos(s.trim().replace(',', '.'));
 const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
@@ -103,7 +111,7 @@ function SelectorCliente({ valor, onCambiar }: { valor: string; onCambiar: (id: 
         .map((c) => (
           <option key={c.id} value={c.id}>
             {c.nombre}
-            {c.porCobrar > 0 ? ` (debe ${formatBs(c.porCobrar)})` : ''}
+            {c.porCobrarUsd > 0 ? ` (debe ${usd(c.porCobrarUsd)})` : ''}
           </option>
         ))}
     </select>
@@ -169,9 +177,9 @@ function PedidosTab() {
               <th className="px-3 py-2.5">Cliente</th>
               <th className="px-3 py-2.5">Modelo</th>
               <th className="px-3 py-2.5 text-right">Prendas</th>
-              <th className="px-3 py-2.5 text-right">Precio</th>
-              <th className="px-3 py-2.5 text-right">Vale</th>
-              <th className="px-3 py-2.5 text-right">Costo</th>
+              <th className="px-3 py-2.5 text-right">Docena $us</th>
+              <th className="px-3 py-2.5 text-right">Vale $us</th>
+              <th className="px-3 py-2.5 text-right">Costo Bs</th>
               <th className="px-3 py-2.5">Estado</th>
               <th className="px-3 py-2.5 text-right">Acciones</th>
             </tr>
@@ -193,8 +201,8 @@ function PedidosTab() {
                   {p.notas && <div className="text-xs text-gray-500">{p.notas}</div>}
                 </td>
                 <td className="mono px-3 py-2 text-right">{p.prendas}</td>
-                <td className="mono px-3 py-2 text-right whitespace-nowrap">{bs(p.precioPrenda)}</td>
-                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap text-ok">{bs(p.venta)}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">{usd(p.precioDocenaUsd)}</td>
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap text-ok">{usd(p.ventaUsd)}</td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(p.costo)}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTADO[p.estado].clase}`}>
@@ -253,7 +261,7 @@ function ModalPedido({ onCerrar }: { onCerrar: () => void }) {
     if (!v.clienteId) return setError('Elegí el cliente');
     if (!v.fichaId) return setError('Elegí el modelo');
     if (!(Number(v.prendas) > 0)) return setError('Indicá cuántas prendas');
-    if (v.precio.trim() && !PATRON_BS.test(v.precio.trim())) return setError('Precio inválido (ej. 95.50)');
+    if (v.precio.trim() && !PATRON_BS.test(v.precio.trim())) return setError('Precio de la docena inválido (ej. 85.50)');
     try {
       await mutar.mutateAsync({
         tipo: 'crearPedido',
@@ -261,7 +269,7 @@ function ModalPedido({ onCerrar }: { onCerrar: () => void }) {
           clienteId: v.clienteId,
           fichaId: v.fichaId,
           prendas: Number(v.prendas),
-          ...(v.precio.trim() ? { precioPrenda: aCent(v.precio) } : {}),
+          ...(v.precio.trim() ? { precioDocenaUsd: aCent(v.precio) } : {}),
           ...(v.fechaEntrega ? { fechaEntrega: v.fechaEntrega } : {}),
           notas: v.notas,
         },
@@ -297,12 +305,12 @@ function ModalPedido({ onCerrar }: { onCerrar: () => void }) {
           <input value={v.prendas} onChange={(e) => cambiar('prendas', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={`mono ${claseInput}`} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Precio por prenda (Bs)</label>
+          <label className="mb-1 block text-sm font-medium">Precio de la docena ($us)</label>
           <input
             value={v.precio}
             onChange={(e) => cambiar('precio', e.target.value)}
             inputMode="decimal"
-            placeholder={ficha ? formatBs(ficha.precioVenta) : 'el de la ficha'}
+            placeholder={ficha ? formatBs(ficha.ventaDocenaUsd) : 'el de la ficha'}
             className={`mono ${claseInput}`}
           />
         </div>
@@ -319,7 +327,12 @@ function ModalPedido({ onCerrar }: { onCerrar: () => void }) {
         <p className="mt-3 text-sm text-gray-600">
           Vale{' '}
           <span className="mono font-semibold text-ok">
-            {bs(Number(v.prendas) * (v.precio.trim() && PATRON_BS.test(v.precio.trim()) ? aCent(v.precio) : ficha.precioVenta))}
+            {usd(
+              totalPorDocena(
+                Number(v.prendas),
+                v.precio.trim() && PATRON_BS.test(v.precio.trim()) ? aCent(v.precio) : ficha.ventaDocenaUsd,
+              ),
+            )}
           </span>
         </p>
       )}
@@ -387,16 +400,17 @@ function DespachosTab() {
               <th className="px-3 py-2.5">Cliente</th>
               <th className="px-3 py-2.5">Qué se despachó</th>
               <th className="px-3 py-2.5 text-right">Prendas</th>
-              <th className="px-3 py-2.5 text-right">Venta</th>
-              <th className="px-3 py-2.5 text-right">Costo</th>
-              <th className="px-3 py-2.5 text-right">Ganancia</th>
+              <th className="px-3 py-2.5 text-right">Venta $us</th>
+              <th className="px-3 py-2.5 text-right">Venta Bs</th>
+              <th className="px-3 py-2.5 text-right">Costo Bs</th>
+              <th className="px-3 py-2.5 text-right">Ganancia Bs</th>
               <th className="px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
@@ -408,16 +422,20 @@ function DespachosTab() {
                 <td className="max-w-[300px] px-3 py-2 text-xs text-gray-600">
                   {d.lineas.map((l) => (
                     <div key={l.id}>
-                      {enDocenas(l.prendas)} · {l.descripcion} a {formatBs(l.precioPrenda)}
+                      {enDocenas(l.prendas)} · {l.descripcion} a {usd(l.precioDocenaUsd)} la docena
                       {l.detalle && <span className="text-gray-400"> · {l.detalle}</span>}
                     </div>
                   ))}
                 </td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap">{enDocenas(d.prendas)}</td>
-                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bs(d.total)}</td>
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{usd(d.totalUsd)}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">
+                  {bs(d.totalBs)}
+                  <div className="text-[11px] text-gray-400">a {tasaTexto(d.tasaCambio)}</div>
+                </td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(d.costo)}</td>
-                <td className={`mono px-3 py-2 text-right whitespace-nowrap ${d.total - d.costo < 0 ? 'text-error' : 'text-ok'}`}>
-                  {bs(d.total - d.costo)}
+                <td className={`mono px-3 py-2 text-right whitespace-nowrap ${d.totalBs - d.costo < 0 ? 'text-error' : 'text-ok'}`}>
+                  {bs(d.totalBs - d.costo)}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button onClick={() => mutar.mutate({ tipo: 'quitarDespacho', id: d.id })} className="text-[13px] font-medium text-error hover:underline">
@@ -428,7 +446,7 @@ function DespachosTab() {
             ))}
             {despachos?.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
                   Todavía no hay despachos.
                 </td>
               </tr>
@@ -466,6 +484,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   const venceVivo = vence || masDias(fecha, plazo);
   const [lineas, setLineas] = useState<LineaForm[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const tasa = useTasa();
   const cambiar = (clave: string, k: 'docenas' | 'sueltas' | 'precio' | 'detalle', valor: string) =>
     setLineas((ls) => ls.map((l) => (l.clave === clave ? { ...l, [k]: valor } : l)));
   const agregar = (valor: string) => {
@@ -476,13 +495,14 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   const info = (l: LineaForm) => {
     if (l.corteId) {
       const c = deposito?.find((x) => x.corteId === l.corteId);
-      return { nombre: c ? `COD ${c.codigo} · ${c.modeloNombre}` : 'corte', precio: c?.precioPrenda ?? null, max: c?.disponibles };
+      return { nombre: c ? `COD ${c.codigo} · ${c.modeloNombre}` : 'corte', precio: c?.precioDocenaUsd ?? null, max: c?.disponibles };
     }
     const f = fichas?.find((x) => x.id === l.fichaId);
-    return { nombre: f?.nombre ?? 'ficha', precio: f?.precioVenta ?? null, max: undefined };
+    return { nombre: f?.nombre ?? 'ficha', precio: f?.ventaDocenaUsd ?? null, max: undefined };
   };
+  // precio de la docena en $us: el escrito o el del pedido/ficha
   const precioDe = (l: LineaForm) => (l.precio.trim() && PATRON_BS.test(l.precio.trim()) ? aCent(l.precio) : info(l).precio ?? 0);
-  const total = lineas.reduce((a, l) => a + prendasDe(l) * precioDe(l), 0);
+  const total = lineas.reduce((a, l) => a + totalPorDocena(prendasDe(l), precioDe(l)), 0);
 
   const onGuardar = async () => {
     setError(null);
@@ -490,6 +510,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
     if (lineas.length === 0) return setError('Agregá al menos un corte o modelo');
     if (lineas.some((l) => prendasDe(l) <= 0)) return setError('Indicá las docenas (o sueltas) de cada línea');
     if (lineas.some((l) => l.precio.trim() && !PATRON_BS.test(l.precio.trim()))) return setError('Hay un precio inválido');
+    if (tasa.tasa == null) return setError('Tipo de cambio inválido (ej. 6.96)');
     try {
       await mutar.mutateAsync({
         tipo: 'crearDespacho',
@@ -497,11 +518,12 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
           clienteId,
           fecha,
           vence: venceVivo,
+          tasaCambio: tasa.tasa,
           notas,
           lineas: lineas.map((l) => ({
             ...(l.corteId ? { corteId: l.corteId } : { fichaId: l.fichaId }),
             prendas: prendasDe(l),
-            ...(l.precio.trim() ? { precioPrenda: aCent(l.precio) } : {}),
+            ...(l.precio.trim() ? { precioDocenaUsd: aCent(l.precio) } : {}),
             ...(l.detalle.trim() ? { detalle: l.detalle } : {}),
           })),
         },
@@ -556,7 +578,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
               <th className="py-1">Qué</th>
               <th className="py-1 text-right">Docenas</th>
               <th className="py-1 text-right">Sueltas</th>
-              <th className="py-1 text-right">Precio / prenda</th>
+              <th className="py-1 text-right">Docena $us</th>
               <th />
             </tr>
           </thead>
@@ -601,13 +623,18 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
           </tbody>
         </table>
       )}
-      <div className="mt-3">
-        <label className="mb-1 block text-sm font-medium">Notas</label>
-        <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="opcional" className={claseInput} />
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <CampoTasa valor={tasa.valor} onCambiar={tasa.setTexto} />
+        <div>
+          <label className="mb-1 block text-sm font-medium">Notas</label>
+          <input value={notas} onChange={(e) => setNotas(e.target.value)} placeholder="opcional" className={claseInput} />
+        </div>
       </div>
       {total > 0 && (
         <p className="mt-3 text-sm text-gray-600">
-          Total del despacho <span className="mono font-semibold">{bs(total)}</span> · queda por cobrar al cliente
+          Total del despacho <span className="mono font-semibold">{usd(total)}</span>
+          {tasa.tasa != null && <span className="mono text-gray-500"> (= {bs(usdABs(total, tasa.tasa))})</span>} · queda por
+          cobrar al cliente
         </p>
       )}
       <PieModal onCerrar={onCerrar} onGuardar={() => void onGuardar()} texto="Registrar despacho" error={error} pendiente={mutar.isPending} />
@@ -634,7 +661,8 @@ function CobrosTab() {
             <tr className={TABLA.filaCabecera}>
               <th className="px-3 py-2.5">Fecha</th>
               <th className="px-3 py-2.5">Cliente</th>
-              <th className="px-3 py-2.5 text-right">Monto</th>
+              <th className="px-3 py-2.5 text-right">Cobrado</th>
+              <th className="px-3 py-2.5 text-right">Equivale a</th>
               <th className="px-3 py-2.5">Nota</th>
               <th className="px-3 py-2.5" />
             </tr>
@@ -642,7 +670,7 @@ function CobrosTab() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-500">
+                <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
                   Cargando…
                 </td>
               </tr>
@@ -651,7 +679,13 @@ function CobrosTab() {
               <tr key={c.id} className={TABLA.fila}>
                 <td className="px-3 py-2 whitespace-nowrap text-gray-600">{fechaCorta(c.fecha)}</td>
                 <td className="max-w-[200px] px-3 py-2 font-medium">{c.cliente.nombre}</td>
-                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap text-ok">{bs(c.monto)}</td>
+                <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap text-ok">
+                  {c.moneda === 'USD' ? usd(c.monto) : bs(c.monto)}
+                </td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-500">
+                  {c.moneda === 'USD' ? bs(c.bs) : usd(c.usd)}
+                  <div className="text-[11px] text-gray-400">a {tasaTexto(c.tasaCambio)}</div>
+                </td>
                 <td className="max-w-[260px] px-3 py-2 text-xs text-gray-600">{c.nota ?? '—'}</td>
                 <td className="px-3 py-2 text-right">
                   <button onClick={() => mutar.mutate({ tipo: 'quitarCobro', id: c.id })} className="text-[13px] font-medium text-error hover:underline">
@@ -662,7 +696,7 @@ function CobrosTab() {
             ))}
             {cobros?.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-gray-500">
+                <td colSpan={6} className="px-5 py-10 text-center text-gray-500">
                   Todavía no hay cobros.
                 </td>
               </tr>
@@ -678,15 +712,29 @@ function CobrosTab() {
 export function ModalCobro({ onCerrar, clienteId = '' }: { onCerrar: () => void; clienteId?: string }) {
   const { data: clientes } = useClientes();
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ clienteId, fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
+  const [v, setV] = useState({
+    clienteId,
+    fecha: hoyLocalISO(),
+    moneda: 'USD' as Moneda,
+    monto: '',
+    nota: '',
+    caja: 'efectivo' as CajaBs,
+  });
   const [error, setError] = useState<string | null>(null);
+  const tasa = useTasa();
   const cliente = clientes?.find((c) => c.id === v.clienteId);
+  const enUsd = v.moneda === 'USD';
+  const monto = PATRON_BS.test(v.monto.trim()) ? aCent(v.monto) : null;
   const onGuardar = async () => {
     setError(null);
     if (!v.clienteId) return setError('Elegí el cliente');
-    if (!PATRON_BS.test(v.monto.trim()) || aCent(v.monto) <= 0) return setError('Monto inválido (ej. 1500)');
+    if (monto == null || monto <= 0) return setError('Monto inválido (ej. 1500)');
+    if (tasa.tasa == null) return setError('Tipo de cambio inválido (ej. 6.96)');
     try {
-      await mutar.mutateAsync({ tipo: 'crearCobro', input: { clienteId: v.clienteId, fecha: v.fecha, monto: aCent(v.monto), nota: v.nota, caja: v.caja } });
+      await mutar.mutateAsync({
+        tipo: 'crearCobro',
+        input: { clienteId: v.clienteId, fecha: v.fecha, moneda: v.moneda, monto, tasaCambio: tasa.tasa, nota: v.nota, caja: v.caja },
+      });
       onCerrar();
     } catch (e) {
       setError(mensaje(e));
@@ -699,7 +747,23 @@ export function ModalCobro({ onCerrar, clienteId = '' }: { onCerrar: () => void;
         <div>
           <label className="mb-1 block text-sm font-medium">Cliente</label>
           <SelectorCliente valor={v.clienteId} onCambiar={(id) => setV({ ...v, clienteId: id })} />
-          {cliente && <p className="mt-1 text-xs text-gray-500">Te debe {bs(cliente.porCobrar)}</p>}
+          {cliente && <p className="mt-1 text-xs text-gray-500">Te debe {usd(cliente.porCobrarUsd)}</p>}
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">¿En qué te pagó?</label>
+          <div className="flex gap-2">
+            {(['USD', 'BOB'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setV({ ...v, moneda: m })}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                  v.moneda === m ? 'border-acento bg-[rgba(47,111,224,0.08)] font-semibold text-acento' : 'border-gray-300'
+                }`}
+              >
+                {m === 'USD' ? '💵 Dólares ($us)' : 'Bolivianos (Bs)'}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -707,15 +771,27 @@ export function ModalCobro({ onCerrar, clienteId = '' }: { onCerrar: () => void;
             <input type="date" value={v.fecha} onChange={(e) => setV({ ...v, fecha: e.target.value })} className={claseInput} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Monto (Bs)</label>
+            <label className="mb-1 block text-sm font-medium">Monto ({enUsd ? '$us' : 'Bs'})</label>
             <input value={v.monto} onChange={(e) => setV({ ...v, monto: e.target.value })} inputMode="decimal" className={`mono ${claseInput}`} />
           </div>
         </div>
+        <CampoTasa valor={tasa.valor} onCambiar={tasa.setTexto} />
+        {monto != null && monto > 0 && tasa.tasa != null && (
+          <p className="text-sm text-gray-600">
+            Equivale a{' '}
+            <span className="mono font-semibold">{enUsd ? bs(usdABs(monto, tasa.tasa)) : usd(bsAUsd(monto, tasa.tasa))}</span>
+            {!enUsd && <span> · se descuenta eso de lo que te debe</span>}
+          </p>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium">Nota</label>
           <input value={v.nota} onChange={(e) => setV({ ...v, nota: e.target.value })} placeholder="opcional" className={claseInput} />
         </div>
-        <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Entró a" />
+        {enUsd ? (
+          <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">Entra a la caja de dólares.</p>
+        ) : (
+          <SelectorCaja valor={v.caja} onCambiar={(caja) => setV({ ...v, caja })} etiqueta="Entró a" />
+        )}
       </div>
       <PieModal onCerrar={onCerrar} onGuardar={() => void onGuardar()} texto="Registrar cobro" error={error} pendiente={mutar.isPending} />
     </Modal>
@@ -743,9 +819,9 @@ function ClientesTab() {
               <th className="px-3 py-2.5">Cliente</th>
               <th className="px-3 py-2.5">Celular</th>
               <th className="px-3 py-2.5 text-right">Plazo</th>
-              <th className="px-3 py-2.5 text-right">Despachado</th>
-              <th className="px-3 py-2.5 text-right">Cobrado</th>
-              <th className="px-3 py-2.5 text-right">Te debe</th>
+              <th className="px-3 py-2.5 text-right">Despachado $us</th>
+              <th className="px-3 py-2.5 text-right">Cobrado $us</th>
+              <th className="px-3 py-2.5 text-right">Te debe $us</th>
               <th className="px-3 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
@@ -767,10 +843,10 @@ function ClientesTab() {
                 <td className="px-3 py-2 text-right whitespace-nowrap text-gray-600">
                   {c.plazoDias === 0 ? 'contado' : `${c.plazoDias} días`}
                 </td>
-                <td className="mono px-3 py-2 text-right whitespace-nowrap">{bs(c.despachado)}</td>
-                <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(c.cobrado)}</td>
-                <td className={`mono px-3 py-2 text-right font-semibold whitespace-nowrap ${c.porCobrar > 0 ? 'text-acento' : 'text-gray-400'}`}>
-                  {bs(c.porCobrar)}
+                <td className="mono px-3 py-2 text-right whitespace-nowrap">{usd(c.despachadoUsd)}</td>
+                <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{usd(c.cobradoUsd)}</td>
+                <td className={`mono px-3 py-2 text-right font-semibold whitespace-nowrap ${c.porCobrarUsd > 0 ? 'text-acento' : 'text-gray-400'}`}>
+                  {usd(c.porCobrarUsd)}
                 </td>
                 <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
                   <button onClick={() => setModal(c)} className="mr-3 text-acento hover:underline">

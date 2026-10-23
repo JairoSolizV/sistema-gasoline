@@ -7,6 +7,7 @@ import {
   aBolivianos,
   docenaEnDolares,
   CANTIDAD_ESCALA,
+  prendaBsDeDocenaUsd,
   consumoTela,
   costoDeCantidad,
   costoFicha,
@@ -212,15 +213,21 @@ export function calcularFicha(
     margen,
   });
 
+  // con precio fijo de la docena en $us, el precio por prenda en Bs sale de él
+  // al último tipo de cambio (docs/PLAN_DOLARES.md); si no, costo + margen
+  const fijo = f.precioDocenaUsd;
+  const precioVenta = fijo != null ? prendaBsDeDocenaUsd(fijo, config.tasaCambioUsd) : c.precioVenta;
+
   return {
     id: f.id,
     codigo: f.codigo,
     nombre: f.nombre,
     modelo: f.modelo && { id: f.modelo.id, nombre: f.modelo.nombre },
     total: c.total,
-    precioVenta: c.precioVenta,
+    precioVenta,
     costoDocenaUsd: docenaEnDolares(c.total, config.tasaCambioUsd),
-    ventaDocenaUsd: docenaEnDolares(c.precioVenta, config.tasaCambioUsd),
+    ventaDocenaUsd: fijo ?? docenaEnDolares(c.precioVenta, config.tasaCambioUsd),
+    precioDocenaFijo: fijo != null,
     incompleto: c.incompleto,
     actualizadoEn: f.actualizadoEn.toISOString(),
     manoDeObraManual: f.manoDeObra,
@@ -248,6 +255,7 @@ const aResumen = (d: FichaCostoDetalleDTO): FichaCostoResumenDTO => ({
   precioVenta: d.precioVenta,
   costoDocenaUsd: d.costoDocenaUsd,
   ventaDocenaUsd: d.ventaDocenaUsd,
+  precioDocenaFijo: d.precioDocenaFijo,
   incompleto: d.incompleto,
   actualizadoEn: d.actualizadoEn,
 });
@@ -320,7 +328,8 @@ export const costosService = {
       precioTotal: enDolares ? aBolivianos(input.montoUsd!, input.tasaCambio!) : input.precioTotal!,
       codigoCorte: input.codigoCorte ?? null,
       condicion: input.condicion,
-      caja: input.caja,
+      // al contado en $us sale de la caja de dólares
+      caja: enDolares && input.condicion === 'contado' ? 'dolares' : input.caja,
       vence: input.condicion === 'credito' && input.vence ? diaADate(input.vence) : null,
       notas: input.notas ?? null,
     });
@@ -328,7 +337,11 @@ export const costosService = {
   },
 
   async editarCompra(id: string, input: EditarCompraInput): Promise<CompraDTO> {
-    if (!(await costosRepository.obtenerCompra(id))) throw new AppError('NO_ENCONTRADO', 'Compra no encontrada', 404);
+    const actual = await costosRepository.obtenerCompra(id);
+    if (!actual) throw new AppError('NO_ENCONTRADO', 'Compra no encontrada', 404);
+    if (input.caja === 'dolares' && actual.moneda !== 'USD') {
+      throw new AppError('VALIDACION', 'Una compra en bolivianos no sale de la caja de dólares', 400);
+    }
     const { vence, ...resto } = input;
     return aCompraDTO(
       await costosRepository.actualizarCompra(id, {
@@ -527,6 +540,7 @@ async function guardar(id: string | null, input: FichaCostoInput): Promise<strin
       empaque: vinculada ? null : (input.empaque ?? null),
       servicioCorteInterno: input.servicioCorteInterno,
       margen: input.margen ?? null,
+      precioDocenaUsd: input.precioDocenaUsd ?? null,
       notas: input.notas ?? null,
     },
     input.lineas.map((l, i) => ({

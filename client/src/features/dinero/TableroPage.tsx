@@ -6,9 +6,11 @@ import { MESES } from '../../lib/meses';
 
 // Tablero de dinero (docs/PLAN_TABLERO_DINERO.md): dónde está la plata del
 // taller hoy, etapa por etapa, lo que tenés frente a lo que debés y el
-// resultado del mes con la cuota del banco aparte. Solo consulta.
+// resultado del mes con la cuota del banco aparte. Solo consulta. Las ventas
+// van en $us y en Bs (docs/PLAN_DOLARES.md).
 
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const usd = (c: number) => `$us ${formatBs(c)}`;
 
 type ClaveEtapa = 'enPuerta' | 'enProduccion' | 'enServicios' | 'deposito';
 const ETAPAS: { clave: ClaveEtapa; titulo: string; ayuda: string; falta: string }[] = [
@@ -67,15 +69,16 @@ export function TableroPage() {
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-acento"
             >
               <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">Por cobrar</div>
-              <div className="mono mt-1 text-xl font-semibold text-acento">{bs(t.porCobrar.total)}</div>
+              <div className="mono mt-1 text-xl font-semibold text-acento">{usd(t.porCobrar.totalUsd)}</div>
+              <div className="mono text-xs text-gray-500">≈ {bs(t.porCobrar.total)}</div>
               <div className="mt-0.5 text-[11px] text-gray-400">
-                {t.porCobrar.clientes.filter((c) => c.monto > 0).length} cliente(s) te deben
+                {t.porCobrar.clientes.filter((c) => c.montoUsd > 0).length} cliente(s) te deben
               </div>
               <ul className="mt-2 space-y-0.5 text-xs text-gray-600">
                 {t.porCobrar.clientes.slice(0, 4).map((c) => (
                   <li key={c.id} className="flex justify-between gap-2">
                     <span className="truncate">{c.nombre}</span>
-                    <span className="mono">{formatBs(c.monto)}</span>
+                    <span className="mono">{usd(c.montoUsd)}</span>
                   </li>
                 ))}
               </ul>
@@ -135,7 +138,10 @@ function TarjetaEtapa({
         </div>
         <div className="flex justify-between gap-2">
           <dt className="text-gray-500">Vale</dt>
-          <dd className="mono font-semibold text-ok">{bs(etapa.venta)}</dd>
+          <dd className="mono text-right font-semibold text-ok">
+            {usd(etapa.ventaUsd)}
+            <div className="text-[11px] font-normal text-gray-500">≈ {bs(etapa.venta)}</div>
+          </dd>
         </div>
         {etapa.sinPrecio > 0 && (
           <div className="text-right text-[11px] text-amber-700">
@@ -181,7 +187,13 @@ function DetalleEtapa({ etapa }: { etapa: EtapaDineroDTO }) {
               <td className="mono px-3 py-1.5 text-right">{i.prendas}</td>
               <td className="mono px-3 py-1.5 text-right whitespace-nowrap">{bs(i.costo)}</td>
               <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-ok">
-                {i.venta != null ? bs(i.venta) : <span className="text-gray-400">sin precio</span>}
+                {i.ventaUsd != null && i.venta != null ? (
+                  <>
+                    {usd(i.ventaUsd)} <span className="text-xs text-gray-500">≈ {bs(i.venta)}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">sin precio</span>
+                )}
               </td>
               <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-amber-700">
                 {i.faltaPagar > 0 ? bs(i.faltaPagar) : '—'}
@@ -201,14 +213,33 @@ function DetalleEtapa({ etapa }: { etapa: EtapaDineroDTO }) {
   );
 }
 
-function Fila({ etiqueta, monto, ayuda, a }: { etiqueta: string; monto: number; ayuda?: string; a?: string }) {
+function Fila({
+  etiqueta,
+  monto,
+  ayuda,
+  a,
+  montoUsd,
+}: {
+  etiqueta: string;
+  monto: number;
+  ayuda?: string;
+  a?: string;
+  montoUsd?: number; // lo que es en dólares: se muestra arriba y su equivalente en Bs abajo
+}) {
   const texto = (
     <>
       <div>
         <div className="text-sm">{etiqueta}</div>
         {ayuda && <div className="text-[11px] text-gray-400">{ayuda}</div>}
       </div>
-      <div className="mono text-sm font-semibold whitespace-nowrap">{bs(monto)}</div>
+      {montoUsd != null ? (
+        <div className="mono text-right text-sm font-semibold whitespace-nowrap">
+          {usd(montoUsd)}
+          <div className="text-[11px] font-normal text-gray-500">≈ {bs(monto)}</div>
+        </div>
+      ) : (
+        <div className="mono text-sm font-semibold whitespace-nowrap">{bs(monto)}</div>
+      )}
     </>
   );
   const clase = 'flex items-start justify-between gap-4 border-b border-gray-100 px-4 py-2 last:border-0';
@@ -237,7 +268,7 @@ function LoQueTenes({ t }: { t: TableroDTO }) {
       <Fila etiqueta="En producción" monto={t.enProduccion.costo} ayuda="cortes abiertos, a costo" />
       <Fila etiqueta="En servicios externos" monto={t.enServicios.costo} ayuda="cortes cerrados con prendas afuera" />
       <Fila etiqueta="Listo para despachar" monto={t.deposito.costo} ayuda="depósito, a costo" />
-      <Fila etiqueta="Por cobrar a clientes" monto={t.porCobrar.total} a="/cuentas-por-cobrar" />
+      <Fila etiqueta="Por cobrar a clientes" monto={t.porCobrar.total} montoUsd={t.porCobrar.totalUsd} a="/cuentas-por-cobrar" />
       <Fila
         etiqueta="Anticipos adelantados a operarios"
         monto={t.anticiposAdelantados}
@@ -257,7 +288,14 @@ function LoQueDebes({ t }: { t: TableroDTO }) {
         <span className="mono font-semibold text-error">{bs(d.total)}</span>
       </div>
       {d.proveedores.lista.map((p) => (
-        <Fila key={p.proveedor} etiqueta={p.proveedor} monto={p.monto} ayuda="compras a crédito − pagos" a="/compras?tab=proveedores" />
+        <Fila
+          key={`${p.proveedor}|${p.moneda}`}
+          etiqueta={p.proveedor}
+          monto={p.montoBs}
+          montoUsd={p.moneda === 'USD' ? p.monto : undefined}
+          ayuda="compras a crédito − pagos"
+          a="/compras?tab=proveedores"
+        />
       ))}
       {d.proveedores.lista.length === 0 && (
         <Fila etiqueta="Proveedores" monto={0} ayuda="marcá las compras a crédito en Compras" a="/compras?tab=proveedores" />
@@ -325,12 +363,12 @@ function ResultadoMes({ t }: { t: TableroDTO }) {
           Resultado de {MESES[t.mes - 1]} {t.anio}
         </div>
         <div className="text-xs text-gray-500">
-          Según lo despachado en el mes ({r.prendasDespachadas.toLocaleString('es-BO')} prendas). Entró en cobros:{' '}
-          <span className="mono font-semibold">{bs(r.cobrado)}</span>
+          Según lo despachado en el mes ({r.prendasDespachadas.toLocaleString('es-BO')} prendas, {usd(r.ventasUsd)}). Entró
+          en cobros: <span className="mono font-semibold">{usd(r.cobradoUsd)}</span> ({bs(r.cobrado)})
         </div>
       </div>
       <div className="py-1">
-        {linea('Ventas (lo despachado)', r.ventas, '')}
+        {linea('Ventas (lo despachado, al cambio de cada día)', r.ventas, '')}
         {linea('Costo de lo vendido', r.costoVendido, '−')}
         {linea('Margen', r.margen, '=', true)}
         {linea('Costos fijos del taller (sueldos, servicios, máquinas…)', r.gastosFijos, '−')}

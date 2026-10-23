@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import {
   aCentavos,
+  bsAUsd,
   CAJAS,
   ETIQUETA_CAJA,
   formatBs,
+  MONEDA_CAJA,
   ORIGENES_CAJA,
+  usdABs,
   type Caja,
   type CajaMesDTO,
   type CategoriaCajaDTO,
@@ -15,18 +18,23 @@ import {
 import { useCaja, useMutacionCaja } from '../../api/caja';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { CampoTasa, useTasa } from '../../components/CampoTasa';
 import { SelectorCaja } from '../../components/SelectorCaja';
 import { TABLA } from '../../components/tabla';
 import { hoyLocalISO } from '../../lib/fechas';
 import { MESES } from '../../lib/meses';
 
-// Caja (docs/PLAN_CAJA.md): efectivo y banco. Lo registrado en otras pantallas
-// (cobros, compras al contado, pagos a proveedores, comida, cuota del banco,
-// anticipos, cierre de mes) entra solo; acá se anota lo demás, se transfiere
-// entre cajas y se hace el arqueo.
+// Caja (docs/PLAN_CAJA.md): efectivo, banco y dólares (docs/PLAN_DOLARES.md).
+// Lo registrado en otras pantallas (cobros, compras al contado, pagos a
+// proveedores, comida, cuota del banco, anticipos, cierre de mes) entra solo;
+// acá se anota lo demás, se transfiere o se cambian dólares y se hace el arqueo.
+// Cada caja va en su moneda.
 
 const PATRON_BS = /^-?\d+([.,]\d{1,2})?$/;
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+/** Monto en la moneda de la caja. */
+const plata = (c: number, caja: Caja) => (MONEDA_CAJA[caja] === 'USD' ? `$us ${formatBs(c)}` : bs(c));
+const simbolo = (caja: Caja) => (MONEDA_CAJA[caja] === 'USD' ? '$us' : 'Bs');
 const aCent = (s: string) => {
   const t = s.trim().replace(',', '.');
   return t.startsWith('-') ? -aCentavos(t.slice(1)) : aCentavos(t);
@@ -51,7 +59,7 @@ const ORIGEN: Record<MovimientoCajaDTO['origen'], string> = {
 };
 
 type ModalCaja =
-  | { tipo: 'movimiento'; clase: 'ingreso' | 'egreso' | 'transferencia' }
+  | { tipo: 'movimiento'; clase: 'ingreso' | 'egreso' | 'transferencia'; cambio?: boolean }
   | { tipo: 'arqueo'; caja: Caja; saldo: number }
   | { tipo: 'inicio'; caja: Caja; actual: ResumenCajaDTO }
   | { tipo: 'categorias' }
@@ -78,12 +86,19 @@ export function CajaPage() {
         <div>
           <h1 className="text-2xl font-semibold">Caja</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Cuánta plata tenés en efectivo y en el banco, y en qué se va. Lo que registrás en otras pantallas entra solo.
+            Cuánta plata tenés en efectivo, en el banco y en dólares, y en qué se va. Lo que registrás en otras pantallas
+            entra solo.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setModal({ tipo: 'categorias' })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50">
             Categorías
+          </button>
+          <button
+            onClick={() => setModal({ tipo: 'movimiento', clase: 'transferencia', cambio: true })}
+            className="rounded-lg border border-ok px-3 py-2 text-sm font-semibold text-ok hover:bg-ok-suave"
+          >
+            💵 Cambiar dólares
           </button>
           <button onClick={() => setModal({ tipo: 'movimiento', clase: 'transferencia' })} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50">
             Transferir
@@ -123,7 +138,7 @@ export function CajaPage() {
               </button>
             </div>
           ))}
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {d.cajas
               .filter((c) => c.configurada)
               .map((c) => (
@@ -147,7 +162,7 @@ export function CajaPage() {
       )}
 
       {modal?.tipo === 'movimiento' && d && (
-        <ModalMovimiento clase={modal.clase} categorias={d.categorias} onCerrar={() => setModal(null)} />
+        <ModalMovimiento clase={modal.clase} cambio={modal.cambio} categorias={d.categorias} onCerrar={() => setModal(null)} />
       )}
       {modal?.tipo === 'arqueo' && <ModalArqueo caja={modal.caja} saldo={modal.saldo} onCerrar={() => setModal(null)} />}
       {modal?.tipo === 'inicio' && <ModalInicio caja={modal.caja} actual={modal.actual} onCerrar={() => setModal(null)} />}
@@ -160,7 +175,7 @@ function TarjetaCaja({ c, onArqueo, onInicio }: { c: ResumenCajaDTO; onArqueo: (
   const fila = (etiqueta: string, monto: number, clase = '') => (
     <div className="flex justify-between gap-2">
       <span className="text-gray-500">{etiqueta}</span>
-      <span className={`mono ${clase}`}>{bs(monto)}</span>
+      <span className={`mono ${clase}`}>{plata(monto, c.caja)}</span>
     </div>
   );
   return (
@@ -171,7 +186,7 @@ function TarjetaCaja({ c, onArqueo, onInicio }: { c: ResumenCajaDTO; onArqueo: (
           Contar la plata (arqueo)
         </button>
       </div>
-      <div className={`mono mt-1 text-2xl font-semibold ${c.saldoFinal < 0 ? 'text-error' : ''}`}>{bs(c.saldoFinal)}</div>
+      <div className={`mono mt-1 text-2xl font-semibold ${c.saldoFinal < 0 ? 'text-error' : ''}`}>{plata(c.saldoFinal, c.caja)}</div>
       <div className="mt-2 space-y-0.5 text-sm">
         {fila('Al empezar el mes', c.saldoInicioMes)}
         {fila('+ Entró', c.ingresos, 'text-ok')}
@@ -188,7 +203,7 @@ function TarjetaCaja({ c, onArqueo, onInicio }: { c: ResumenCajaDTO; onArqueo: (
           : 'Sin arqueos todavía'}
         {' · '}
         <button onClick={onInicio} className="hover:underline">
-          desde {c.desde && fechaCorta(c.desde)} con {bs(c.saldoInicial)}
+          desde {c.desde && fechaCorta(c.desde)} con {plata(c.saldoInicial, c.caja)}
         </button>
       </div>
       {c.saldoFinal < 0 && (
@@ -207,7 +222,9 @@ function PorCategoria({ d }: { d: CajaMesDTO }) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm font-semibold">{titulo}</span>
+          <span className="text-sm font-semibold">
+            {titulo} <span className="text-xs font-normal text-gray-400">(todo en Bs)</span>
+          </span>
           <span className="mono text-sm font-semibold">{bs(total)}</span>
         </div>
         <div className="mt-2 space-y-1.5">
@@ -263,7 +280,7 @@ function Movimientos({
         <h2 className="text-sm font-semibold text-gray-700">Movimientos del mes ({lista.length})</h2>
         <div className="flex gap-2">
           <select value={filtroCaja} onChange={(e) => onFiltroCaja(e.target.value as Caja | '')} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm">
-            <option value="">Las dos cajas</option>
+            <option value="">Todas las cajas</option>
             {CAJAS.map((c) => (
               <option key={c} value={c}>
                 {ETIQUETA_CAJA[c]}
@@ -321,8 +338,8 @@ function Movimientos({
                   {m.descripcion}
                   <span className="ml-1 text-[11px] text-gray-400">· {ORIGEN[m.origen]}</span>
                 </td>
-                <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-ok">{m.tipo === 'ingreso' ? bs(m.monto) : ''}</td>
-                <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-error">{m.tipo === 'egreso' ? bs(m.monto) : ''}</td>
+                <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-ok">{m.tipo === 'ingreso' ? plata(m.monto, m.caja) : ''}</td>
+                <td className="mono px-3 py-1.5 text-right whitespace-nowrap text-error">{m.tipo === 'egreso' ? plata(m.monto, m.caja) : ''}</td>
                 <td className="px-3 py-1.5 text-right text-[13px] font-medium">
                   {(m.origen === 'manual' || m.origen === 'transferencia' || m.origen === 'arqueo') &&
                     !m.id.endsWith(':entra') && (
@@ -365,29 +382,42 @@ function Pie({ onCerrar, onGuardar, texto, error, pendiente }: { onCerrar: () =>
 
 function ModalMovimiento({
   clase,
+  cambio = false,
   categorias,
   onCerrar,
 }: {
   clase: 'ingreso' | 'egreso' | 'transferencia';
+  cambio?: boolean; // "cambiar dólares": de la caja de dólares al efectivo
   categorias: CategoriaCajaDTO[];
   onCerrar: () => void;
 }) {
   const mutar = useMutacionCaja();
   const transferencia = clase === 'transferencia';
   const [v, setV] = useState({
-    caja: 'efectivo' as Caja,
-    cajaDestino: 'banco' as Caja,
+    caja: (cambio ? 'dolares' : 'efectivo') as Caja,
+    cajaDestino: (cambio ? 'efectivo' : 'banco') as Caja,
     fecha: hoyLocalISO(),
     monto: '',
     categoriaId: '',
-    descripcion: transferencia ? 'Depósito al banco' : '',
+    descripcion: cambio ? 'Cambio de dólares' : transferencia ? 'Depósito al banco' : '',
   });
   const [error, setError] = useState<string | null>(null);
+  const tasa = useTasa();
+  // entre la caja de dólares y una de Bs: se pide el tipo de cambio del día
+  const esCambio = transferencia && MONEDA_CAJA[v.caja] !== MONEDA_CAJA[v.cajaDestino];
+  const monto = PATRON_BS.test(v.monto.trim()) ? aCent(v.monto) : null;
+  const entra =
+    esCambio && monto != null && monto > 0 && tasa.tasa != null
+      ? v.caja === 'dolares'
+        ? usdABs(monto, tasa.tasa)
+        : bsAUsd(monto, tasa.tasa)
+      : null;
   const opciones = categorias.filter((c) => c.tipo === clase && c.activo);
   const onGuardar = async () => {
     setError(null);
-    if (!PATRON_BS.test(v.monto.trim()) || aCent(v.monto) <= 0) return setError('Monto inválido (ej. 1250)');
+    if (monto == null || monto <= 0) return setError('Monto inválido (ej. 1250)');
     if (!transferencia && !v.categoriaId) return setError('Elegí la categoría');
+    if (esCambio && tasa.tasa == null) return setError('Tipo de cambio inválido (ej. 6.96)');
     if (!v.descripcion.trim()) return setError('Describí el movimiento');
     try {
       await mutar.mutateAsync({
@@ -396,8 +426,9 @@ function ModalMovimiento({
           tipo: clase,
           caja: v.caja,
           ...(transferencia ? { cajaDestino: v.cajaDestino } : { categoriaId: v.categoriaId }),
+          ...(esCambio ? { tasaCambio: tasa.tasa! } : {}),
           fecha: v.fecha,
-          monto: aCent(v.monto),
+          monto,
           descripcion: v.descripcion,
         },
       });
@@ -406,7 +437,9 @@ function ModalMovimiento({
       setError(mensaje(e));
     }
   };
-  const titulo = { ingreso: 'Anotar ingreso', egreso: 'Anotar gasto', transferencia: 'Transferir entre cajas' }[clase];
+  const titulo = cambio
+    ? 'Cambiar dólares'
+    : { ingreso: 'Anotar ingreso', egreso: 'Anotar gasto', transferencia: 'Transferir entre cajas' }[clase];
   return (
     <Modal onCerrar={onCerrar}>
       <h2 className="text-lg font-semibold">{titulo}</h2>
@@ -416,14 +449,20 @@ function ModalMovimiento({
           solos: no los anotes acá.
         </p>
       )}
+      {cambio && (
+        <p className="mt-1 text-xs text-gray-500">
+          Sacás dólares de la caja de dólares y entran bolivianos al tipo de cambio del día.
+        </p>
+      )}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <SelectorCaja
           etiqueta={transferencia ? 'Sale de' : clase === 'ingreso' ? 'Entra a' : 'Sale de'}
           valor={v.caja}
+          cajas={CAJAS}
           onCambiar={(caja) => setV({ ...v, caja, cajaDestino: caja === 'efectivo' ? 'banco' : 'efectivo' })}
         />
         {transferencia ? (
-          <SelectorCaja etiqueta="Entra a" valor={v.cajaDestino} onCambiar={(cajaDestino) => setV({ ...v, cajaDestino })} />
+          <SelectorCaja etiqueta="Entra a" valor={v.cajaDestino} cajas={CAJAS} onCambiar={(cajaDestino) => setV({ ...v, cajaDestino })} />
         ) : (
           <div>
             <label className="mb-1 block text-sm font-medium">Categoría</label>
@@ -442,9 +481,20 @@ function ModalMovimiento({
           <input type="date" value={v.fecha} onChange={(e) => setV({ ...v, fecha: e.target.value })} className={claseInput} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Monto (Bs)</label>
+          <label className="mb-1 block text-sm font-medium">
+            {esCambio ? 'Sale' : 'Monto'} ({simbolo(v.caja)})
+          </label>
           <input value={v.monto} onChange={(e) => setV({ ...v, monto: e.target.value })} inputMode="decimal" className={`mono ${claseInput}`} />
         </div>
+        {esCambio && (
+          <>
+            <CampoTasa valor={tasa.valor} onCambiar={tasa.setTexto} />
+            <div className="self-end pb-2 text-sm text-gray-600">
+              Entra{' '}
+              <span className="mono font-semibold text-ok">{entra != null ? plata(entra, v.cajaDestino) : '—'}</span>
+            </div>
+          </>
+        )}
         <div className="col-span-2">
           <label className="mb-1 block text-sm font-medium">Detalle</label>
           <input
@@ -486,13 +536,13 @@ function ModalArqueo({ caja, saldo, onCerrar }: { caja: Caja; saldo: number; onC
       {resultado ? (
         <>
           <p className="mt-3 text-sm text-gray-700">
-            El sistema decía <span className="mono font-semibold">{bs(resultado.sistema)}</span>.{' '}
+            El sistema decía <span className="mono font-semibold">{plata(resultado.sistema, caja)}</span>.{' '}
             {resultado.diferencia === 0 ? (
               <strong className="text-ok">¡Cuadró exacto!</strong>
             ) : (
               <>
                 Quedó anotado un <strong className={resultado.diferencia > 0 ? 'text-ok' : 'text-error'}>
-                  {resultado.diferencia > 0 ? 'sobrante' : 'faltante'} de {bs(Math.abs(resultado.diferencia))}
+                  {resultado.diferencia > 0 ? 'sobrante' : 'faltante'} de {plata(Math.abs(resultado.diferencia), caja)}
                 </strong>
                 . Si encontrás el motivo (un gasto sin anotar, algo en la caja equivocada), corregilo y quitá el arqueo.
               </>
@@ -507,7 +557,8 @@ function ModalArqueo({ caja, saldo, onCerrar }: { caja: Caja; saldo: number; onC
       ) : (
         <>
           <p className="mt-1 text-xs text-gray-500">
-            Contá la plata de la caja y escribí cuánto hay. Hoy el sistema dice {bs(saldo)} al fin del mes que estás viendo.
+            Contá la plata de la caja y escribí cuánto hay. Hoy el sistema dice {plata(saldo, caja)} al fin del mes que estás
+            viendo.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
@@ -515,7 +566,7 @@ function ModalArqueo({ caja, saldo, onCerrar }: { caja: Caja; saldo: number; onC
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={claseInput} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Contaste (Bs)</label>
+              <label className="mb-1 block text-sm font-medium">Contaste ({simbolo(caja)})</label>
               <input value={contado} onChange={(e) => setContado(e.target.value)} inputMode="decimal" className={`mono ${claseInput}`} />
             </div>
             <div className="col-span-2">
@@ -558,7 +609,7 @@ function ModalInicio({ caja, actual, onCerrar }: { caja: Caja; actual: ResumenCa
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className={claseInput} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium">Saldo inicial (Bs)</label>
+          <label className="mb-1 block text-sm font-medium">Saldo inicial ({simbolo(caja)})</label>
           <input value={saldo} onChange={(e) => setSaldo(e.target.value)} inputMode="decimal" className={`mono ${claseInput}`} />
         </div>
       </div>

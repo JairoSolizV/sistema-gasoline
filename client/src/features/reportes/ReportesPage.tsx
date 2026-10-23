@@ -149,20 +149,40 @@ function Ventas({ desde, hasta }: { desde: string; hasta: string }) {
   const { data: r, isLoading } = useReporte<VentasReporteDTO>('ventas', desde, hasta);
   if (!r) return <Cargando cargando={isLoading} />;
   const t = r.meses.reduce(
-    (a, m) => ({ prendas: a.prendas + m.prendas, vendido: a.vendido + m.vendido, ganancia: a.ganancia + m.ganancia, cobrado: a.cobrado + m.cobrado }),
-    { prendas: 0, vendido: 0, ganancia: 0, cobrado: 0 },
+    (a, m) => ({
+      prendas: a.prendas + m.prendas,
+      vendidoUsd: a.vendidoUsd + m.vendidoUsd,
+      vendido: a.vendido + m.vendido,
+      ganancia: a.ganancia + m.ganancia,
+      cobradoUsd: a.cobradoUsd + m.cobradoUsd,
+      cobrado: a.cobrado + m.cobrado,
+    }),
+    { prendas: 0, vendidoUsd: 0, vendido: 0, ganancia: 0, cobradoUsd: 0, cobrado: 0 },
   );
   return (
     <>
-      <Seccion titulo="Mes por mes" ayuda="Vendido = lo que entregaste. Cobrado = la plata que te pagaron ese mes (puede ser de entregas anteriores).">
+      <Seccion
+        titulo="Mes por mes"
+        ayuda="Vendido = lo que entregaste. Cobrado = la plata que te pagaron ese mes (puede ser de entregas anteriores). En Bs, al cambio de cada día."
+      >
         <Tabla
-          cabeceras={[{ texto: 'Mes' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido (Bs)', derecha: true }, { texto: 'Ganancia (Bs)', derecha: true }, { texto: 'Cobrado (Bs)', derecha: true }]}
+          cabeceras={[
+            { texto: 'Mes' },
+            { texto: 'Prendas', derecha: true },
+            { texto: 'Vendido ($us)', derecha: true },
+            { texto: 'Vendido (Bs)', derecha: true },
+            { texto: 'Ganancia (Bs)', derecha: true },
+            { texto: 'Cobrado ($us)', derecha: true },
+            { texto: 'Cobrado (Bs)', derecha: true },
+          ]}
           pie={
             <tr className={filaTotal}>
               <Td>Total</Td>
               <Td derecha>{enDocenas(t.prendas)}</Td>
+              <Td derecha>{bs(t.vendidoUsd)}</Td>
               <Td derecha>{bs(t.vendido)}</Td>
               <Td derecha>{bs(t.ganancia)}</Td>
+              <Td derecha>{bs(t.cobradoUsd)}</Td>
               <Td derecha>{bs(t.cobrado)}</Td>
             </tr>
           }
@@ -172,40 +192,42 @@ function Ventas({ desde, hasta }: { desde: string; hasta: string }) {
               <Td clase="capitalize">{nombreMes(m.mes)}</Td>
               <Td derecha>{m.prendas ? enDocenas(m.prendas) : '—'}</Td>
               <Td derecha>
-                <ConBarra valor={m.vendido} max={max(r.meses.map((x) => x.vendido))} texto={bs(m.vendido)} color="#7F77DD" />
+                <ConBarra valor={m.vendidoUsd} max={max(r.meses.map((x) => x.vendidoUsd))} texto={bs(m.vendidoUsd)} color="#7F77DD" />
               </Td>
+              <Td derecha clase="text-gray-600">{bs(m.vendido)}</Td>
               <Td derecha clase={m.ganancia < 0 ? 'text-error' : 'text-ok'}>{bs(m.ganancia)}</Td>
               <Td derecha>
-                <ConBarra valor={m.cobrado} max={max(r.meses.map((x) => x.cobrado))} texto={bs(m.cobrado)} color="#639922" />
+                <ConBarra valor={m.cobradoUsd} max={max(r.meses.map((x) => x.cobradoUsd))} texto={bs(m.cobradoUsd)} color="#639922" />
               </Td>
+              <Td derecha clase="text-gray-600">{bs(m.cobrado)}</Td>
             </tr>
           ))}
         </Tabla>
       </Seccion>
-      <Seccion titulo="Por cliente" ayuda="Quién te compra más y quién te debe hoy.">
-        <Tabla cabeceras={[{ texto: 'Cliente' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido (Bs)', derecha: true }, { texto: 'Cobrado (Bs)', derecha: true }, { texto: 'Te debe hoy (Bs)', derecha: true }]}>
+      <Seccion titulo="Por cliente" ayuda="Quién te compra más y quién te debe hoy, en dólares.">
+        <Tabla cabeceras={[{ texto: 'Cliente' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido ($us)', derecha: true }, { texto: 'Cobrado ($us)', derecha: true }, { texto: 'Te debe hoy ($us)', derecha: true }]}>
           {r.clientes.map((c) => (
             <tr key={c.id} className={TABLA.fila}>
               <Td clase="max-w-[220px] font-medium">{c.nombre}</Td>
               <Td derecha>{enDocenas(c.prendas)}</Td>
               <Td derecha>
-                <ConBarra valor={c.vendido} max={max(r.clientes.map((x) => x.vendido))} texto={bs(c.vendido)} color="#7F77DD" />
+                <ConBarra valor={c.vendidoUsd} max={max(r.clientes.map((x) => x.vendidoUsd))} texto={bs(c.vendidoUsd)} color="#7F77DD" />
               </Td>
-              <Td derecha>{bs(c.cobrado)}</Td>
-              <Td derecha clase={c.debeHoy > 0 ? 'font-semibold text-acento' : 'text-gray-400'}>{bs(c.debeHoy)}</Td>
+              <Td derecha>{bs(c.cobradoUsd)}</Td>
+              <Td derecha clase={c.debeHoyUsd > 0 ? 'font-semibold text-acento' : 'text-gray-400'}>{bs(c.debeHoyUsd)}</Td>
             </tr>
           ))}
           {r.clientes.length === 0 && <Vacio columnas={5} />}
         </Tabla>
       </Seccion>
       <Seccion titulo="Por modelo" ayuda="Qué modelos se vendieron más.">
-        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido (Bs)', derecha: true }]}>
+        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido ($us)', derecha: true }]}>
           {r.modelos.map((m) => (
             <tr key={m.modelo} className={TABLA.fila}>
               <Td clase="max-w-[280px] font-medium">{m.modelo}</Td>
               <Td derecha>{enDocenas(m.prendas)}</Td>
               <Td derecha>
-                <ConBarra valor={m.vendido} max={max(r.modelos.map((x) => x.vendido))} texto={bs(m.vendido)} color="#7F77DD" />
+                <ConBarra valor={m.vendidoUsd} max={max(r.modelos.map((x) => x.vendidoUsd))} texto={bs(m.vendidoUsd)} color="#7F77DD" />
               </Td>
             </tr>
           ))}
@@ -368,11 +390,12 @@ function Ganancia({ desde, hasta }: { desde: string; hasta: string }) {
         titulo="Lo que de verdad te dejó cada modelo"
         ayuda="Con lo que entregaste en estos meses: lo vendido menos lo que costó hacer esas prendas (sin los gastos fijos del taller)."
       >
-        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido (Bs)', derecha: true }, { texto: 'Costó (Bs)', derecha: true }, { texto: 'Ganancia (Bs)', derecha: true }, { texto: 'Por prenda', derecha: true }, { texto: '% ganancia', derecha: true }]}>
+        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Prendas', derecha: true }, { texto: 'Vendido ($us)', derecha: true }, { texto: 'Vendido (Bs)', derecha: true }, { texto: 'Costó (Bs)', derecha: true }, { texto: 'Ganancia (Bs)', derecha: true }, { texto: 'Por prenda', derecha: true }, { texto: '% ganancia', derecha: true }]}>
           {r.vendidos.map((m) => (
             <tr key={m.modelo} className={TABLA.fila}>
               <Td clase="max-w-[240px] font-medium">{m.modelo}</Td>
               <Td derecha>{enDocenas(m.prendas)}</Td>
+              <Td derecha>{bs(m.vendidoUsd)}</Td>
               <Td derecha>{bs(m.vendido)}</Td>
               <Td derecha>{bs(m.costo)}</Td>
               <Td derecha clase={m.ganancia < 0 ? 'font-semibold text-error' : 'font-semibold text-ok'}>
@@ -382,17 +405,21 @@ function Ganancia({ desde, hasta }: { desde: string; hasta: string }) {
               <Td derecha>{pct(m.margen)}</Td>
             </tr>
           ))}
-          {r.vendidos.length === 0 && <Vacio columnas={7} />}
+          {r.vendidos.length === 0 && <Vacio columnas={8} />}
         </Tabla>
       </Seccion>
       <Seccion
         titulo="Lo que dejaría cada modelo hoy (según la ficha)"
-        ayuda="Precio de venta menos costo por prenda, con los precios de hoy y los gastos fijos incluidos. Sirve para comparar modelos aunque todavía no se hayan vendido."
+        ayuda="Precio de venta menos costo por prenda, con los precios de hoy y los gastos fijos incluidos. La docena fija en $us se pasa a Bs al último tipo de cambio. Sirve para comparar modelos aunque todavía no se hayan vendido."
       >
-        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Costo (Bs)', derecha: true }, { texto: 'Precio (Bs)', derecha: true }, { texto: 'Ganancia por prenda', derecha: true }, { texto: '% ganancia', derecha: true }]}>
+        <Tabla cabeceras={[{ texto: 'Modelo' }, { texto: 'Docena ($us)', derecha: true }, { texto: 'Costo (Bs)', derecha: true }, { texto: 'Precio (Bs)', derecha: true }, { texto: 'Ganancia por prenda', derecha: true }, { texto: '% ganancia', derecha: true }]}>
           {r.fichas.map((f) => (
             <tr key={f.id} className={TABLA.fila}>
               <Td clase="max-w-[280px] font-medium">{f.nombre}</Td>
+              <Td derecha clase={f.docenaFija ? 'font-semibold' : 'text-gray-500'}>
+                {bs(f.docenaUsd)}
+                {!f.docenaFija && <span className="text-[10px]"> calc.</span>}
+              </Td>
               <Td derecha>{bs(f.costo)}</Td>
               <Td derecha>{bs(f.precio)}</Td>
               <Td derecha clase={f.ganancia < 0 ? 'text-error' : 'text-ok'}>{bs(f.ganancia)}</Td>

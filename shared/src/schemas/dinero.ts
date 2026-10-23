@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
-import { cajaSchema } from './caja.js';
+import { cajaBsSchema } from './caja.js';
 
 // Tablero de dinero (docs/PLAN_TABLERO_DINERO.md): clientes, pedidos,
 // despachos, cobros y pagos a proveedores. Dinero en centavos.
@@ -10,6 +10,8 @@ const texto = (max: number) =>
 const dia = z.string().refine(esDiaValido, 'Fecha inválida (aaaa-mm-dd)');
 const monto = z.number().int().min(1, 'El monto debe ser mayor a 0').max(1_000_000_000);
 const precio = z.number().int().min(0, 'El precio no puede ser negativo').max(100_000_000);
+const tasa = z.number().int().min(1, 'Tipo de cambio inválido').max(10_000_000); // diezmilésimos
+const moneda = z.enum(['USD', 'BOB']);
 const prendas = z.number().int().min(1, 'Indicá cuántas prendas').max(1_000_000);
 
 export const ESTADOS_PEDIDO = ['pendiente', 'en_produccion', 'entregado', 'cancelado'] as const;
@@ -38,12 +40,12 @@ export const editarClienteSchema = z
   .partial()
   .refine((o) => Object.keys(o).length > 0, { message: 'Nada que actualizar' });
 
-/** Pedido: sin precio usa el precio de venta de la ficha. */
+/** Pedido: sin precio usa el de la docena en $us de la ficha. */
 export const pedidoInputSchema = z.object({
   clienteId: z.uuid('Elegí el cliente'),
   fichaId: z.uuid('Elegí el modelo (ficha de costo)'),
   prendas,
-  precioPrenda: precio.optional(),
+  precioDocenaUsd: precio.optional(), // centavos de $us por docena
   fechaEntrega: dia.optional(),
   notas: texto(200).optional(),
 });
@@ -51,7 +53,7 @@ export const pedidoInputSchema = z.object({
 export const editarPedidoSchema = z
   .object({
     prendas,
-    precioPrenda: precio,
+    precioDocenaUsd: precio,
     fechaEntrega: dia.nullable(),
     estado: z.enum(ESTADOS_PEDIDO),
     corteId: z.uuid().nullable(), // el corte con el que se produce
@@ -67,7 +69,7 @@ const lineaDespachoSchema = z
     corteId: z.uuid().optional(),
     fichaId: z.uuid().optional(),
     prendas,
-    precioPrenda: precio.optional(),
+    precioDocenaUsd: precio.optional(), // centavos de $us por docena
     detalle: texto(80).optional(), // talla y color si no va surtido
   })
   .refine((l) => (l.corteId == null) !== (l.fichaId == null), {
@@ -78,6 +80,7 @@ export const despachoInputSchema = z.object({
   clienteId: z.uuid('Elegí el cliente'),
   fecha: dia,
   vence: dia.optional(), // sin fecha: la del despacho + el plazo del cliente
+  tasaCambio: tasa.optional(), // sin tasa: la última usada
   notas: texto(200).optional(),
   lineas: z.array(lineaDespachoSchema).min(1, 'Agregá al menos una línea'),
 });
@@ -85,17 +88,20 @@ export const despachoInputSchema = z.object({
 export const cobroInputSchema = z.object({
   clienteId: z.uuid('Elegí el cliente'),
   fecha: dia,
-  monto,
+  moneda: moneda.default('USD'),
+  monto, // en su moneda
+  tasaCambio: tasa.optional(), // sin tasa: la última usada
   nota: texto(120).optional(),
-  caja: cajaSchema.default('efectivo'),
+  caja: cajaBsSchema.default('efectivo'), // solo cobros en Bs; en $us entra a la caja de dólares
 });
 
 export const pagoProveedorInputSchema = z.object({
   proveedor: z.string().trim().min(1, 'Indicá el proveedor').max(80).transform(normalizarProveedor),
   fecha: dia,
-  monto,
+  moneda: moneda.default('BOB'),
+  monto, // en su moneda
   nota: texto(120).optional(),
-  caja: cajaSchema.default('efectivo'),
+  caja: cajaBsSchema.default('efectivo'), // solo pagos en Bs; en $us sale de la caja de dólares
 });
 
 export type ClienteInput = z.infer<typeof clienteInputSchema>;

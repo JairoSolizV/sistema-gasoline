@@ -4,9 +4,12 @@ import { useCuentasPorPagar } from '../../api/dinero';
 import { TABLA } from '../../components/tabla';
 
 // Cuentas por pagar (docs/PLAN_TABLERO_DINERO.md): todo lo que debés en un
-// solo lugar, por fecha de vencimiento. Cada renglón lleva a donde se paga.
+// solo lugar, por fecha de vencimiento. Cada renglón lleva a donde se paga. Lo
+// que se debe en $us (la tela) se muestra en $us y su equivalente en Bs, al
+// último tipo de cambio, para sumar (docs/PLAN_DOLARES.md).
 
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const usd = (c: number) => `$us ${formatBs(c)}`;
 const fechaCorta = (dia: string) => dia.split('-').reverse().join('/');
 const TIPO: Record<CuentaPorPagarDTO['tipo'], string> = {
   proveedor: 'Proveedor',
@@ -43,7 +46,12 @@ export function CuentasPorPagarPage() {
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {tarjeta('Vencido', d.vencido, d.vencido > 0 ? 'text-error' : '', 'ya pasó la fecha')}
             {tarjeta('Vence esta semana', d.semana, d.semana > 0 ? 'text-amber-700' : '', 'en los próximos 7 días')}
-            {tarjeta('Total que debés', d.total, '', 'sin el resto del préstamo')}
+            {tarjeta(
+              'Total que debés',
+              d.total,
+              '',
+              d.totalUsd > 0 ? `de eso ${usd(d.totalUsd)} en dólares · sin el resto del préstamo` : 'sin el resto del préstamo',
+            )}
           </div>
           <div className={`mt-4 ${TABLA.contenedorPagina}`}>
             <table className="text-sm">
@@ -53,6 +61,7 @@ export function CuentasPorPagarPage() {
                   <th className="px-3 py-2.5">A quién</th>
                   <th className="px-3 py-2.5">Qué</th>
                   <th className="px-3 py-2.5 text-right">Monto</th>
+                  <th className="px-3 py-2.5 text-right">En Bs</th>
                   <th className="px-3 py-2.5" />
                 </tr>
               </thead>
@@ -80,7 +89,10 @@ export function CuentasPorPagarPage() {
                         <div className="text-[11px] text-gray-400">{TIPO[i.tipo]}</div>
                       </td>
                       <td className="max-w-[320px] px-3 py-2 text-gray-600">{i.detalle}</td>
-                      <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">{bs(i.monto)}</td>
+                      <td className="mono px-3 py-2 text-right font-semibold whitespace-nowrap">
+                        {i.moneda === 'USD' ? usd(i.monto) : bs(i.monto)}
+                      </td>
+                      <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(i.montoBs)}</td>
                       <td className="px-3 py-2 text-right text-[13px] font-medium whitespace-nowrap">
                         <Link to={i.enlace} className="text-acento hover:underline">
                           Pagar
@@ -91,7 +103,7 @@ export function CuentasPorPagarPage() {
                 })}
                 {d.items.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-gray-500">
+                    <td colSpan={6} className="px-5 py-10 text-center text-gray-500">
                       No debés nada pendiente. Las compras a crédito aparecen acá cuando las marcás así en Compras.
                     </td>
                   </tr>
@@ -100,7 +112,8 @@ export function CuentasPorPagarPage() {
             </table>
           </div>
           <p className="mt-3 text-xs text-gray-500">
-            A cada proveedor sus pagos le cancelan primero las compras más viejas. Servicios externos y operarios: lo que se
+            A cada proveedor sus pagos le cancelan primero las compras más viejas (los de $us, las de $us). Los dólares se
+            pasan a Bs a {String(d.tasaCambio / 10_000)}, el último tipo de cambio. Servicios externos y operarios: lo que se
             les debe del mes, se paga al cerrar el mes en Liquidación.
           </p>
         </>

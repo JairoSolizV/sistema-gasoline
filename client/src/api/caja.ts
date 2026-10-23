@@ -54,6 +54,8 @@ export function useMutacionCaja() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ejecutar,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['caja'] }),
+    // un cambio de dólares deja su tipo de cambio como el último
+    onSuccess: () =>
+      Promise.all([qc.invalidateQueries({ queryKey: ['caja'] }), qc.invalidateQueries({ queryKey: ['configuracion'] })]),
   });
 }

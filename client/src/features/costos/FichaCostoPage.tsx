@@ -3,7 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   aCentavos,
   costoFicha,
+  docenaEnDolares,
   formatBs,
+  prendaBsDeDocenaUsd,
   precioUnitario,
   type CategoriaInsumo,
   type FichaCostoDetalleDTO,
@@ -175,12 +177,14 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const [empaqueBs, setEmpaqueBs] = useState(ficha?.empaqueManual != null ? (ficha.empaqueManual / 100).toFixed(2) : '');
   const [servicio, setServicio] = useState(ficha?.servicioCorteInterno ?? true);
   const [margenPct, setMargenPct] = useState(ficha?.margenPropio != null ? String(ficha.margenPropio / 100) : '');
+  // precio fijo de la docena en $us (docs/PLAN_DOLARES.md); vacío = costo + margen
+  const [docenaUsd, setDocenaUsd] = useState(ficha?.precioDocenaFijo ? (ficha.ventaDocenaUsd / 100).toFixed(2) : '');
   const [notas, setNotas] = useState(ficha?.notas ?? '');
   const [filas, setFilas] = useState<Fila[]>(ficha?.lineas.map(aFila) ?? []);
   const [error, setError] = useState<string | null>(null);
   const [sucio, setSucio] = useState(false);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
-  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, notas, filas]);
+  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas]);
   useEffect(() => setSucio(false), []); // recién cargada: sin cambios
 
   const porId = useMemo(() => new Map((insumos ?? []).map((i) => [i.id, i])), [insumos]);
@@ -216,6 +220,8 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
       : undefined,
     margen,
   });
+  const docenaFija = docenaUsd.trim() && PATRON_BS.test(docenaUsd.trim()) ? bs(docenaUsd) : null;
+  const precioFijo = docenaFija != null && config ? { docena: docenaFija, tasa: config.tasaCambioUsd } : null;
 
   const onGuardar = async () => {
     setError(null);
@@ -228,6 +234,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
     }
     if (!vinculado && manoBs.trim() && !PATRON_BS.test(manoBs.trim())) return setError('Mano de obra inválida');
     if (margenPct.trim() && !PATRON_DECIMAL.test(margenPct.trim())) return setError('Margen inválido (ej. 30)');
+    if (docenaUsd.trim() && docenaFija == null) return setError('Precio de la docena inválido (ej. 85.50)');
     const input: FichaCostoInput = {
       codigo,
       nombre,
@@ -236,6 +243,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
       empaque: !vinculado && empaqueBs.trim() ? bs(empaqueBs) : null,
       servicioCorteInterno: servicio,
       margen: margenPct.trim() ? aCentesimasPct(margenPct) : null,
+      precioDocenaUsd: docenaFija,
       notas,
       lineas,
     };
@@ -272,7 +280,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
             />
           </div>
         </div>
-        <ResumenCosto calculo={calculo} margen={margen} incompletoMO={manoDeObra == null} />
+        <ResumenCosto calculo={calculo} margen={margen} precioFijo={precioFijo} incompletoMO={manoDeObra == null} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -318,15 +326,35 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="text-sm font-semibold">Precio de venta</div>
-          <label className="mt-3 mb-1 block text-xs font-medium text-gray-500">Margen sobre el costo (%)</label>
+          <label className="mt-3 mb-1 block text-xs font-medium text-gray-500">Precio fijo de la docena ($us)</label>
           <input
-            value={margenPct}
-            onChange={(e) => setMargenPct(e.target.value)}
+            value={docenaUsd}
+            onChange={(e) => setDocenaUsd(e.target.value)}
             inputMode="decimal"
-            placeholder={config ? `general: ${config.margenVenta / 100}` : ''}
-            className={`mono ${claseInput} max-w-32`}
+            placeholder={config ? `calculado: ${formatBs(docenaEnDolares(calculo.precioVenta, config.tasaCambioUsd))}` : ''}
+            className={`mono ${claseInput} max-w-40`}
           />
-          <p className="mt-2 text-xs text-gray-500">Vacío = el margen general de Configuración ({config ? pct(config.margenVenta) : '…'}).</p>
+          {precioFijo ? (
+            <p className="mt-2 text-xs text-gray-500">
+              = Bs {formatBs(prendaBsDeDocenaUsd(precioFijo.docena, precioFijo.tasa))} por prenda al último tipo de cambio (
+              {precioFijo.tasa / 10_000}). Con precio fijo el margen no se usa.
+            </p>
+          ) : (
+            <>
+              <label className="mt-3 mb-1 block text-xs font-medium text-gray-500">Margen sobre el costo (%)</label>
+              <input
+                value={margenPct}
+                onChange={(e) => setMargenPct(e.target.value)}
+                inputMode="decimal"
+                placeholder={config ? `general: ${config.margenVenta / 100}` : ''}
+                className={`mono ${claseInput} max-w-32`}
+              />
+              <p className="mt-2 text-xs text-gray-500">
+                Sin precio fijo: costo + margen. Vacío = el margen general de Configuración (
+                {config ? pct(config.margenVenta) : '…'}).
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -417,12 +445,15 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
 function ResumenCosto({
   calculo,
   margen,
+  precioFijo,
   incompletoMO,
 }: {
   calculo: ReturnType<typeof costoFicha>;
   margen: number;
+  precioFijo: { docena: number; tasa: number } | null;
   incompletoMO: boolean;
 }) {
+  const venta = precioFijo ? prendaBsDeDocenaUsd(precioFijo.docena, precioFijo.tasa) : calculo.precioVenta;
   const fila = (t: string, v: number) => (
     <div className="flex justify-between gap-6">
       <span className="text-gray-500">{t}</span>
@@ -441,9 +472,19 @@ function ResumenCosto({
         <span className="mono text-lg font-semibold">Bs {formatBs(calculo.total)}</span>
       </div>
       <div className="flex justify-between gap-6">
-        <span className="text-gray-500">Venta (+{pct(margen)})</span>
-        <span className="mono font-semibold text-ok">Bs {formatBs(calculo.precioVenta)}</span>
+        <span className="text-gray-500">
+          {precioFijo ? `Venta ($us ${formatBs(precioFijo.docena)} la docena)` : `Venta (+${pct(margen)})`}
+        </span>
+        <span className="mono font-semibold text-ok">Bs {formatBs(venta)}</span>
       </div>
+      {precioFijo && (
+        <div className="flex justify-between gap-6">
+          <span className="text-gray-500">Te deja por prenda</span>
+          <span className={`mono font-semibold ${venta - calculo.total < 0 ? 'text-error' : 'text-ok'}`}>
+            Bs {formatBs(venta - calculo.total)}
+          </span>
+        </div>
+      )}
       {(calculo.incompleto || incompletoMO) && (
         <p className="mt-2 text-xs text-amber-700">
           {calculo.incompleto ? 'Hay insumos sin precio (registrá una compra): el costo es parcial.' : 'La mano de obra del modelo se calcula al guardar.'}

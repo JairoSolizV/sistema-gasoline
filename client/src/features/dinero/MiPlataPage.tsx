@@ -9,9 +9,10 @@ import { enDocenas } from '../costos/formato';
 // "¿Dónde está mi plata?" (docs/PLAN_DIDACTICO_REPORTES.md): el camino de las
 // prendas, del pedido al cobro, con lo que ya está puesto y lo que falta en cada
 // paso. Pensado para que lo entienda cualquiera: dibujos, palabras simples y
-// semáforo.
+// semáforo. Lo que vale y lo que te deben, en $us como vendés (docs/PLAN_DOLARES.md).
 
 const bs = (c: number) => `Bs ${formatBs(c)}`;
+const usd = (c: number) => `$us ${formatBs(c)}`;
 const peor = (p: PasoCaminoDTO) =>
   p.cortes.some((c) => c.semaforo === 'demora') ? 'demora' : p.cortes.some((c) => c.semaforo === 'atencion') ? 'atencion' : 'ok';
 
@@ -44,7 +45,7 @@ export function MiPlataPage() {
               prendas={d.pedidos.prendas}
               filas={[
                 { texto: 'Vas a necesitar', monto: d.pedidos.necesitas, clase: 'text-amber-700' },
-                { texto: 'Vale', monto: d.pedidos.vale, clase: 'text-ok' },
+                { texto: 'Vale', monto: d.pedidos.valeUsd, clase: 'text-ok', usd: true },
               ]}
               enlace="/ventas?tab=pedidos"
             />
@@ -62,7 +63,7 @@ export function MiPlataPage() {
                   filas={[
                     { texto: 'Ya pusiste', monto: p.invertido, clase: '' },
                     ...(p.paso !== 'deposito' ? [{ texto: 'Falta poner', monto: p.falta, clase: 'text-amber-700' }] : []),
-                    { texto: 'Vale', monto: p.vale, clase: 'text-ok' },
+                    { texto: 'Vale', monto: p.valeUsd, clase: 'text-ok', usd: true },
                   ]}
                   activa={abierto === p.paso}
                   onClick={() => setAbierto(abierto === p.paso ? null : p.paso)}
@@ -76,10 +77,12 @@ export function MiPlataPage() {
               nombre="Entregado, por cobrar"
               explicacion="Ya lo llevaste y el cliente todavía no pagó"
               filas={[
-                { texto: 'Te deben', monto: d.porCobrar.total, clase: 'text-acento' },
-                ...(d.porCobrar.vencido > 0 ? [{ texto: 'Ya vencido', monto: d.porCobrar.vencido, clase: 'text-error' }] : []),
+                { texto: 'Te deben', monto: d.porCobrar.totalUsd, clase: 'text-acento', usd: true },
+                ...(d.porCobrar.vencidoUsd > 0
+                  ? [{ texto: 'Ya vencido', monto: d.porCobrar.vencidoUsd, clase: 'text-error', usd: true }]
+                  : []),
               ]}
-              semaforo={d.porCobrar.vencido > 0 ? COLOR_SEMAFORO.demora : undefined}
+              semaforo={d.porCobrar.vencidoUsd > 0 ? COLOR_SEMAFORO.demora : undefined}
               pie={`${d.porCobrar.clientes} cliente(s)`}
               enlace="/cuentas-por-cobrar"
             />
@@ -88,7 +91,10 @@ export function MiPlataPage() {
               icono="💰"
               nombre="Cobrado este mes"
               explicacion="La plata que ya entró este mes"
-              filas={[{ texto: 'Entró', monto: d.cobradoMes, clase: 'text-ok' }]}
+              filas={[
+                { texto: 'Entró', monto: d.cobradoMesUsd, clase: 'text-ok', usd: true },
+                { texto: 'en Bs', monto: d.cobradoMes, clase: 'text-gray-500' },
+              ]}
               enlace="/ventas?tab=cobros"
             />
           </div>
@@ -166,7 +172,7 @@ function Estacion({
   nombre: string;
   explicacion: string;
   prendas?: number;
-  filas: { texto: string; monto: number; clase: string }[];
+  filas: { texto: string; monto: number; clase: string; usd?: boolean }[];
   semaforo?: { punto: string; texto: string };
   pie?: string;
   enlace?: string;
@@ -196,7 +202,7 @@ function Estacion({
         {filas.map((f) => (
           <div key={f.texto} className="flex justify-between gap-2">
             <dt className="text-gray-500">{f.texto}</dt>
-            <dd className={`mono font-semibold ${f.clase}`}>{bs(f.monto)}</dd>
+            <dd className={`mono font-semibold ${f.clase}`}>{f.usd ? usd(f.monto) : bs(f.monto)}</dd>
           </div>
         ))}
       </dl>
@@ -262,9 +268,10 @@ function DetallePaso({ p }: { p: PasoCaminoDTO }) {
                     </span>
                   </span>
                 )}
-                {c.vale != null && (
+                {c.valeUsd != null && c.vale != null && (
                   <span className="text-ok">
-                    Vale <span className="mono font-semibold">{bs(c.vale)}</span>
+                    Vale <span className="mono font-semibold">{usd(c.valeUsd)}</span>
+                    <span className="mono text-xs text-gray-500"> ≈ {bs(c.vale)}</span>
                   </span>
                 )}
               </div>
