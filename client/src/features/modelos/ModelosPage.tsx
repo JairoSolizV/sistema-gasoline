@@ -4,6 +4,7 @@ import { formatBs, type ModeloDTO } from '@taller/shared';
 import { useEliminarModelo, useModelos } from '../../api/modelos';
 import { ErrorApi } from '../../api/client';
 import { Modal } from '../../components/Modal';
+import { TABLA } from '../../components/tabla';
 
 /** Confirmación antes de eliminar. Un modelo con cortes o moldes no se puede
  *  borrar (perdería el historial de pagos): se explica y no se ofrece borrar. */
@@ -84,7 +85,7 @@ export function ModelosPage() {
         </button>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className={`mt-6 ${TABLA.contenedor}`}>
         {isLoading && <div className="p-8 text-center text-sm text-gray-500">Cargando catálogo…</div>}
         {error && (
           <div className="p-8 text-center text-sm text-error">
@@ -92,23 +93,23 @@ export function ModelosPage() {
           </div>
         )}
         {modelos && (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-                <th className="px-5 py-3">Modelo</th>
-                <th className="px-5 py-3">Versiones</th>
-                <th className="px-5 py-3">Búsqueda</th>
-                <th className="px-5 py-3">Operaciones</th>
-                <th className="px-5 py-3 text-right">Mano de obra / prenda</th>
-                <th className="px-5 py-3" />
+          <table className="text-sm">
+            <thead className={TABLA.cabecera}>
+              <tr className={TABLA.filaCabecera}>
+                <th className="px-3 py-2.5">Modelo</th>
+                <th className="px-3 py-2.5">Versiones</th>
+                <th className="px-3 py-2.5">Búsqueda</th>
+                <th className="px-3 py-2.5 text-right">Operaciones</th>
+                <th className="px-3 py-2.5 text-right">Mano de obra / prenda</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {modelos.map((m) => {
                 const ultima = m.versiones[0];
                 return (
-                  <tr key={m.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/60">
-                    <td className="px-5 py-3">
+                  <tr key={m.id} className={TABLA.fila}>
+                    <td className="max-w-[300px] px-3 py-2">
                       <Link
                         to={`/modelos/versiones/${ultima?.id ?? ''}`}
                         className="font-medium text-acento hover:underline"
@@ -116,8 +117,8 @@ export function ModelosPage() {
                         {m.nombre}
                       </Link>
                     </td>
-                    <td className="px-5 py-3">
-                      <div className="flex flex-wrap gap-1">
+                    <td className="px-3 py-2">
+                      <div className="flex max-w-[180px] flex-wrap gap-1">
                         {m.versiones.map((v) => (
                           <Link
                             key={v.id}
@@ -133,7 +134,7 @@ export function ModelosPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-sm">
+                    <td className="px-3 py-2 text-sm whitespace-nowrap">
                       {m.buscador ? (
                         <span className="text-gray-700">{m.buscador.nombre}</span>
                       ) : m.sinBuscador ? (
@@ -144,13 +145,13 @@ export function ModelosPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-gray-600">{ultima?.cantidadOperaciones ?? 0}</td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="mono px-3 py-2 text-right text-gray-600">{ultima?.cantidadOperaciones ?? 0}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
                       <span className="mono font-semibold">
                         Bs {ultima ? formatBs(ultima.costoManoObraPrenda) : '—'}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-3 py-2 text-right">
                       <button
                         onClick={() => setAEliminar(m)}
                         className="text-[13px] font-medium text-error hover:underline"

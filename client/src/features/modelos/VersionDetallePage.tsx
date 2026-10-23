@@ -148,8 +148,8 @@ function GrupoModelo({
   );
   const todoEmpaque = ops.every((o) => o.esEmpaque);
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-2.5">
+    <div className="max-w-[820px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-100 px-5 py-2.5">
         <div className="flex items-baseline gap-3">
           <span className="text-sm font-semibold">{grupo}</span>
           <span className="text-xs text-gray-500">{ops.length} operaciones</span>
@@ -166,33 +166,33 @@ function GrupoModelo({
           Bs {formatBs(ops.reduce((a, o) => a + o.ct, 0))}
         </span>
       </div>
-      <table className="w-full text-sm">
+      <table className="w-full table-fixed text-sm">
         <tbody>
           {ops.map((op) => (
             <tr
               key={op.id}
               {...fila(op.id)}
-              className={`border-b border-gray-100 last:border-0 ${
+              className={`border-b border-gray-200/70 last:border-0 even:bg-slate-100 hover:bg-blue-50 ${
                 arrastrado === op.id ? 'opacity-40' : ''
               } ${claseIndicador(indicador(op.id))}`}
             >
               <td
                 {...manija(op.id)}
-                className="w-6 cursor-grab pl-3 text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
+                className="w-7 cursor-grab pl-3 text-gray-300 select-none hover:text-gray-500 active:cursor-grabbing"
               >
                 ⠿
               </td>
-              <td className="w-14 px-3 py-2 text-gray-400">{op.n ?? '—'}</td>
-              <td className="w-32 px-3 py-2 text-gray-600">{op.equipo}</td>
-              <td className="px-3 py-2 font-medium">
+              <td className="w-12 px-2 py-1.5 text-gray-400">{op.n ?? '—'}</td>
+              <td className="w-28 truncate px-3 py-1.5 text-gray-600">{op.equipo}</td>
+              <td className="w-52 px-3 py-1.5 font-medium">
                 {op.proceso}
                 {op.esEmpaque && <MarcaEmpaque />}
               </td>
-              <td className="px-3 py-2 text-gray-600">{op.pieza ?? '—'}</td>
-              <td className="w-28 px-3 py-2 text-right">
+              <td className="w-44 px-3 py-1.5 text-gray-600">{op.pieza ?? '—'}</td>
+              <td className="w-24 px-3 py-1.5 text-right whitespace-nowrap">
                 <span className="mono font-semibold">Bs {formatBs(op.ct)}</span>
               </td>
-              <td className="w-36 px-5 py-2">
+              <td className="w-36 px-3 py-1.5">
                 <div className="flex justify-end gap-3 text-[13px] font-medium">
                   <button onClick={() => onEditar(op)} className="text-acento hover:underline">
                     Editar
