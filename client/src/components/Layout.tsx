@@ -49,6 +49,7 @@ const RUTAS_AREA: [string, ClaveArea][] = [
   ['/inventario', 'compras'],
   ['/cuentas-por-pagar', 'compras'],
   ['/ventas', 'ventas'],
+  ['/cuentas-por-cobrar', 'ventas'],
   ['/costos-fijos', 'finanzas'],
   ['/productos', 'costos'],
   ['/costos', 'costos'],
@@ -182,6 +183,9 @@ export function Layout() {
           <TituloSeccion area="ventas" />
           <ItemMenu area="ventas" a="/ventas" icono={<Icono d="M3 7h18l-2 11H5zM8 7V5a4 4 0 0 1 8 0v2" />}>
             Ventas y cobros
+          </ItemMenu>
+          <ItemMenu area="ventas" a="/cuentas-por-cobrar" icono={<Icono d="M4 5h16v14H4zM4 9h16M15 14h1M8 14h4" />}>
+            Cuentas por cobrar
           </ItemMenu>
 
           <TituloSeccion area="costos" />

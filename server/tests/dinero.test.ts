@@ -151,6 +151,26 @@ describe('despachos y cobranzas', () => {
     expect(t.resultadoMes.queda).toBe(t.resultadoMes.margen - t.resultadoMes.gastosFijos - t.resultadoMes.cuotaBanco);
   });
 
+  test('cuentas por cobrar: el cobro va al despacho más viejo; vence según el plazo del cliente', async () => {
+    const enDias = (n: number) => {
+      const d = new Date(`${hoy}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    };
+    const cxc = (await request(app).get('/api/v1/dinero/cuentas-por-cobrar')).body.data;
+    const mios = cxc.items.filter((i: { cliente: { id: string } }) => i.cliente.id === ids.CLI);
+    // despacho del corte (60 000): cobrado 30 000; despacho de la ficha (48 000): sin cobrar
+    expect(mios).toHaveLength(2);
+    expect(mios).toEqual(expect.arrayContaining([
+      expect.objectContaining({ total: 60_000, cobrado: 30_000, pendiente: 30_000, vence: enDias(30) }),
+      expect.objectContaining({ total: 48_000, cobrado: 0, pendiente: 48_000, vence: enDias(30) }),
+    ]));
+    // con plazo de 15 días, un despacho nuevo vence a los 15
+    await request(app).patch(`/api/v1/dinero/clientes/${ids.CLI}`).send({ plazoDias: 15 });
+    const nuevo = await despachar({ lineas: [{ fichaId: ficha.id, prendas: 12, precioPrenda: 1000 }] });
+    expect(nuevo.body.data.vence).toBe(enDias(15));
+  });
+
   test('un cliente con movimientos no se elimina', async () => {
     const res = await request(app).delete(`/api/v1/dinero/clientes/${ids.CLI}`);
     expect(res.status).toBe(409);

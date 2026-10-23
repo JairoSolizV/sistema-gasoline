@@ -91,7 +91,7 @@ export const dineroRepository = {
     return prisma.despacho.findUnique({ where: { id }, include: incluirDespacho });
   },
   crearDespacho(
-    data: { clienteId: string; fecha: Date; notas: string | null },
+    data: { clienteId: string; fecha: Date; vence: Date; notas: string | null },
     lineas: Omit<Prisma.DespachoLineaCreateManyInput, 'despachoId'>[],
   ) {
     return prisma.despacho.create({

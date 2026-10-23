@@ -82,3 +82,9 @@ invertido y que no gasta de más:
   banco, ordenado por vencimiento (vencido · esta semana · total). Despachos en docenas surtidas + sueltas,
   con talla y color opcional por línea. Migraciones `20261023180000_despacho_detalle` y
   `20261023200000_compra_vence`.
+- **2026-10-23 — Cuentas por cobrar.** Cada cliente tiene un plazo de pago (30 días por defecto, 0 = al
+  contado) y cada despacho su fecha de cobro (fecha + plazo, editable). Pantalla **Cuentas por cobrar**
+  (área Ventas): despachos sin terminar de pagar por fecha de cobro (los cobros cancelan primero los más
+  viejos), vencido · esta semana · total, resumen por cliente con su celular, **Cobrar** abre el cobro con
+  el cliente elegido, y aviso de clientes que pagaron de más. Migración `20261023240000_cuentas_por_cobrar`
+  (los despachos existentes: fecha + 30). 393 tests en verde.

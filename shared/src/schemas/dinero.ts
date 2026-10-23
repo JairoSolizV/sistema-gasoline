@@ -18,10 +18,13 @@ export type EstadoPedido = (typeof ESTADOS_PEDIDO)[number];
 /** Nombre de proveedor para agrupar deudas: mayúsculas y sin espacios de más. */
 export const normalizarProveedor = (s: string) => s.trim().replace(/\s+/g, ' ').toUpperCase();
 
+const plazoDias = z.number().int().min(0, 'El plazo no puede ser negativo').max(365);
+
 export const clienteInputSchema = z.object({
   nombre: z.string().trim().min(1, 'El nombre es obligatorio').max(80),
   celular: texto(30).optional(),
   notas: texto(200).optional(),
+  plazoDias: plazoDias.optional(), // días para pagar (por defecto 30)
 });
 
 export const editarClienteSchema = z
@@ -29,6 +32,7 @@ export const editarClienteSchema = z
     nombre: z.string().trim().min(1).max(80),
     celular: texto(30),
     notas: texto(200),
+    plazoDias,
     activo: z.boolean(),
   })
   .partial()
@@ -73,6 +77,7 @@ const lineaDespachoSchema = z
 export const despachoInputSchema = z.object({
   clienteId: z.uuid('Elegí el cliente'),
   fecha: dia,
+  vence: dia.optional(), // sin fecha: la del despacho + el plazo del cliente
   notas: texto(200).optional(),
   lineas: z.array(lineaDespachoSchema).min(1, 'Agregá al menos una línea'),
 });

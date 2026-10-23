@@ -63,7 +63,7 @@ export function TableroPage() {
               />
             ))}
             <Link
-              to="/ventas?tab=clientes"
+              to="/cuentas-por-cobrar"
               className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-acento"
             >
               <div className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">Por cobrar</div>
@@ -237,7 +237,7 @@ function LoQueTenes({ t }: { t: TableroDTO }) {
       <Fila etiqueta="En producción" monto={t.enProduccion.costo} ayuda="cortes abiertos, a costo" />
       <Fila etiqueta="En servicios externos" monto={t.enServicios.costo} ayuda="cortes cerrados con prendas afuera" />
       <Fila etiqueta="Listo para despachar" monto={t.deposito.costo} ayuda="depósito, a costo" />
-      <Fila etiqueta="Por cobrar a clientes" monto={t.porCobrar.total} a="/ventas?tab=clientes" />
+      <Fila etiqueta="Por cobrar a clientes" monto={t.porCobrar.total} a="/cuentas-por-cobrar" />
       <Fila
         etiqueta="Anticipos adelantados a operarios"
         monto={t.anticiposAdelantados}

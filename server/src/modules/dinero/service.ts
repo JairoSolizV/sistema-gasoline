@@ -16,6 +16,8 @@ import {
   type CobroDTO,
   type CobroInput,
   type CorteDineroDTO,
+  type CuentaPorCobrarDTO,
+  type CuentasPorCobrarDTO,
   type CuentaPorPagarDTO,
   type CuentasPorPagarDTO,
   type Cuenta,
@@ -43,6 +45,12 @@ import { rangoMesUTC } from '../liquidacion/repository.js';
 import { dineroRepository, type DespachoConDatos, type PedidoConDatos } from './repository.js';
 
 const fr = (n: number) => ({ num: BigInt(n), den: 1n });
+/** 'aaaa-mm-dd' + n días. */
+const sumarDias = (dia: string, n: number) => {
+  const d = diaADate(dia);
+  d.setUTCDate(d.getUTCDate() + n);
+  return dateADia(d);
+};
 
 /** Costo por prenda de una ficha SIN costos fijos (esos se restan una vez en el
  *  resultado del mes) y precio de venta tal como lo muestra la ficha. */
@@ -155,6 +163,7 @@ function aDespachoDTO(d: DespachoConDatos): DespachoDTO {
     id: d.id,
     cliente: d.cliente,
     fecha: dateADia(d.fecha),
+    vence: dateADia(d.vence),
     notas: d.notas,
     lineas: d.lineas.map((l) => ({
       id: l.id,
@@ -198,6 +207,7 @@ export const dineroService = {
         nombre: c.nombre,
         celular: c.celular,
         notas: c.notas,
+        plazoDias: c.plazoDias,
         activo: c.activo,
         despachado: t.despachado,
         cobrado: t.cobrado,
@@ -213,6 +223,7 @@ export const dineroService = {
       nombre: input.nombre,
       celular: input.celular ?? null,
       notas: input.notas ?? null,
+      ...(input.plazoDias !== undefined ? { plazoDias: input.plazoDias } : {}),
     });
     return (await this.listarClientes()).find((x) => x.id === c.id)!;
   },
@@ -300,7 +311,7 @@ export const dineroService = {
   /** Cada línea guarda la FOTO del costo por prenda (corte real o ficha, sin
    *  costos fijos). Un corte tiene que estar cerrado y no se despacha de más. */
   async crearDespacho(input: DespachoInput): Promise<DespachoDTO> {
-    await clienteOError(input.clienteId);
+    const cliente = await clienteOError(input.clienteId);
     const [{ config, fichas, fijo }, cortes] = await Promise.all([contexto(), cortesDinero()]);
     const pedidas = new Map<string, number>(); // prendas pedidas por corte en este despacho
     const lineas = input.lineas.map((l) => {
@@ -350,7 +361,12 @@ export const dineroService = {
       };
     });
     const d = await dineroRepository.crearDespacho(
-      { clienteId: input.clienteId, fecha: diaADate(input.fecha), notas: input.notas ?? null },
+      {
+        clienteId: input.clienteId,
+        fecha: diaADate(input.fecha),
+        vence: diaADate(input.vence ?? sumarDias(input.fecha, cliente.plazoDias)),
+        notas: input.notas ?? null,
+      },
       lineas,
     );
     return aDespachoDTO(d);
@@ -446,6 +462,59 @@ export const dineroService = {
     await dineroRepository.eliminarPagoProveedor(id);
   },
 
+  // ── Cuentas por cobrar: despachos sin pagar ──
+  /** A cada cliente sus cobros le cancelan primero los despachos más viejos;
+   *  lo que queda de cada despacho vence en su fecha. */
+  async cuentasPorCobrar(): Promise<CuentasPorCobrarDTO> {
+    const hoy = hoyEnBolivia();
+    const [despachos, cobros, clientes] = await Promise.all([
+      dineroRepository.listarDespachos(),
+      dineroRepository.listarCobros(),
+      dineroRepository.listarClientes(),
+    ]);
+    const celular = new Map(clientes.map((c) => [c.id, c.celular]));
+    const cobrado = new Map<string, number>();
+    for (const c of cobros) cobrado.set(c.clienteId, (cobrado.get(c.clienteId) ?? 0) + c.monto);
+
+    const items: CuentaPorCobrarDTO[] = [];
+    const viejosPrimero = [...despachos].sort(
+      (a, b) => a.fecha.getTime() - b.fecha.getTime() || a.creadoEn.getTime() - b.creadoEn.getTime(),
+    );
+    for (const d of viejosPrimero) {
+      const total = d.lineas.reduce((a, l) => a + l.total, 0);
+      const disponible = cobrado.get(d.clienteId) ?? 0;
+      const aplicado = Math.min(disponible, total);
+      cobrado.set(d.clienteId, disponible - aplicado);
+      if (total - aplicado <= 0) continue;
+      const prendas = d.lineas.reduce((a, l) => a + l.prendas, 0);
+      items.push({
+        despachoId: d.id,
+        cliente: { ...d.cliente, celular: celular.get(d.clienteId) ?? null },
+        fecha: dateADia(d.fecha),
+        vence: dateADia(d.vence),
+        detalle: `${d.lineas.map((l) => l.descripcion).join(', ')} · ${prendas} prendas`,
+        total,
+        cobrado: aplicado,
+        pendiente: total - aplicado,
+      });
+    }
+    items.sort((a, b) => a.vence.localeCompare(b.vence) || b.pendiente - a.pendiente);
+    const enSemana = sumarDias(hoy, 7);
+    const suma = (xs: CuentaPorCobrarDTO[]) => xs.reduce((a, x) => a + x.pendiente, 0);
+    const nombres = new Map(clientes.map((c) => [c.id, c.nombre]));
+    return {
+      hoy,
+      items,
+      total: suma(items),
+      vencido: suma(items.filter((x) => x.vence < hoy)),
+      semana: suma(items.filter((x) => x.vence >= hoy && x.vence <= enSemana)),
+      // lo que sobra de los cobros: el cliente pagó de más (adelanto)
+      adelantos: [...cobrado]
+        .filter(([, m]) => m > 0)
+        .map(([id, monto]) => ({ id, nombre: nombres.get(id) ?? '', monto })),
+    };
+  },
+
   // ── Cuentas por pagar: proveedores, servicios, operarios y banco ──
   /** A cada proveedor sus pagos le cancelan primero las compras más viejas;
    *  lo que queda de cada compra vence en su fecha. Servicios externos y
@@ -529,7 +598,7 @@ export const dineroService = {
     }
 
     items.sort((a, b) => (a.vence ?? '9999').localeCompare(b.vence ?? '9999') || b.monto - a.monto);
-    const enSemana = dateADia(new Date(Date.UTC(anio, mes - 1, Number(hoy.slice(8, 10)) + 7)));
+    const enSemana = sumarDias(hoy, 7);
     const suma = (xs: CuentaPorPagarDTO[]) => xs.reduce((a, x) => a + x.monto, 0);
     return {
       hoy,

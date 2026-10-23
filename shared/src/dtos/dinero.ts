@@ -7,6 +7,7 @@ export interface ClienteDTO {
   nombre: string;
   celular: string | null;
   notas: string | null;
+  plazoDias: number; // días para pagar un despacho
   activo: boolean;
   despachado: number; // Σ despachos
   cobrado: number; // Σ cobros
@@ -45,6 +46,7 @@ export interface DespachoDTO {
   id: string;
   cliente: { id: string; nombre: string };
   fecha: string;
+  vence: string; // cuándo lo tiene que pagar
   notas: string | null;
   lineas: DespachoLineaDTO[];
   prendas: number;
@@ -114,6 +116,27 @@ export interface EtapaDineroDTO {
   sinPrecio: number; // cuántos ítems no tienen precio de venta (modelo sin ficha)
   faltaPagar: number;
   items: TableroItemDTO[];
+}
+
+/** Un despacho que el cliente todavía no terminó de pagar. */
+export interface CuentaPorCobrarDTO {
+  despachoId: string;
+  cliente: { id: string; nombre: string; celular: string | null };
+  fecha: string;
+  vence: string;
+  detalle: string; // qué se le despachó
+  total: number;
+  cobrado: number; // lo que ya pagó de este despacho (los cobros van a los más viejos)
+  pendiente: number;
+}
+
+export interface CuentasPorCobrarDTO {
+  hoy: string;
+  items: CuentaPorCobrarDTO[]; // por fecha de vencimiento
+  total: number;
+  vencido: number;
+  semana: number; // vence en los próximos 7 días
+  adelantos: { id: string; nombre: string; monto: number }[]; // clientes que pagaron de más
 }
 
 /** Algo que hay que pagar (cuentas por pagar). */

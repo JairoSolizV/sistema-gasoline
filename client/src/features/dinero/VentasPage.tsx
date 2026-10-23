@@ -42,6 +42,12 @@ const aCent = (s: string) => aCentavos(s.trim().replace(',', '.'));
 const claseInput =
   'w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-acento';
 const mensaje = (e: unknown) => (e instanceof ErrorApi ? e.message : 'Error al guardar');
+/** 'aaaa-mm-dd' + n días. */
+const masDias = (dia: string, n: number) => {
+  const d = new Date(`${dia}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
 const botonPrincipal = 'rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60';
 const botonSecundario = 'rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50';
 
@@ -451,9 +457,13 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   const { data: deposito } = useDeposito();
   const { data: fichas } = useFichasCosto();
   const mutar = useMutacionDinero();
+  const { data: clientes } = useClientes();
   const [clienteId, setClienteId] = useState('');
   const [fecha, setFecha] = useState(hoyLocalISO());
+  const [vence, setVence] = useState(''); // vacío = fecha + plazo del cliente
   const [notas, setNotas] = useState('');
+  const plazo = clientes?.find((c) => c.id === clienteId)?.plazoDias ?? 30;
+  const venceVivo = vence || masDias(fecha, plazo);
   const [lineas, setLineas] = useState<LineaForm[]>([]);
   const [error, setError] = useState<string | null>(null);
   const cambiar = (clave: string, k: 'docenas' | 'sueltas' | 'precio' | 'detalle', valor: string) =>
@@ -486,6 +496,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
         input: {
           clienteId,
           fecha,
+          vence: venceVivo,
           notas,
           lineas: lineas.map((l) => ({
             ...(l.corteId ? { corteId: l.corteId } : { fichaId: l.fichaId }),
@@ -504,7 +515,7 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
   return (
     <Modal onCerrar={onCerrar} ancho="max-w-2xl">
       <h2 className="text-lg font-semibold">Registrar despacho</h2>
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-3 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium">Cliente</label>
           <SelectorCliente valor={clienteId} onCambiar={setClienteId} />
@@ -512,6 +523,11 @@ function ModalDespacho({ onCerrar }: { onCerrar: () => void }) {
         <div>
           <label className="mb-1 block text-sm font-medium">Fecha</label>
           <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className={claseInput} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Te lo paga el</label>
+          <input type="date" value={venceVivo} onChange={(e) => setVence(e.target.value)} className={claseInput} />
+          <p className="mt-0.5 text-[11px] text-gray-400">plazo del cliente: {plazo} días</p>
         </div>
       </div>
       <label className="mt-4 mb-1 block text-sm font-medium">Agregar del depósito o de un modelo</label>
@@ -659,10 +675,10 @@ function CobrosTab() {
   );
 }
 
-function ModalCobro({ onCerrar }: { onCerrar: () => void }) {
+export function ModalCobro({ onCerrar, clienteId = '' }: { onCerrar: () => void; clienteId?: string }) {
   const { data: clientes } = useClientes();
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ clienteId: '', fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
+  const [v, setV] = useState({ clienteId, fecha: hoyLocalISO(), monto: '', nota: '', caja: 'efectivo' as Caja });
   const [error, setError] = useState<string | null>(null);
   const cliente = clientes?.find((c) => c.id === v.clienteId);
   const onGuardar = async () => {
@@ -726,6 +742,7 @@ function ClientesTab() {
             <tr className={TABLA.filaCabecera}>
               <th className="px-3 py-2.5">Cliente</th>
               <th className="px-3 py-2.5">Celular</th>
+              <th className="px-3 py-2.5 text-right">Plazo</th>
               <th className="px-3 py-2.5 text-right">Despachado</th>
               <th className="px-3 py-2.5 text-right">Cobrado</th>
               <th className="px-3 py-2.5 text-right">Te debe</th>
@@ -747,6 +764,9 @@ function ClientesTab() {
                   {c.notas && <div className="text-xs text-gray-500">{c.notas}</div>}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-gray-600">{c.celular ?? '—'}</td>
+                <td className="px-3 py-2 text-right whitespace-nowrap text-gray-600">
+                  {c.plazoDias === 0 ? 'contado' : `${c.plazoDias} días`}
+                </td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap">{bs(c.despachado)}</td>
                 <td className="mono px-3 py-2 text-right whitespace-nowrap text-gray-600">{bs(c.cobrado)}</td>
                 <td className={`mono px-3 py-2 text-right font-semibold whitespace-nowrap ${c.porCobrar > 0 ? 'text-acento' : 'text-gray-400'}`}>
@@ -788,14 +808,21 @@ function ClientesTab() {
 
 function ModalCliente({ cliente, onCerrar }: { cliente: ClienteDTO | null; onCerrar: () => void }) {
   const mutar = useMutacionDinero();
-  const [v, setV] = useState({ nombre: cliente?.nombre ?? '', celular: cliente?.celular ?? '', notas: cliente?.notas ?? '' });
+  const [v, setV] = useState({
+    nombre: cliente?.nombre ?? '',
+    celular: cliente?.celular ?? '',
+    notas: cliente?.notas ?? '',
+    plazo: String(cliente?.plazoDias ?? 30),
+  });
   const [error, setError] = useState<string | null>(null);
   const onGuardar = async () => {
     setError(null);
     if (!v.nombre.trim()) return setError('El nombre es obligatorio');
+    if (!/^\d{1,3}$/.test(v.plazo)) return setError('Plazo inválido (días, 0 = al contado)');
+    const input = { nombre: v.nombre, celular: v.celular, notas: v.notas, plazoDias: Number(v.plazo) };
     try {
       await mutar.mutateAsync(
-        cliente ? { tipo: 'editarCliente', id: cliente.id, input: v } : { tipo: 'crearCliente', input: v },
+        cliente ? { tipo: 'editarCliente', id: cliente.id, input } : { tipo: 'crearCliente', input },
       );
       onCerrar();
     } catch (e) {
@@ -817,6 +844,16 @@ function ModalCliente({ cliente, onCerrar }: { cliente: ClienteDTO | null; onCer
         <div>
           <label className="mb-1 block text-sm font-medium">Notas</label>
           <input value={v.notas} onChange={(e) => setV({ ...v, notas: e.target.value })} placeholder="ej. tienda, feria, mayorista" className={claseInput} />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Plazo para pagar (días)</label>
+          <input
+            value={v.plazo}
+            onChange={(e) => setV({ ...v, plazo: e.target.value.replace(/\D/g, '') })}
+            inputMode="numeric"
+            className={`mono w-28 ${claseInput}`}
+          />
+          <p className="mt-0.5 text-[11px] text-gray-400">0 = paga al contado. Cada despacho se puede cambiar.</p>
         </div>
       </div>
       <PieModal onCerrar={onCerrar} onGuardar={() => void onGuardar()} texto="Guardar" error={error} pendiente={mutar.isPending} />

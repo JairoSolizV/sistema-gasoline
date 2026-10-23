@@ -24,6 +24,7 @@ import { TableroPage } from './features/dinero/TableroPage';
 import { VentasPage } from './features/dinero/VentasPage';
 import { CajaPage } from './features/dinero/CajaPage';
 import { CuentasPorPagarPage } from './features/dinero/CuentasPorPagarPage';
+import { CuentasPorCobrarPage } from './features/dinero/CuentasPorCobrarPage';
 import { CatalogoProductosPage } from './features/costos/CatalogoProductosPage';
 import { PantallaError } from './components/PantallaError';
 
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
           { path: '/ventas', element: <VentasPage /> },
           { path: '/caja', element: <CajaPage /> },
           { path: '/cuentas-por-pagar', element: <CuentasPorPagarPage /> },
+          { path: '/cuentas-por-cobrar', element: <CuentasPorCobrarPage /> },
           { path: '/configuracion', element: <ConfiguracionPage /> },
           { path: '*', element: <Navigate to="/" replace /> },
         ],

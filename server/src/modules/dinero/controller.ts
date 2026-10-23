@@ -18,6 +18,9 @@ export const dineroController = {
   async tablero(_req: Request, res: Response) {
     res.json({ data: await dineroService.tablero() });
   },
+  async cuentasPorCobrar(_req: Request, res: Response) {
+    res.json({ data: await dineroService.cuentasPorCobrar() });
+  },
   async cuentasPorPagar(_req: Request, res: Response) {
     res.json({ data: await dineroService.cuentasPorPagar() });
   },
