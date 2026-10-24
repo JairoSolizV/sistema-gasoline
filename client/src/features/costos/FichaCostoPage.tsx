@@ -5,11 +5,14 @@ import {
   costoFicha,
   docenaEnDolares,
   formatBs,
+  CM_HILO_POR_PRENDA_DEFECTO,
   medidaCierrePorDefecto,
+  TITULOS_HILO,
   prendaBsDeDocenaUsd,
   precioUnitario,
   type CategoriaInsumo,
   type CierrePorTalla,
+  type TituloHilo,
   type FichaCostoDetalleDTO,
   type FichaCostoInput,
   type InsumoDTO,
@@ -185,10 +188,16 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const [filas, setFilas] = useState<Fila[]>(ficha?.lineas.map(aFila) ?? []);
   // requerimiento de insumos: medida del cierre de cada talla ([] = regla por defecto)
   const [cierres, setCierres] = useState<CierrePorTalla[]>(ficha?.cierresPorTalla ?? []);
+  // requerimiento: metros de cada hilo por prenda (vacíos = los de la hoja)
+  const [metrosHilo, setMetrosHilo] = useState<Record<TituloHilo, string>>(() =>
+    Object.fromEntries(
+      TITULOS_HILO.map((t) => [t, ficha?.cmHiloPorPrenda ? String(ficha.cmHiloPorPrenda[t] / 100) : '']),
+    ) as Record<TituloHilo, string>,
+  );
   const [error, setError] = useState<string | null>(null);
   const [sucio, setSucio] = useState(false);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
-  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas, cierres]);
+  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas, cierres, metrosHilo]);
   useEffect(() => setSucio(false), []); // recién cargada: sin cambios
 
   const porId = useMemo(() => new Map((insumos ?? []).map((i) => [i.id, i])), [insumos]);
@@ -241,6 +250,10 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
     if (docenaUsd.trim() && docenaFija == null) return setError('Precio de la docena inválido (ej. 85.50)');
     if (cierres.some((c) => !Number.isInteger(c.talla))) return setError('Talla inválida en los cierres');
     if (new Set(cierres.map((c) => c.talla)).size !== cierres.length) return setError('Hay una talla repetida en los cierres');
+    const conMetros = TITULOS_HILO.some((t) => metrosHilo[t].trim() !== '');
+    if (TITULOS_HILO.some((t) => metrosHilo[t].trim() !== '' && !PATRON_DECIMAL.test(metrosHilo[t].trim()))) {
+      return setError('Metros de hilo por prenda inválidos (ej. 12 o 12.5)');
+    }
     const input: FichaCostoInput = {
       codigo,
       nombre,
@@ -252,6 +265,17 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
       precioDocenaUsd: docenaFija,
       notas,
       cierresPorTalla: cierres.length ? [...cierres].sort((a, b) => a.talla - b.talla) : null,
+      // los títulos vacíos toman el valor de la hoja
+      cmHiloPorPrenda: conMetros
+        ? (Object.fromEntries(
+            TITULOS_HILO.map((t) => [
+              t,
+              metrosHilo[t].trim() === ''
+                ? CM_HILO_POR_PRENDA_DEFECTO[t]
+                : Math.round(Number(metrosHilo[t].trim().replace(',', '.')) * 100),
+            ]),
+          ) as Record<TituloHilo, number>)
+        : null,
       lineas,
     };
     const guardada = await guardar.mutateAsync({ id: ficha?.id ?? null, input });
@@ -396,6 +420,31 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="text-sm font-semibold">Metros de hilo por prenda</div>
+        <div className="text-xs text-gray-500">
+          Para el requerimiento: conos que consume un corte = prendas × metros ÷ metros del cono (sus
+          yardas). Se compra el mayor entre esto y la carga de las máquinas. Vacío = el de la hoja.
+        </div>
+        <div className="mt-3 flex flex-wrap gap-4">
+          {TITULOS_HILO.map((t) => (
+            <label key={t} className="text-xs">
+              <span className="mb-1 block font-medium text-gray-600">Hilo {t}</span>
+              <span className="flex items-center gap-1.5">
+                <input
+                  value={metrosHilo[t]}
+                  onChange={(e) => setMetrosHilo({ ...metrosHilo, [t]: e.target.value })}
+                  inputMode="decimal"
+                  placeholder={String(CM_HILO_POR_PRENDA_DEFECTO[t] / 100)}
+                  className="mono w-20 rounded-md border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:border-acento"
+                />
+                <span className="text-gray-500">m</span>
+              </span>
+            </label>
+          ))}
+        </div>
       </div>
 
       <CierresPorTalla

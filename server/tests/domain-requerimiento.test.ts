@@ -6,6 +6,8 @@
 import { describe, expect, test } from 'vitest';
 import {
   calcularRequerimiento,
+  CM_HILO_POR_PRENDA_DEFECTO,
+  conosPorConsumo,
   MAQUINAS_HILO_DEFECTO,
   medidaCierrePorDefecto,
   type EntradaRequerimiento,
@@ -47,6 +49,7 @@ const entrada = (extra: Partial<EntradaRequerimiento> = {}): EntradaRequerimient
     Over: insumo('Hilo Over', 5500),
   },
   avios: [],
+  cmHiloPorPrenda: CM_HILO_POR_PRENDA_DEFECTO,
   ...extra,
 });
 
@@ -135,5 +138,42 @@ describe('requerimiento de la hoja del dueño', () => {
     expect(r.sinPrecio).toBe(1); // la bolsa (los hilos sin elegir van como aviso)
     expect(r.avisos).toContain('Elegí el hilo 20/3 del corte');
     expect(r.total).toBe(136000 + 55500 + 100000 + 85000);
+  });
+
+  test('REQ-8: consumo por yardas: 5 200 yd y 12 m por jean → 396 prendas por cono', () => {
+    // hoja: 5 200 yd = 4 754.88 m; ÷ 12 m = 396.24 prendas por cono
+    expect(conosPorConsumo(396, 1200, 5200)).toBe(1);
+    expect(conosPorConsumo(397, 1200, 5200)).toBe(2);
+    // 1690 prendas: 20/3 4.27 → 5 · 20/2 6.16 → 7 · 40/2 7.70 → 8 · Over 2.46 → 3
+    expect([
+      conosPorConsumo(1690, 1200, 5200),
+      conosPorConsumo(1690, 2400, 7200),
+      conosPorConsumo(1690, 3000, 7200),
+      conosPorConsumo(1690, 4800, 36000),
+    ]).toEqual([5, 7, 8, 3]);
+  });
+
+  test('REQ-9: hilos = el mayor entre la carga de las máquinas y el consumo', () => {
+    const conYardas = (id: string, precio: number, yardas: number) =>
+      insumo(id, precio, null, { yardasPorCono: yardas });
+    const hilos = {
+      '20/3': conYardas('Hilo 20/3', 3000, 5200),
+      '20/2': conYardas('Hilo 20/2', 2800, 7200),
+      '40/2': conYardas('Hilo 40/2', 1050, 7200),
+      Over: conYardas('Hilo Over', 5500, 36000),
+    };
+    // 1690 prendas: el consumo (5/7/8/3) es menor que la carga (14/16/9/5) → manda la carga
+    const r = calcularRequerimiento(entrada({ hilos }));
+    const hilosDe = (x: typeof r) => x.lineas.filter((l) => l.grupo === 'Hilos');
+    expect(hilosDe(r).map((l) => l.necesita)).toEqual([14, 16, 9, 5]);
+    expect(hilosDe(r)[0].detalle).toBe('carga de máquinas 14 · consumo 5');
+
+    // un corte de 5 070 prendas (el triple): 20/3 13 < 14, 20/2 19 > 16, 40/2 24 > 9, Over 8 > 5
+    const grande = calcularRequerimiento(
+      entrada({ hilos, cantidades: [507, 1014, 1014, 507, 507, 507, 507, 507] }),
+    );
+    expect(hilosDe(grande).map((l) => l.necesita)).toEqual([14, 19, 24, 8]);
+    expect(hilosDe(grande)[1].detalle).toBe('carga de máquinas 16 · consumo 19 (manda el consumo)');
+    expect(r.avisos.some((a) => a.includes('yardas'))).toBe(false);
   });
 });

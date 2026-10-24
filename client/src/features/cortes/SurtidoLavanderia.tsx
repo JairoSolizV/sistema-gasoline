@@ -126,6 +126,8 @@ export function SurtidoLavanderia({
         />
       )}
 
+      {editando && <CompararColores corte={corte} especiales={especiales} />}
+
       {surtido.grupos.length > 0 ? (
         <div className="space-y-5 px-5 py-4">
           {editando && (
@@ -650,5 +652,65 @@ export function HojaSurtido({ corte }: { corte: CorteDetalleDTO }) {
         </tfoot>
       </table>
     </HojaOficio>
+  );
+}
+
+/** Cuántas docenas salen con 7, 6, 5 y 4 colores (como la hoja del dueño), para
+ *  decidir cuántos colores mandar a la lavandería. */
+function CompararColores({ corte, especiales }: { corte: CorteDetalleDTO; especiales: number[] }) {
+  const opciones = [7, 6, 5, 4].map((n) =>
+    surtidoDe(
+      corte,
+      Array.from({ length: n }, (_, i) => `C${i + 1}`),
+      especiales,
+    ),
+  );
+  // "1 de 12 doc + 6 · 6 de 12 doc": cuántos colores salen con cada cantidad
+  const resumen = (colores: { docenas: number; sueltas: number }[]) => {
+    const cuenta = new Map<string, number>();
+    for (const c of colores) {
+      const k = textoDocenas(c.docenas, c.sueltas);
+      cuenta.set(k, (cuenta.get(k) ?? 0) + 1);
+    }
+    return [...cuenta].map(([k, n]) => `${n} de ${k}`).join(' · ');
+  };
+  const grupos = opciones[0].grupos.map((g) => g.nombre);
+
+  return (
+    <div className="border-b border-gray-200 px-5 py-4">
+      <div className="mb-1.5 text-sm font-medium">
+        ¿Cuántos colores?{' '}
+        <span className="font-normal text-gray-500">· docenas por color según cuántos colores se manden</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+              <th className="py-1.5 pr-4">Colores</th>
+              {grupos.map((g) => (
+                <th key={g} className="px-3 py-1.5">
+                  {g}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {opciones.map((s, i) => {
+              const n = 7 - i;
+              return (
+                <tr key={n} className="border-b border-gray-100">
+                  <td className="mono py-1 pr-4 font-semibold">{n}</td>
+                  {s.grupos.map((g) => (
+                    <td key={g.nombre} className="mono px-3 py-1 text-xs">
+                      {resumen(g.colores)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

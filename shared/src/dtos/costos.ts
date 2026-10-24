@@ -30,6 +30,7 @@ export interface InsumoDTO {
   unidadesPorEnvase: number | null; // requerimiento: bolsa de 120, rollo de 500… (null = por unidad)
   precioEnvase: number | null; // centavos; referencia si no hay compras
   porTalla: boolean; // un envase por talla (talla tejida)
+  yardasPorCono: number | null; // hilo: para el consumo del requerimiento
   notas: string | null;
   activo: boolean;
   compras: number; // cuántas compras tiene
@@ -103,6 +104,7 @@ export interface FichaCostoDetalleDTO extends FichaCostoResumenDTO {
   margen: number; // el que se aplicó
   notas: string | null;
   cierresPorTalla: { talla: number; medidaCm: number }[] | null; // null = la regla por defecto
+  cmHiloPorPrenda: Record<'20/3' | '20/2' | '40/2' | 'Over', number> | null; // null = los de la hoja
   lineas: LineaCostoDTO[];
   materiales: number;
   manoDeObra: number;

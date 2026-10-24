@@ -72,6 +72,10 @@ export function RequerimientoInsumos({
               Cierres:{' '}
               {r.reglaCierres === 'ficha' ? 'regla de la ficha' : 'regla general (hasta 44: 12 · 46–48: 15 · 50+: 18 cm)'}
             </span>
+            <span>
+              Hilo por prenda ({r.hiloDeFicha ? 'de la ficha' : 'de la hoja'}):{' '}
+              {r.hilos.map((h) => `${h.titulo} ${r.cmHiloPorPrenda[h.titulo] / 100} m`).join(' · ')}
+            </span>
             <span>{r.prendas} prendas</span>
           </div>
 

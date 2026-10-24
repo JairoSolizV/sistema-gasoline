@@ -681,6 +681,7 @@ model Insumo {
   unidadesPorEnvase Int? // ej. bolsa de 120 cierres, rollo de 500 tallas; null = por unidad
   precioEnvase      Int? // centavos; referencia si el insumo todavía no tiene compras
   porTalla          Boolean @default(false) // un envase por talla (talla tejida)
+  yardasPorCono     Int? // hilo: para calcular cuántos conos consume un corte
   notas       String?
   activo      Boolean         @default(true)
   creadoEn    DateTime        @default(now())
@@ -730,6 +731,9 @@ model FichaCosto {
   // requerimiento: medida del cierre de cada talla, [{ talla, medidaCm }];
   // null = la regla de la hoja del dueño (medidaCierrePorDefecto de shared)
   cierresPorTalla      Json?
+  // requerimiento: centímetros de cada hilo por prenda, { "20/3": 1200, … };
+  // null = los de la hoja del dueño (CM_HILO_POR_PRENDA_DEFECTO de shared)
+  cmHiloPorPrenda      Json?
   notas                String?
   // catálogo de productos: lo que se le muestra al cliente
   tallas               String? // ej. "28 al 38"

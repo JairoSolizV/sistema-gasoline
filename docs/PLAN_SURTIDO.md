@@ -71,6 +71,9 @@ ESPECIAL. Mientras se edita, la tabla muestra la **vista previa**. Ya guardado: 
 (solo la hoja, en oficio o medio oficio) y **Registrar envío a lavandería**. El color aparece en cada
 envío de Servicios externos.
 
+**¿Cuántos colores?** Mientras se eligen los colores, una tabla compara las docenas por color con 7, 6,
+5 y 4 colores (como la pestaña "Hoja1 (2)" de su hoja, que ya trae el reparto 34-34-34-34-33).
+
 ## 7. Tests
 
 `server/tests/domain-surtido.test.ts` (SUR-1 a SUR-8: los casos de la hoja en 7, 6, 5 y 4 colores,

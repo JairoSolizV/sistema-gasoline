@@ -37,6 +37,7 @@ export function detalleInsumo(i: InsumoDTO): string {
     i.marca,
     i.numeroLlave && `llave ${i.numeroLlave}`,
     i.rendimiento && `rinde ${i.rendimiento} prendas/cono`,
+    i.yardasPorCono && `${i.yardasPorCono.toLocaleString('es-BO')} yd`,
     i.unidadesPorEnvase &&
       `envase de ${i.unidadesPorEnvase}${i.precioEnvase != null ? ` a Bs ${formatBs(i.precioEnvase)}` : ''}`,
     i.porTalla && 'uno por talla',
@@ -219,6 +220,7 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
     unidadesPorEnvase: insumo?.unidadesPorEnvase?.toString() ?? '',
     precioEnvase: insumo?.precioEnvase != null ? formatBs(insumo.precioEnvase).replace(/ /g, '') : '',
     porTalla: insumo?.porTalla ?? false,
+    yardasPorCono: insumo?.yardasPorCono?.toString() ?? '',
     notas: insumo?.notas ?? '',
     activo: insumo?.activo ?? true,
   });
@@ -233,6 +235,7 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
       ['medidaCm', 'La medida'],
       ['rendimiento', 'El rendimiento'],
       ['unidadesPorEnvase', 'Las unidades por envase'],
+      ['yardasPorCono', 'Las yardas del cono'],
     ] as const) {
       const n = entero(v[k]);
       if (n != null && (!Number.isInteger(n) || n < 1)) return setError(`${etiqueta} debe ser un número entero`);
@@ -254,6 +257,7 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
       unidadesPorEnvase: entero(v.unidadesPorEnvase),
       precioEnvase: precio === '' ? null : aCentavos(precio),
       porTalla: v.porTalla,
+      yardasPorCono: entero(v.yardasPorCono),
       notas: v.notas,
     };
     await guardar.mutateAsync({ id: insumo?.id ?? null, input: insumo ? { ...input, activo: v.activo } : input });
@@ -299,6 +303,7 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
           <>
             {campo('titulo', 'Título', 'ej. 20/3')}
             {campo('rendimiento', 'Prendas que rinde un cono', 'ej. 100')}
+            {campo('yardasPorCono', 'Yardas del cono', 'ej. 5200 (requerimiento)')}
           </>
         )}
         {v.categoria === 'tela' && campo('anchoCm', 'Ancho (cm)', 'ej. 190')}

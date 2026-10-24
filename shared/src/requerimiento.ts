@@ -8,8 +8,9 @@
 //    redondeando hacia arriba; se informa lo que sobra.
 //  - Cierres: la medida sale de la talla (regla de la ficha del modelo; si no
 //    tiene, la de su hoja: hasta la 44 → 12 cm, 46–48 → 15 cm, desde la 50 → 18 cm).
-//  - Hilos: conos FIJOS por máquina para todo el corte (no crecen con las
-//    prendas), con la lista de máquinas de Configuración. El hilo de cada
+//  - Hilos: el MAYOR entre la carga de las máquinas (conos fijos por máquina,
+//    lista de Configuración) y el consumo del corte (prendas × metros por jean
+//    de la ficha ÷ metros del cono, que salen de sus yardas). El hilo de cada
 //    título (20/3, 20/2, 40/2, Over) se elige en el corte (color).
 //  - Talla tejida (insumo "un envase por talla"): un rollo por talla aunque
 //    sobre; no se descuenta stock (cada talla es una etiqueta distinta).
@@ -46,6 +47,21 @@ export const MAQUINAS_HILO_DEFECTO: MaquinaHilos[] = [
   ...Array.from({ length: 6 }, () => m('RECTA', 1, 1, 0, 0)),
 ];
 
+/** Metros de cada hilo por prenda, en CENTÍMETROS (enteros), de la hoja del
+ *  dueño: 12 / 24 / 30 / 48 m por jean. Cada ficha puede tener los suyos. */
+export const CM_HILO_POR_PRENDA_DEFECTO: Record<TituloHilo, number> = {
+  '20/3': 1200,
+  '20/2': 2400,
+  '40/2': 3000,
+  Over: 4800,
+};
+
+/** Conos que consume un corte: prendas × cm por prenda ÷ cm del cono
+ *  (1 yarda = 91.44 cm), hacia arriba. Enteros exactos. */
+export function conosPorConsumo(prendas: number, cmPorPrenda: number, yardasPorCono: number): number {
+  return Math.ceil((prendas * cmPorPrenda * 100) / (yardasPorCono * 9144));
+}
+
 export interface CierrePorTalla {
   talla: number;
   medidaCm: number;
@@ -67,6 +83,7 @@ export interface InsumoRequerimiento {
   porTalla: boolean; // un envase por talla (talla tejida)
   precioEnvase: number | null; // centavos; null = sin precio
   disponible: number | null; // milésimas en inventario para este corte
+  yardasPorCono?: number | null; // hilos: para calcular el consumo
 }
 
 export type GrupoRequerimiento = 'Cierres' | 'Hilos' | 'Empaque';
@@ -102,6 +119,8 @@ export interface EntradaRequerimiento {
   insumoCierre: (medidaCm: number) => InsumoRequerimiento | null;
   maquinas: MaquinaHilos[];
   hilos: Partial<Record<TituloHilo, InsumoRequerimiento | null>>;
+  /** cm de cada hilo por prenda (ficha del modelo o los de la hoja) */
+  cmHiloPorPrenda: Record<TituloHilo, number>;
   /** líneas "por prenda" de la ficha que no son cierres (avíos de empaque, talla tejida…) */
   avios: { insumo: InsumoRequerimiento; cantidad: number /* milésimas por prenda */ }[];
 }
@@ -184,22 +203,32 @@ export function calcularRequerimiento(e: EntradaRequerimiento): Requerimiento {
     if (!insumo) avisos.push(`Falta cargar en Insumos el cierre de ${medida} cm`);
   }
 
-  // ── Hilos: conos fijos por máquina ──
+  // ── Hilos: el mayor entre la carga de las máquinas y el consumo ──
+  const prendas = e.cantidades.reduce((a, b) => a + b, 0);
   for (const titulo of TITULOS_HILO) {
-    const conos = e.maquinas.reduce((a, maq) => a + (maq.conos[titulo] ?? 0), 0);
-    if (conos === 0) continue;
-    const detalle = 'conos fijos por máquina';
+    const carga = e.maquinas.reduce((a, maq) => a + (maq.conos[titulo] ?? 0), 0);
     const insumo = e.hilos[titulo];
+    const yardas = insumo?.yardasPorCono ?? null;
+    const consumo =
+      yardas && e.cmHiloPorPrenda[titulo] > 0
+        ? conosPorConsumo(prendas, e.cmHiloPorPrenda[titulo], yardas)
+        : null;
+    const conos = Math.max(carga, consumo ?? 0);
+    if (conos === 0) continue;
+    const detalle =
+      consumo == null
+        ? `carga de máquinas ${carga}`
+        : `carga de máquinas ${carga} · consumo ${consumo}${consumo > carga ? ' (manda el consumo)' : ''}`;
     lineas.push(
       insumo
         ? linea('Hilos', insumo, conos, detalle)
         : faltaInsumo('Hilos', `Hilo ${titulo} (elegí el color)`, conos, detalle),
     );
     if (!insumo) avisos.push(`Elegí el hilo ${titulo} del corte`);
+    else if (yardas == null) avisos.push(`${insumo.nombre}: cargá las yardas del cono para calcular el consumo`);
   }
 
   // ── Empaque y avíos de la ficha (por prenda) ──
-  const prendas = e.cantidades.reduce((a, b) => a + b, 0);
   for (const { insumo, cantidad } of e.avios) {
     if (insumo.porTalla) {
       // un envase por talla, sin descontar stock
@@ -254,6 +283,8 @@ export interface RequerimientoCorteDTO extends Requerimiento {
   prendas: number;
   ficha: { id: string; nombre: string } | null; // la del modelo del corte
   reglaCierres: 'ficha' | 'defecto'; // de dónde salió la medida de los cierres
+  cmHiloPorPrenda: Record<TituloHilo, number>; // el que se usó
+  hiloDeFicha: boolean; // los metros por prenda salen de la ficha (si no, los de la hoja)
   hilos: { titulo: TituloHilo; elegido: OpcionInsumoDTO | null; opciones: OpcionInsumoDTO[] }[];
   maquinas: MaquinaHilos[];
 }

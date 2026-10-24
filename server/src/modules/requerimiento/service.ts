@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import {
   calcularRequerimiento,
   CANTIDAD_ESCALA,
+  CM_HILO_POR_PRENDA_DEFECTO,
   costoDeCantidad,
   MAQUINAS_HILO_DEFECTO,
   precioUnitario,
@@ -86,6 +87,7 @@ export const requerimientoService = {
       porTalla: i.porTalla,
       precioEnvase: precioDelEnvase(i),
       disponible: (stock.get(i.id)?.stock ?? 0) + (yaDescontado.get(i.id) ?? 0),
+      yardasPorCono: i.yardasPorCono,
     });
     const porId = new Map(insumos.map((i) => [i.id, i]));
     const activos = insumos.filter((i) => i.activo);
@@ -108,6 +110,8 @@ export const requerimientoService = {
     });
 
     const cierresPorTalla = (ficha?.cierresPorTalla as CierrePorTalla[] | null) ?? null;
+    const hiloDeFicha = ficha?.cmHiloPorPrenda as Record<TituloHilo, number> | null | undefined;
+    const cmHiloPorPrenda = hiloDeFicha ?? CM_HILO_POR_PRENDA_DEFECTO;
     const maquinas = (config.hilosMaquinas as MaquinaHilos[] | null) ?? MAQUINAS_HILO_DEFECTO;
     const tallas = corte.tallas as number[];
     const plus = corte.plusPorTalla as number[];
@@ -123,6 +127,7 @@ export const requerimientoService = {
       },
       maquinas,
       hilos: Object.fromEntries(hilos.map((h) => [h.titulo, h.insumo && aRequerimiento(h.insumo)])),
+      cmHiloPorPrenda,
       avios: (ficha?.lineas ?? [])
         .filter(
           (l) =>
@@ -145,6 +150,8 @@ export const requerimientoService = {
       prendas: cantidades.reduce((a, b) => a + b, 0),
       ficha: ficha && { id: ficha.id, nombre: ficha.nombre },
       reglaCierres: cierresPorTalla ? 'ficha' : 'defecto',
+      cmHiloPorPrenda,
+      hiloDeFicha: hiloDeFicha != null,
       hilos: hilos.map((h) => ({
         titulo: h.titulo,
         elegido: h.insumo && { id: h.insumo.id, nombre: h.insumo.nombre },

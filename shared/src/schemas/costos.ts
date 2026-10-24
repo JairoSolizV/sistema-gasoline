@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
 import { cajaBsSchema, cajaSchema } from './caja.js';
+import { TITULOS_HILO, type TituloHilo } from '../requerimiento.js';
 
 // Costos de producción (docs/PLAN_COSTOS.md). Unidades en shared/costos.ts:
 // cantidades en milésimas, dinero en centavos, tasa en diezmilésimos.
@@ -44,6 +45,7 @@ export const insumoInputSchema = z.object({
   unidadesPorEnvase: entero(1, 'Las unidades por envase deben ser al menos 1').nullable().optional(),
   precioEnvase: centavos.nullable().optional(), // referencia si no hay compras
   porTalla: z.boolean().optional(), // un envase por talla (talla tejida)
+  yardasPorCono: entero(1, 'Las yardas del cono deben ser mayores a 0').nullable().optional(), // hilo
   notas: texto(200).optional(),
 });
 
@@ -123,6 +125,16 @@ export const fichaCostoInputSchema = z.object({
     .array(z.object({ talla: z.number().int(), medidaCm: entero(1, 'Medida de cierre inválida') }))
     .max(40)
     .refine((cs) => new Set(cs.map((c) => c.talla)).size === cs.length, 'Hay una talla repetida')
+    .nullable()
+    .optional(),
+  // requerimiento: cm de cada hilo por prenda (null = los de la hoja: 12 / 24 / 30 / 48 m)
+  cmHiloPorPrenda: z
+    .object(
+      Object.fromEntries(TITULOS_HILO.map((t) => [t, entero(0, 'Metros de hilo inválidos')])) as Record<
+        TituloHilo,
+        z.ZodNumber
+      >,
+    )
     .nullable()
     .optional(),
   lineas: z.array(lineaCostoInputSchema).max(60).default([]),

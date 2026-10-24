@@ -31,6 +31,21 @@ descontando lo que ya hay en inventario, con el monto de la compra.
 9. Se creó la ficha del **COD 23** (CLASICO GSLN BJO RIGIDO) vinculada al modelo, con la talla tejida; la
    tela, los hilos y el empaque los completa el dueño.
 
+## 2b. Hilo por consumo (2026-10-23, segunda vuelta)
+
+La hoja sumó otra forma de calcular los hilos: **yardas por cono** (20/3: 5 200; 20/2 y 40/2: 7 200;
+Over: 36 000; 1 yd = 0.9144 m) y **metros por jean** (12 / 24 / 30 / 48 m). Prendas por cono = metros del
+cono ÷ metros por jean (20/3: 396). Decisiones:
+
+1. **Conos = el mayor entre la carga de las máquinas y el consumo del corte** (prendas × metros ÷
+   metros del cono, hacia arriba). Con 1690 prendas el consumo es 5 / 7 / 8 / 3 y manda la carga
+   (14 / 16 / 9 / 5); en un corte grande puede mandar el consumo.
+2. **Metros por jean en la ficha de cada modelo** (vacío = los de la hoja) y **yardas en cada insumo de
+   hilo**. Cargadas en la base del taller el 2026-10-23.
+
+El dato del costurero (C40 = 1400: "un cono de 20/3 alcanza para 100 prendas") no se usa: el dueño dice
+que no tiene lógica, y con 12 m por jean un cono de 5 200 yardas rinde ~396.
+
 **Error en la hoja:** en cierres de 15 cm decía 33.8 bolsas (dividía entre 10, no entre 120): son 2.82 →
 3 bolsas. El total de cierres era Bs 2 563.17 (comprando por fracción), no Bs 8 295.08.
 
@@ -39,7 +54,7 @@ descontando lo que ya hay en inventario, con el monto de la compra.
 | Grupo | Necesita | Detalle |
 |---|---|---|
 | Cierres | prendas de las tallas de cada medida | medida por talla: regla de la ficha o la general |
-| Hilos | Σ conos de cada título en la lista de máquinas | fijo por corte; hilo elegido en el corte |
+| Hilos | el mayor entre la carga de las máquinas y el consumo | hilo elegido en el corte (§2b) |
 | Empaque | prendas × cantidad por prenda de la ficha | avíos por prenda que no son cierre ni tela |
 | Talla tejida | un envase por talla | insumo marcado "un envase por talla"; no descuenta stock |
 
@@ -59,6 +74,8 @@ hacia arriba; **sobran** = envases × unidades − falta; **monto** = envases ×
 - `Configuracion.hilosMaquinas` `[{ maquina, conos: { "20/3", "20/2", "40/2", "Over" } }]` (null = la
   lista de la hoja: 14 / 16 / 9 / 5 conos).
 - `Corte.hilosRequerimiento` `{ "20/3": insumoId, … }`.
+- `Insumo.yardasPorCono` y `FichaCosto.cmHiloPorPrenda` `{ "20/3": 1200, … }` (centímetros; null = los de
+  la hoja).
 
 Cargado en la base del taller el 2026-10-23: cierres 12/15/18 cm en bolsas de 120 a Bs 170/185/200; tags
 y cuero paquete de 100 a Bs 50; bolsa paquete de 100 a Bs 31; remache 1000 a Bs 70; botón envase de 1000;
@@ -77,6 +94,7 @@ uno por talla). Respaldo previo: `backups/taller_pagos_antes_requerimiento_2026-
 
 ## 6. Tests
 
-`server/tests/domain-requerimiento.test.ts` (REQ-1 a REQ-7, con los números de la hoja) y
+`server/tests/domain-requerimiento.test.ts` (REQ-1 a REQ-9, con los números de la hoja; REQ-8 y REQ-9:
+consumo por yardas y el mayor entre carga y consumo) y
 `server/tests/requerimiento.test.ts` (REQ-A1 a REQ-A5: regla de la ficha, talla tejida, precio de la
 compra y stock, no pedir dos veces lo ya descontado, hilo elegido).

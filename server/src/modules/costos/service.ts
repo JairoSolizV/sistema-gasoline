@@ -80,6 +80,7 @@ function aInsumoDTO(
     unidadesPorEnvase: i.unidadesPorEnvase,
     precioEnvase: i.precioEnvase,
     porTalla: i.porTalla,
+    yardasPorCono: i.yardasPorCono,
     notas: i.notas,
     activo: i.activo,
     compras: i._count.compras,
@@ -240,6 +241,7 @@ export function calcularFicha(
     margen,
     notas: f.notas,
     cierresPorTalla: (f.cierresPorTalla as { talla: number; medidaCm: number }[] | null) ?? null,
+    cmHiloPorPrenda: (f.cmHiloPorPrenda as FichaCostoDetalleDTO['cmHiloPorPrenda']) ?? null,
     lineas: lineasDTO.map((l, i) => ({ ...l, costo: c.lineas[i] })),
     materiales: c.materiales,
     manoDeObra: c.manoDeObra,
@@ -547,6 +549,7 @@ async function guardar(id: string | null, input: FichaCostoInput): Promise<strin
       precioDocenaUsd: input.precioDocenaUsd ?? null,
       notas: input.notas ?? null,
       cierresPorTalla: input.cierresPorTalla ?? Prisma.DbNull,
+      cmHiloPorPrenda: input.cmHiloPorPrenda ?? Prisma.DbNull,
     },
     input.lineas.map((l, i) => ({
       orden: i + 1,
