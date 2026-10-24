@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { esDiaValido } from '../dias.js';
 import { PROCESOS_CORTE } from '../servicioCorte.js';
 import { MAX_COLORES_SURTIDO } from '../surtido.js';
+import { TITULOS_HILO, type TituloHilo } from '../requerimiento.js';
 
 // Datos del tendido (informativos; no afectan pagos). Los mismos campos se
 // piden al crear el corte y al completarlos/editarlos después. Quién cortó y
@@ -202,6 +203,17 @@ export const editarColorLavadoSchema = z
   .object({ nombre: nombreColor, activo: z.boolean(), orden: z.number().int().min(0) })
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, { message: 'Nada que actualizar' });
+
+/** Hilo del corte para cada título (el color); null = el de la ficha del modelo. */
+export const elegirHilosSchema = z.object({
+  hilos: z.object(
+    Object.fromEntries(TITULOS_HILO.map((t) => [t, z.uuid().nullable().optional()])) as Record<
+      TituloHilo,
+      z.ZodOptional<z.ZodNullable<z.ZodUUID>>
+    >,
+  ),
+});
+export type ElegirHilosInput = z.infer<typeof elegirHilosSchema>;
 
 export type GuardarSurtidoInput = z.infer<typeof guardarSurtidoSchema>;
 export type EnviarSurtidoInput = z.infer<typeof enviarSurtidoSchema>;

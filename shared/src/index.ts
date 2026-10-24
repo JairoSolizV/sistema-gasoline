@@ -8,6 +8,7 @@ export * from './costos.js';
 export * from './tiempos.js';
 export * from './tendido.js';
 export * from './surtido.js';
+export * from './requerimiento.js';
 export * from './pasos.js';
 export * from './reportes.js';
 export * from './dtos/operario.js';

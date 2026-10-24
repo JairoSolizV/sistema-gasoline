@@ -3,8 +3,10 @@ import type {
   ColorLavadoDTO,
   CorteDetalleDTO,
   EditarColorLavadoInput,
+  ElegirHilosInput,
   EnviarSurtidoInput,
   GuardarSurtidoInput,
+  RequerimientoCorteDTO,
 } from '@taller/shared';
 import { api } from './client';
 
@@ -82,5 +84,26 @@ export function useEnviarSurtido() {
         body: JSON.stringify(input),
       }),
     onSuccess: aplicar,
+  });
+}
+
+// ── Requerimiento de insumos del corte (docs/PLAN_REQUERIMIENTO.md) ──
+
+export function useRequerimiento(corteId: string) {
+  return useQuery({
+    queryKey: ['requerimiento', corteId],
+    queryFn: () => api<RequerimientoCorteDTO>(`/cortes/${corteId}/requerimiento`),
+  });
+}
+
+export function useElegirHilos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ corteId, input }: { corteId: string; input: ElegirHilosInput }) =>
+      api<RequerimientoCorteDTO>(`/cortes/${corteId}/requerimiento/hilos`, {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (dto, { corteId }) => qc.setQueryData(['requerimiento', corteId], dto),
   });
 }

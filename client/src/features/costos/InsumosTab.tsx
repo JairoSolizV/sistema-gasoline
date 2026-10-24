@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { CATEGORIAS_INSUMO, formatBs, type CategoriaInsumo, type InsumoDTO, type InsumoInput } from '@taller/shared';
+import {
+  aCentavos,
+  CATEGORIAS_INSUMO,
+  formatBs,
+  type CategoriaInsumo,
+  type InsumoDTO,
+  type InsumoInput,
+} from '@taller/shared';
 import { useCrearConteo, useEliminarInsumo, useGuardarInsumo, useInsumos, useKardex } from '../../api/costos';
 import { hoyLocalISO } from '../../lib/fechas';
 import { ErrorApi } from '../../api/client';
@@ -30,6 +37,9 @@ export function detalleInsumo(i: InsumoDTO): string {
     i.marca,
     i.numeroLlave && `llave ${i.numeroLlave}`,
     i.rendimiento && `rinde ${i.rendimiento} prendas/cono`,
+    i.unidadesPorEnvase &&
+      `envase de ${i.unidadesPorEnvase}${i.precioEnvase != null ? ` a Bs ${formatBs(i.precioEnvase)}` : ''}`,
+    i.porTalla && 'uno por talla',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -206,6 +216,9 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
     numeroLlave: insumo?.numeroLlave ?? '',
     medidaCm: insumo?.medidaCm?.toString() ?? '',
     rendimiento: insumo?.rendimiento?.toString() ?? '',
+    unidadesPorEnvase: insumo?.unidadesPorEnvase?.toString() ?? '',
+    precioEnvase: insumo?.precioEnvase != null ? formatBs(insumo.precioEnvase).replace(/ /g, '') : '',
+    porTalla: insumo?.porTalla ?? false,
     notas: insumo?.notas ?? '',
     activo: insumo?.activo ?? true,
   });
@@ -219,10 +232,13 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
       ['anchoCm', 'El ancho'],
       ['medidaCm', 'La medida'],
       ['rendimiento', 'El rendimiento'],
+      ['unidadesPorEnvase', 'Las unidades por envase'],
     ] as const) {
       const n = entero(v[k]);
       if (n != null && (!Number.isInteger(n) || n < 1)) return setError(`${etiqueta} debe ser un número entero`);
     }
+    const precio = v.precioEnvase.trim().replace(',', '.');
+    if (precio !== '' && !/^\d+(\.\d{1,2})?$/.test(precio)) return setError('Precio del envase inválido (ej. 170)');
     const input: InsumoInput = {
       nombre: v.nombre,
       categoria: v.categoria,
@@ -235,6 +251,9 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
       numeroLlave: v.numeroLlave,
       medidaCm: entero(v.medidaCm),
       rendimiento: entero(v.rendimiento),
+      unidadesPorEnvase: entero(v.unidadesPorEnvase),
+      precioEnvase: precio === '' ? null : aCentavos(precio),
+      porTalla: v.porTalla,
       notas: v.notas,
     };
     await guardar.mutateAsync({ id: insumo?.id ?? null, input: insumo ? { ...input, activo: v.activo } : input });
@@ -292,6 +311,20 @@ function ModalInsumo({ insumo, onCerrar }: { insumo: InsumoDTO | null; onCerrar:
         )}
         {campo('color', 'Color')}
         {campo('codigo', 'Código')}
+        {v.categoria !== 'tela' && (
+          <>
+            <div className="col-span-2 mt-1 text-xs text-gray-500">
+              Para el requerimiento de insumos: en qué envase se compra (bolsa de 120 cierres, rollo de
+              500 tallas, paquete de 100 bolsas…).
+            </div>
+            {campo('unidadesPorEnvase', 'Unidades por envase', 'ej. 120 (vacío = por unidad)')}
+            {campo('precioEnvase', 'Precio del envase (Bs)', 'si todavía no hay compras')}
+            <label className="col-span-2 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={v.porTalla} onChange={(e) => cambiar('porTalla', e.target.checked)} />
+              Un envase por talla (ej. talla tejida: un rollo para cada talla)
+            </label>
+          </>
+        )}
         <div className="col-span-2">{campo('notas', 'Notas')}</div>
         {insumo && (
           <label className="col-span-2 flex items-center gap-2 text-sm">

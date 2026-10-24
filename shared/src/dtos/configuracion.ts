@@ -1,3 +1,5 @@
+import type { MaquinaHilos } from '../requerimiento.js';
+
 export interface ConfiguracionDTO {
   topeAnticipoAdvertencia: number; // centavos
   diferencialMaestroExterno: number; // centavos
@@ -14,4 +16,6 @@ export interface ConfiguracionDTO {
   margenVenta: number; // costos: margen general del precio de venta, centésimas de % (3000 = 30 %)
   prendasMesCostoFijo: number; // costos fijos: prendas por mes con las que se reparten en las fichas
   tasaCambioUsd: number; // costos: Bs por $us para mostrar la docena en dólares (diezmilésimos)
+  // requerimiento de insumos: máquinas y conos de cada hilo (docs/PLAN_REQUERIMIENTO.md)
+  hilosMaquinas: MaquinaHilos[];
 }

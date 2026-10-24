@@ -5,9 +5,11 @@ import {
   costoFicha,
   docenaEnDolares,
   formatBs,
+  medidaCierrePorDefecto,
   prendaBsDeDocenaUsd,
   precioUnitario,
   type CategoriaInsumo,
+  type CierrePorTalla,
   type FichaCostoDetalleDTO,
   type FichaCostoInput,
   type InsumoDTO,
@@ -181,10 +183,12 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const [docenaUsd, setDocenaUsd] = useState(ficha?.precioDocenaFijo ? (ficha.ventaDocenaUsd / 100).toFixed(2) : '');
   const [notas, setNotas] = useState(ficha?.notas ?? '');
   const [filas, setFilas] = useState<Fila[]>(ficha?.lineas.map(aFila) ?? []);
+  // requerimiento de insumos: medida del cierre de cada talla ([] = regla por defecto)
+  const [cierres, setCierres] = useState<CierrePorTalla[]>(ficha?.cierresPorTalla ?? []);
   const [error, setError] = useState<string | null>(null);
   const [sucio, setSucio] = useState(false);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
-  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas]);
+  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas, cierres]);
   useEffect(() => setSucio(false), []); // recién cargada: sin cambios
 
   const porId = useMemo(() => new Map((insumos ?? []).map((i) => [i.id, i])), [insumos]);
@@ -235,6 +239,8 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
     if (!vinculado && manoBs.trim() && !PATRON_BS.test(manoBs.trim())) return setError('Mano de obra inválida');
     if (margenPct.trim() && !PATRON_DECIMAL.test(margenPct.trim())) return setError('Margen inválido (ej. 30)');
     if (docenaUsd.trim() && docenaFija == null) return setError('Precio de la docena inválido (ej. 85.50)');
+    if (cierres.some((c) => !Number.isInteger(c.talla))) return setError('Talla inválida en los cierres');
+    if (new Set(cierres.map((c) => c.talla)).size !== cierres.length) return setError('Hay una talla repetida en los cierres');
     const input: FichaCostoInput = {
       codigo,
       nombre,
@@ -245,6 +251,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
       margen: margenPct.trim() ? aCentesimasPct(margenPct) : null,
       precioDocenaUsd: docenaFija,
       notas,
+      cierresPorTalla: cierres.length ? [...cierres].sort((a, b) => a.talla - b.talla) : null,
       lineas,
     };
     const guardada = await guardar.mutateAsync({ id: ficha?.id ?? null, input });
@@ -390,6 +397,16 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
           </tbody>
         </table>
       </div>
+
+      <CierresPorTalla
+        cierres={cierres}
+        setCierres={setCierres}
+        medidas={[
+          ...new Set(
+            (insumos ?? []).filter((i) => i.categoria === 'cierre' && i.medidaCm).map((i) => i.medidaCm!),
+          ),
+        ].sort((a, b) => a - b)}
+      />
 
       <div className="mt-4">
         <label className="mb-1 block text-sm font-medium">Notas</label>
@@ -602,5 +619,84 @@ function FilaEditor({
         </button>
       </td>
     </tr>
+  );
+}
+
+/** Requerimiento de insumos: qué cierre lleva cada talla de este modelo
+ *  (docs/PLAN_REQUERIMIENTO.md). Sin filas, se usa la regla por defecto. */
+function CierresPorTalla({
+  cierres,
+  setCierres,
+  medidas,
+}: {
+  cierres: CierrePorTalla[];
+  setCierres: (c: CierrePorTalla[]) => void;
+  medidas: number[];
+}) {
+  const opciones = medidas.length ? medidas : [12, 15, 18];
+  const cambiar = (i: number, c: Partial<CierrePorTalla>) =>
+    setCierres(cierres.map((x, k) => (k === i ? { ...x, ...c } : x)));
+  const siguiente = () => {
+    const ultima = cierres.length ? Math.max(...cierres.map((c) => c.talla)) + 2 : 40;
+    setCierres([...cierres, { talla: ultima, medidaCm: medidaCierrePorDefecto(ultima) }]);
+  };
+  const porDefecto = () =>
+    setCierres([40, 42, 44, 46, 48, 50, 52, 54].map((talla) => ({ talla, medidaCm: medidaCierrePorDefecto(talla) })));
+
+  return (
+    <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Cierre por talla</div>
+          <div className="text-xs text-gray-500">
+            Para el requerimiento de insumos de los cortes de este modelo.
+            {cierres.length === 0 && ' Sin filas usa la regla general: hasta la 44 → 12 cm, 46–48 → 15 cm, desde la 50 → 18 cm.'}
+          </div>
+        </div>
+        <div className="flex gap-3 text-[13px] font-medium text-acento">
+          {cierres.length === 0 && (
+            <button onClick={porDefecto} className="hover:underline">
+              Cargar 40 a 54 con la regla general
+            </button>
+          )}
+          <button onClick={siguiente} className="hover:underline">
+            + Talla
+          </button>
+        </div>
+      </div>
+      {cierres.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {cierres.map((c, i) => (
+            <span key={i} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1 text-sm">
+              <input
+                value={Number.isNaN(c.talla) ? '' : c.talla}
+                onChange={(e) => cambiar(i, { talla: parseInt(e.target.value, 10) })}
+                inputMode="numeric"
+                className="mono w-12 rounded border border-gray-300 px-1 py-0.5 text-center outline-none focus:border-acento"
+              />
+              <span className="text-gray-400">→</span>
+              <select
+                value={c.medidaCm}
+                onChange={(e) => cambiar(i, { medidaCm: Number(e.target.value) })}
+                className="rounded border border-gray-300 px-1 py-0.5 outline-none focus:border-acento"
+              >
+                {[...new Set([...opciones, c.medidaCm])].sort((a, b) => a - b).map((m) => (
+                  <option key={m} value={m}>
+                    {m} cm
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={() => setCierres(cierres.filter((_, k) => k !== i))}
+                title="Quitar talla"
+                className="text-gray-400 hover:text-error"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -187,6 +187,9 @@ model Corte {
   // colores de lavado); null = sin surtido. Tallas ESPECIAL: null = desde la 48.
   surtidoColores              Json?
   tallasEspeciales            Json?
+  // Requerimiento de insumos: hilo elegido para cada título, { "20/3": insumoId, … }
+  // (el color del corte). null = los hilos de la ficha del modelo.
+  hilosRequerimiento          Json?
   estado          EstadoCorte      @default(borrador)
   fechaInicio     DateTime         @default(now())
   fechaCierre     DateTime? // se fija al cerrar; eje del consolidado
@@ -358,6 +361,10 @@ model Configuracion {
   // costos: tipo de cambio para mostrar precios por docena en $us (diezmilésimos;
   // 11.85 = 118 500). Solo para mostrar; no cambia ningún cálculo en Bs.
   tasaCambioUsd               Int @default(118500)
+  // Requerimiento de insumos (docs/PLAN_REQUERIMIENTO.md): máquinas del taller
+  // y los conos de cada hilo que llevan, [{ maquina, conos: { "20/3": 2, … } }].
+  // null = la lista de la hoja del dueño (MAQUINAS_HILO_DEFECTO de shared).
+  hilosMaquinas               Json?
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -670,6 +677,10 @@ model Insumo {
   numeroLlave String? // cierre
   medidaCm    Int? // cierre
   rendimiento Int? // hilo: prendas que rinde un cono (base; la ficha puede tener el suyo)
+  // requerimiento (docs/PLAN_REQUERIMIENTO.md): se compra en envases completos
+  unidadesPorEnvase Int? // ej. bolsa de 120 cierres, rollo de 500 tallas; null = por unidad
+  precioEnvase      Int? // centavos; referencia si el insumo todavía no tiene compras
+  porTalla          Boolean @default(false) // un envase por talla (talla tejida)
   notas       String?
   activo      Boolean         @default(true)
   creadoEn    DateTime        @default(now())
@@ -716,6 +727,9 @@ model FichaCosto {
   servicioCorteInterno Boolean      @default(true) // suma las tarifas del servicio de corte
   margen               Int? // centésimas de %; null = el general de Configuración
   precioDocenaUsd      Int? // precio fijo de la docena en $us (centavos); null = costo + margen
+  // requerimiento: medida del cierre de cada talla, [{ talla, medidaCm }];
+  // null = la regla de la hoja del dueño (medidaCierrePorDefecto de shared)
+  cierresPorTalla      Json?
   notas                String?
   // catálogo de productos: lo que se le muestra al cliente
   tallas               String? // ej. "28 al 38"

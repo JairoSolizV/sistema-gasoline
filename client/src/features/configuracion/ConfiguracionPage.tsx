@@ -3,8 +3,11 @@ import {
   aCentavos,
   CLAVES_TARIFA_CORTE,
   formatBs,
+  MAQUINAS_HILO_DEFECTO,
+  TITULOS_HILO,
   type ClaveTarifaCorte,
   type ConfiguracionDTO,
+  type MaquinaHilos,
 } from '@taller/shared';
 import { useConfiguracion, useEditarConfiguracion } from '../../api/configuracion';
 import { ErrorApi } from '../../api/client';
@@ -294,8 +297,131 @@ export function ConfiguracionPage() {
             </button>
             {guardado && <span className="text-sm font-medium text-ok">✓ Guardado</span>}
           </div>
+
+          <HilosMaquinas guardadas={data.hilosMaquinas} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Requerimiento de insumos (docs/PLAN_REQUERIMIENTO.md): las máquinas del
+ *  taller y cuántos conos de cada hilo lleva cargados cada una. Son conos fijos
+ *  por corte: no crecen con la cantidad de prendas. */
+function HilosMaquinas({ guardadas }: { guardadas: MaquinaHilos[] }) {
+  const editar = useEditarConfiguracion();
+  const [filas, setFilas] = useState<MaquinaHilos[]>(guardadas);
+  const [guardado, setGuardado] = useState(false);
+  useEffect(() => setFilas(guardadas), [guardadas]);
+
+  const cambiar = (i: number, cambio: Partial<MaquinaHilos>) => {
+    setFilas(filas.map((f, k) => (k === i ? { ...f, ...cambio } : f)));
+    setGuardado(false);
+  };
+  const totales = TITULOS_HILO.map((t) => filas.reduce((a, f) => a + (f.conos[t] || 0), 0));
+  const valido = filas.every((f) => f.maquina.trim() !== '');
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-200 bg-gray-50 px-5 py-3">
+        <div className="text-sm font-semibold">Hilos por máquina</div>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Para el requerimiento de insumos de cada corte: conos de cada hilo que lleva cargada cada
+          máquina. Son fijos por corte, no dependen de la cantidad de prendas.
+        </p>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+            <th className="px-5 py-2">Máquina</th>
+            {TITULOS_HILO.map((t) => (
+              <th key={t} className="px-2 py-2 text-right">
+                {t}
+              </th>
+            ))}
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f, i) => (
+            <tr key={i} className="border-t border-gray-100">
+              <td className="px-5 py-1">
+                <input
+                  value={f.maquina}
+                  onChange={(e) => cambiar(i, { maquina: e.target.value.toUpperCase() })}
+                  className="w-40 rounded-md border border-gray-300 px-2 py-1 text-sm outline-none focus:border-acento"
+                />
+              </td>
+              {TITULOS_HILO.map((t) => (
+                <td key={t} className="px-2 py-1 text-right">
+                  <input
+                    value={f.conos[t] || ''}
+                    onChange={(e) =>
+                      cambiar(i, { conos: { ...f.conos, [t]: parseInt(e.target.value.replace(/\D/g, '') || '0', 10) } })
+                    }
+                    inputMode="numeric"
+                    placeholder="0"
+                    className="mono w-14 rounded-md border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:border-acento"
+                  />
+                </td>
+              ))}
+              <td className="px-3 text-center">
+                <button
+                  onClick={() => setFilas(filas.filter((_, k) => k !== i))}
+                  title="Quitar máquina"
+                  className="text-gray-400 hover:text-error"
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-gray-300 font-semibold">
+            <td className="px-5 py-2">Total conos</td>
+            {totales.map((n, i) => (
+              <td key={i} className="mono px-4 py-2 text-right">
+                {n}
+              </td>
+            ))}
+            <td />
+          </tr>
+        </tfoot>
+      </table>
+      <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-5 py-3">
+        <button
+          onClick={() =>
+            setFilas([...filas, { maquina: '', conos: { '20/3': 0, '20/2': 0, '40/2': 0, Over: 0 } }])
+          }
+          className="text-[13px] font-medium text-acento hover:underline"
+        >
+          + Máquina
+        </button>
+        <button
+          onClick={() => setFilas(MAQUINAS_HILO_DEFECTO)}
+          className="text-[13px] font-medium text-gray-500 hover:underline"
+        >
+          Volver a la lista de la hoja
+        </button>
+        <span className="flex-1" />
+        {editar.error != null && (
+          <span className="text-xs text-error">
+            {editar.error instanceof ErrorApi ? editar.error.message : 'Error al guardar'}
+          </span>
+        )}
+        {guardado && <span className="text-sm font-medium text-ok">✓ Guardado</span>}
+        <button
+          onClick={async () => {
+            await editar.mutateAsync({ hilosMaquinas: filas });
+            setGuardado(true);
+          }}
+          disabled={editar.isPending || !valido}
+          className="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-white hover:bg-[#265dc2] disabled:opacity-60"
+        >
+          Guardar máquinas
+        </button>
+      </div>
     </div>
   );
 }

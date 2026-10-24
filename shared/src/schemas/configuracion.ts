@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TITULOS_HILO, type TituloHilo } from '../requerimiento.js';
 
 // Tarifas predeterminadas del servicio de corte interno (centavos). Se copian a
 // cada corte al crearlo; ahí se editan (docs/PLAN_SERVICIO_CORTE.md §2).
@@ -24,6 +25,21 @@ export const editarConfiguracionSchema = z
     margenVenta: z.number().int().min(0).max(100_000).optional(),
     prendasMesCostoFijo: z.number().int().min(1).max(1_000_000).optional(),
     tasaCambioUsd: z.number().int().min(1).max(10_000_000).optional(), // diezmilésimos
+    // requerimiento: máquinas del taller y los conos de cada hilo que llevan
+    hilosMaquinas: z
+      .array(
+        z.object({
+          maquina: z.string().trim().min(1, 'Falta el nombre de la máquina').max(40).transform((v) => v.toUpperCase()),
+          conos: z.object(
+            Object.fromEntries(TITULOS_HILO.map((t) => [t, z.number().int().min(0).max(20)])) as Record<
+              TituloHilo,
+              z.ZodNumber
+            >,
+          ),
+        }),
+      )
+      .max(60)
+      .optional(),
     nombreTaller: z
       .preprocess((v) => (v === '' || v == null ? null : v), z.string().trim().max(80).nullable())
       .optional(),

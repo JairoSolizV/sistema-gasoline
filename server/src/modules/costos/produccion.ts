@@ -34,7 +34,7 @@ import {
   rendimientoDeLinea,
 } from './service.js';
 
-type CorteCosto = Awaited<ReturnType<typeof costosRepository.cortesParaCosto>>[number];
+export type CorteCosto = Awaited<ReturnType<typeof costosRepository.cortesParaCosto>>[number];
 const fr = (n: number): Fraccion => ({ num: BigInt(n), den: 1n });
 
 /** La ficha que usa un corte: la vinculada a su modelo (la última actualizada). */
@@ -51,7 +51,7 @@ const telaPrincipal = (f: FichaConDatos) => f.lineas.findIndex((l) => l.tipo ===
 
 /** Material que gastó un corte, por insumo, en milésimas exactas. La tela
  *  principal usa el tizado real si el corte tiene prendas por capa. */
-function consumoDeCorte(c: CorteCosto, f: FichaConDatos): Map<string, Fraccion> {
+export function consumoDeCorte(c: CorteCosto, f: FichaConDatos): Map<string, Fraccion> {
   const consumo = new Map<string, Fraccion>();
   const principal = telaPrincipal(f);
   f.lineas.forEach((l, i) => {

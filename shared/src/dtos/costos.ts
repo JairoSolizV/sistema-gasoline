@@ -27,6 +27,9 @@ export interface InsumoDTO {
   numeroLlave: string | null;
   medidaCm: number | null;
   rendimiento: number | null;
+  unidadesPorEnvase: number | null; // requerimiento: bolsa de 120, rollo de 500… (null = por unidad)
+  precioEnvase: number | null; // centavos; referencia si no hay compras
+  porTalla: boolean; // un envase por talla (talla tejida)
   notas: string | null;
   activo: boolean;
   compras: number; // cuántas compras tiene
@@ -99,6 +102,7 @@ export interface FichaCostoDetalleDTO extends FichaCostoResumenDTO {
   margenPropio: number | null; // centésimas de %
   margen: number; // el que se aplicó
   notas: string | null;
+  cierresPorTalla: { talla: number; medidaCm: number }[] | null; // null = la regla por defecto
   lineas: LineaCostoDTO[];
   materiales: number;
   manoDeObra: number;

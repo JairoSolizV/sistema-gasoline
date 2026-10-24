@@ -36,6 +36,7 @@ import { ServicioCorte } from './ServicioCorte';
 import { PasosCorte } from '../../components/PasosCorte';
 import { EnviosServicio } from './EnviosServicio';
 import { HojaSurtido, SurtidoLavanderia } from './SurtidoLavanderia';
+import { HojaRequerimiento, RequerimientoInsumos } from './RequerimientoInsumos';
 import { imprimir, type Tamano } from '../../components/Imprimir';
 import { DuracionEstimada } from './DuracionEstimada';
 import { CalculadoraTendido } from './CalculadoraTendido';
@@ -224,12 +225,13 @@ export function CorteDetallePage() {
   const [modalOp, setModalOp] = useState<ModalOperacion | null>(null);
   const reordenar = useReordenarOperacionesCorte();
   const [fechaCierre, setFechaCierre] = useState(hoyLocalISO);
-  // mientras se imprime la hoja de surtido, el resto de la página no sale
-  const [hojaSurtido, setHojaSurtido] = useState(false);
-  const imprimirSurtido = (tamano: Tamano) => {
-    flushSync(() => setHojaSurtido(true));
+  // mientras se imprime una hoja propia (surtido, requerimiento), el resto de
+  // la página no sale
+  const [hoja, setHoja] = useState<'surtido' | 'requerimiento' | null>(null);
+  const imprimirHoja = (cual: 'surtido' | 'requerimiento') => (tamano: Tamano) => {
+    flushSync(() => setHoja(cual));
     const terminar = () => {
-      setHojaSurtido(false);
+      setHoja(null);
       window.removeEventListener('afterprint', terminar);
     };
     window.addEventListener('afterprint', terminar);
@@ -267,8 +269,9 @@ export function CorteDetallePage() {
 
   return (
     <>
-      {hojaSurtido && <HojaSurtido corte={corte} />}
-    <div className={`p-8 ${hojaSurtido ? 'print:hidden' : ''}`}>
+      {hoja === 'surtido' && <HojaSurtido corte={corte} />}
+      {hoja === 'requerimiento' && <HojaRequerimiento corte={corte} />}
+    <div className={`p-8 ${hoja ? 'print:hidden' : ''}`}>
       <div className="text-xs text-gray-500">
         <Link to="/cortes" className="hover:underline">
           Cortes
@@ -450,6 +453,7 @@ export function CorteDetallePage() {
       </div>
 
       <CalculadoraTendido corte={corte} />
+      <RequerimientoInsumos corte={corte} onImprimir={imprimirHoja('requerimiento')} />
 
       <div className="mt-6">
         <PasosCorte corteId={corte.id} paso={corte.paso} pasoDesde={corte.pasoDesde} />
@@ -524,7 +528,7 @@ export function CorteDetallePage() {
 
           <HistorialCambios cambios={corte.cambios} />
 
-          <SurtidoLavanderia corte={corte} onImprimir={imprimirSurtido} />
+          <SurtidoLavanderia corte={corte} onImprimir={imprimirHoja('surtido')} />
           <EnviosServicio corte={corte} />
         </div>
       )}

@@ -2,7 +2,7 @@
 // por prenda. SOLO CONSULTA: lee CT y tarifas del sistema, nunca toca pagos.
 // El dinero lo calcula el dominio compartido (shared/costos.ts): fracciones
 // exactas y un solo redondeo por número informado.
-import type { Configuracion } from '@prisma/client';
+import { Prisma, type Configuracion } from '@prisma/client';
 import {
   aBolivianos,
   docenaEnDolares,
@@ -77,6 +77,9 @@ function aInsumoDTO(
     numeroLlave: i.numeroLlave,
     medidaCm: i.medidaCm,
     rendimiento: i.rendimiento,
+    unidadesPorEnvase: i.unidadesPorEnvase,
+    precioEnvase: i.precioEnvase,
+    porTalla: i.porTalla,
     notas: i.notas,
     activo: i.activo,
     compras: i._count.compras,
@@ -236,6 +239,7 @@ export function calcularFicha(
     margenPropio: f.margen,
     margen,
     notas: f.notas,
+    cierresPorTalla: (f.cierresPorTalla as { talla: number; medidaCm: number }[] | null) ?? null,
     lineas: lineasDTO.map((l, i) => ({ ...l, costo: c.lineas[i] })),
     materiales: c.materiales,
     manoDeObra: c.manoDeObra,
@@ -542,6 +546,7 @@ async function guardar(id: string | null, input: FichaCostoInput): Promise<strin
       margen: input.margen ?? null,
       precioDocenaUsd: input.precioDocenaUsd ?? null,
       notas: input.notas ?? null,
+      cierresPorTalla: input.cierresPorTalla ?? Prisma.DbNull,
     },
     input.lineas.map((l, i) => ({
       orden: i + 1,

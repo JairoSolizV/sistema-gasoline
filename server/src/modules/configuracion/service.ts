@@ -7,7 +7,9 @@
 import type { Configuracion, Prisma } from '@prisma/client';
 import {
   CLAVES_TARIFA_CORTE,
+  MAQUINAS_HILO_DEFECTO,
   type ConfiguracionDTO,
+  type MaquinaHilos,
   type EditarConfiguracionInput,
 } from '@taller/shared';
 import { configuracionRepository } from './repository.js';
@@ -28,6 +30,7 @@ function aDTO(c: Configuracion): ConfiguracionDTO {
     margenVenta: c.margenVenta,
     prendasMesCostoFijo: c.prendasMesCostoFijo,
     tasaCambioUsd: c.tasaCambioUsd,
+    hilosMaquinas: (c.hilosMaquinas as MaquinaHilos[] | null) ?? MAQUINAS_HILO_DEFECTO,
   };
 }
 
@@ -51,6 +54,7 @@ export const configuracionService = {
         ? { prendasMesCostoFijo: input.prendasMesCostoFijo }
         : {}),
       ...(input.tasaCambioUsd !== undefined ? { tasaCambioUsd: input.tasaCambioUsd } : {}),
+      ...(input.hilosMaquinas !== undefined ? { hilosMaquinas: input.hilosMaquinas } : {}),
     };
     for (const clave of CLAVES_TARIFA_CORTE) {
       if (input[clave] !== undefined) data[clave] = input[clave];

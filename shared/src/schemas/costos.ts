@@ -40,6 +40,10 @@ export const insumoInputSchema = z.object({
   numeroLlave: texto(20).optional(),
   medidaCm: entero(1, 'Medida inválida').nullable().optional(),
   rendimiento: entero(1, 'El rendimiento son prendas por cono (mayor a 0)').nullable().optional(),
+  // requerimiento (docs/PLAN_REQUERIMIENTO.md): envase en que se compra
+  unidadesPorEnvase: entero(1, 'Las unidades por envase deben ser al menos 1').nullable().optional(),
+  precioEnvase: centavos.nullable().optional(), // referencia si no hay compras
+  porTalla: z.boolean().optional(), // un envase por talla (talla tejida)
   notas: texto(200).optional(),
 });
 
@@ -114,6 +118,13 @@ export const fichaCostoInputSchema = z.object({
   margen: z.number().int().min(0).max(100_000).nullable().optional(), // null = el general
   precioDocenaUsd: centavos.nullable().optional(), // precio fijo de la docena en $us (null = costo + margen)
   notas: texto(500).optional(),
+  // requerimiento: medida del cierre de cada talla (null = la regla por defecto)
+  cierresPorTalla: z
+    .array(z.object({ talla: z.number().int(), medidaCm: entero(1, 'Medida de cierre inválida') }))
+    .max(40)
+    .refine((cs) => new Set(cs.map((c) => c.talla)).size === cs.length, 'Hay una talla repetida')
+    .nullable()
+    .optional(),
   lineas: z.array(lineaCostoInputSchema).max(60).default([]),
 });
 
