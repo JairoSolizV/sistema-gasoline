@@ -17,7 +17,7 @@
 //  - A comprar = lo que se necesita − lo que hay (nunca negativo).
 // Cantidades en milésimas como en Costos; dinero en centavos.
 
-import { CANTIDAD_ESCALA } from './costos.js';
+import { CANTIDAD_ESCALA, type Fraccion } from './costos.js';
 
 export const TITULOS_HILO = ['20/3', '20/2', '40/2', 'Over'] as const;
 export type TituloHilo = (typeof TITULOS_HILO)[number];
@@ -56,10 +56,46 @@ export const CM_HILO_POR_PRENDA_DEFECTO: Record<TituloHilo, number> = {
   Over: 4800,
 };
 
-/** Conos que consume un corte: prendas × cm por prenda ÷ cm del cono
- *  (1 yarda = 91.44 cm), hacia arriba. Enteros exactos. */
-export function conosPorConsumo(prendas: number, cmPorPrenda: number, yardasPorCono: number): number {
-  return Math.ceil((prendas * cmPorPrenda * 100) / (yardasPorCono * 9144));
+/** Merma del hilo (enhebrar, cortes, roturas), en % sobre los metros por prenda. */
+export const MERMA_HILO_DEFECTO = 10;
+
+/** Conos que consume un corte: prendas × cm por prenda × (1 + merma) ÷ cm del
+ *  cono (1 yarda = 91.44 cm), hacia arriba. Enteros exactos. */
+export function conosPorConsumo(
+  prendas: number,
+  cmPorPrenda: number,
+  yardasPorCono: number,
+  mermaPct = 0,
+): number {
+  return Math.ceil((prendas * cmPorPrenda * (100 + mermaPct)) / (yardasPorCono * 9144));
+}
+
+/** Prendas que rinde un cono (fracción exacta), para el costo y el stock:
+ *  POR METROS si el hilo tiene yardas y es de un título conocido
+ *  (yardas × 91.44 ÷ (cm por prenda × (1 + merma))); si no, el "rinde" escrito
+ *  a mano (de la ficha o del insumo). null = no se puede calcular. */
+export function rendimientoHilo(o: {
+  titulo: string | null;
+  yardasPorCono: number | null;
+  cmPorPrenda: Record<TituloHilo, number>;
+  mermaPct: number;
+  rendimiento: number | null;
+}): { rendimiento: Fraccion | null; porMetros: boolean } {
+  const titulo = TITULOS_HILO.find((t) => t.toLowerCase() === o.titulo?.toLowerCase());
+  const cm = titulo ? o.cmPorPrenda[titulo] : 0;
+  if (titulo && o.yardasPorCono && cm > 0) {
+    return {
+      rendimiento: {
+        num: BigInt(o.yardasPorCono * 9144),
+        den: BigInt(cm * (100 + o.mermaPct)),
+      },
+      porMetros: true,
+    };
+  }
+  return {
+    rendimiento: o.rendimiento ? { num: BigInt(o.rendimiento), den: 1n } : null,
+    porMetros: false,
+  };
 }
 
 export interface CierrePorTalla {
@@ -121,6 +157,7 @@ export interface EntradaRequerimiento {
   hilos: Partial<Record<TituloHilo, InsumoRequerimiento | null>>;
   /** cm de cada hilo por prenda (ficha del modelo o los de la hoja) */
   cmHiloPorPrenda: Record<TituloHilo, number>;
+  mermaHilo: number; // %
   /** líneas "por prenda" de la ficha que no son cierres (avíos de empaque, talla tejida…) */
   avios: { insumo: InsumoRequerimiento; cantidad: number /* milésimas por prenda */ }[];
 }
@@ -211,7 +248,7 @@ export function calcularRequerimiento(e: EntradaRequerimiento): Requerimiento {
     const yardas = insumo?.yardasPorCono ?? null;
     const consumo =
       yardas && e.cmHiloPorPrenda[titulo] > 0
-        ? conosPorConsumo(prendas, e.cmHiloPorPrenda[titulo], yardas)
+        ? conosPorConsumo(prendas, e.cmHiloPorPrenda[titulo], yardas, e.mermaHilo)
         : null;
     const conos = Math.max(carga, consumo ?? 0);
     if (conos === 0) continue;
@@ -284,6 +321,7 @@ export interface RequerimientoCorteDTO extends Requerimiento {
   ficha: { id: string; nombre: string } | null; // la del modelo del corte
   reglaCierres: 'ficha' | 'defecto'; // de dónde salió la medida de los cierres
   cmHiloPorPrenda: Record<TituloHilo, number>; // el que se usó
+  mermaHilo: number; // % que se usó
   hiloDeFicha: boolean; // los metros por prenda salen de la ficha (si no, los de la hoja)
   hilos: { titulo: TituloHilo; elegido: OpcionInsumoDTO | null; opciones: OpcionInsumoDTO[] }[];
   maquinas: MaquinaHilos[];

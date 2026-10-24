@@ -22,8 +22,8 @@ describe('líneas de la ficha (por prenda)', () => {
   });
 
   test('hilo: precio del cono ÷ prendas que rinde', () => {
-    expect(redondear(costoLinea({ tipo: 'hilo', rendimiento: 100, precio: cono(2800) })!)).toBe(28);
-    expect(redondear(costoLinea({ tipo: 'hilo', rendimiento: 600, precio: cono(5500) })!)).toBe(9); // 0.0917
+    expect(redondear(costoLinea({ tipo: 'hilo', rendimiento: { num: 100n, den: 1n }, precio: cono(2800) })!)).toBe(28);
+    expect(redondear(costoLinea({ tipo: 'hilo', rendimiento: { num: 600n, den: 1n }, precio: cono(5500) })!)).toBe(9); // 0.0917
   });
 
   test('cierre a Bs 200 la caja de 120: 1.6667 → 1.67', () => {
@@ -61,10 +61,10 @@ describe('total de la ficha', () => {
           prendasPorCapa: 20,
           precio: precioUnitario({ precioTotal: 95_000, cantidad: 100_000 }), // 9.50/m → 0.741
         },
-        { tipo: 'hilo', rendimiento: 100, precio: cono(2800) }, // 0.28
-        { tipo: 'hilo', rendimiento: 50, precio: cono(2800) }, // 0.56
-        { tipo: 'hilo', rendimiento: 600, precio: cono(5500) }, // 0.0917
-        { tipo: 'hilo', rendimiento: 100, precio: cono(1125) }, // 0.1125
+        { tipo: 'hilo', rendimiento: { num: 100n, den: 1n }, precio: cono(2800) }, // 0.28
+        { tipo: 'hilo', rendimiento: { num: 50n, den: 1n }, precio: cono(2800) }, // 0.56
+        { tipo: 'hilo', rendimiento: { num: 600n, den: 1n }, precio: cono(5500) }, // 0.0917
+        { tipo: 'hilo', rendimiento: { num: 100n, den: 1n }, precio: cono(1125) }, // 0.1125
       ],
       manoDeObra: 714,
       empaque: 100,

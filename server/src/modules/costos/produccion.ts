@@ -68,7 +68,7 @@ export function consumoDeCorte(c: CorteCosto, f: FichaConDatos): Map<string, Fra
           cantidad: l.cantidad,
           largoMm: l.largoMm,
           prendasPorCapa: l.prendasPorCapa,
-          rendimiento: rendimientoDeLinea(l),
+          rendimiento: rendimientoDeLinea(l, f),
         },
         c.cantidadTotal,
       );
@@ -225,7 +225,7 @@ export function costoRealCorte(
   if (f) {
     const principal = telaPrincipal(f);
     f.lineas.forEach((l, i) => {
-      const porPrenda = costoLinea(aLineaParaCosto(l));
+      const porPrenda = costoLinea(aLineaParaCosto(l, f));
       if (porPrenda === null) sinPrecio = true;
       const todas = porPrenda && porPrendas(porPrenda, prendas);
       if (i === principal) {
@@ -327,7 +327,7 @@ export function partesDeCorte(c: CorteCosto, f: FichaConDatos | null, config: Co
     const principal = telaPrincipal(f);
     f.lineas.forEach((l, i) => {
       if (i === principal) return; // la tela principal va con el tizado real
-      const porPrenda = costoLinea(aLineaParaCosto(l));
+      const porPrenda = costoLinea(aLineaParaCosto(l, f));
       const todas = porPrenda && porPrendas(porPrenda, c.cantidadTotal);
       if (l.tipo === 'precio_prenda') externos.push(todas);
       else if (l.tipo === 'prorrateo') empaque.push(todas);
@@ -405,7 +405,7 @@ export async function proyeccion(
             cantidad: l.cantidad,
             largoMm: l.largoMm,
             prendasPorCapa: l.prendasPorCapa,
-            rendimiento: rendimientoDeLinea(l),
+            rendimiento: rendimientoDeLinea(l, f),
           },
           item.prendas,
         );
@@ -413,7 +413,7 @@ export async function proyeccion(
         insumoInfo.set(l.insumoId, { nombre: l.insumo.nombre, unidad: l.insumo.unidad, precio: precioDeLinea(l) });
       } else {
         // precio por prenda y prorrateos: plata, no material
-        const porPrenda = costoLinea(aLineaParaCosto(l));
+        const porPrenda = costoLinea(aLineaParaCosto(l, f));
         if (porPrenda) producir.push(porPrendas(porPrenda, item.prendas));
       }
     }

@@ -8,6 +8,9 @@ import {
   calcularRequerimiento,
   CM_HILO_POR_PRENDA_DEFECTO,
   conosPorConsumo,
+  costoLinea,
+  redondear,
+  rendimientoHilo,
   MAQUINAS_HILO_DEFECTO,
   medidaCierrePorDefecto,
   type EntradaRequerimiento,
@@ -50,6 +53,7 @@ const entrada = (extra: Partial<EntradaRequerimiento> = {}): EntradaRequerimient
   },
   avios: [],
   cmHiloPorPrenda: CM_HILO_POR_PRENDA_DEFECTO,
+  mermaHilo: 0,
   ...extra,
 });
 
@@ -175,5 +179,39 @@ describe('requerimiento de la hoja del dueño', () => {
     expect(hilosDe(grande).map((l) => l.necesita)).toEqual([14, 19, 24, 8]);
     expect(hilosDe(grande)[1].detalle).toBe('carga de máquinas 16 · consumo 19 (manda el consumo)');
     expect(r.avisos.some((a) => a.includes('yardas'))).toBe(false);
+  });
+
+  test('REQ-10: la merma (10 %) se suma a los metros por jean', () => {
+    // 1690 prendas × 12 m × 1.10 = 22 308 m ÷ 4 754.88 m = 4.69 → 5 (sin merma: 4.27 → 5)
+    expect(conosPorConsumo(1690, 1200, 5200, 10)).toBe(5);
+    // Over: 1690 × 48 × 1.10 = 89 232 m ÷ 32 918.4 = 2.71 → 3
+    expect(conosPorConsumo(1690, 4800, 36000, 10)).toBe(3);
+    // 40/2: 1690 × 30 × 1.10 = 55 770 m ÷ 6 583.68 = 8.47 → 9 (sin merma: 8)
+    expect(conosPorConsumo(1690, 3000, 7200, 10)).toBe(9);
+  });
+
+  test('REQ-11: costo del hilo por metros: 20/3 a Bs 30 rinde 360 prendas con 10 % de merma', () => {
+    const { rendimiento, porMetros } = rendimientoHilo({
+      titulo: '20/3',
+      yardasPorCono: 5200,
+      cmPorPrenda: CM_HILO_POR_PRENDA_DEFECTO,
+      mermaPct: 10,
+      rendimiento: 100, // el "rinde" del costurero ya no se usa
+    });
+    expect(porMetros).toBe(true);
+    expect(Number(rendimiento!.num) / Number(rendimiento!.den)).toBeCloseTo(360.2, 1);
+    // Bs 30 por cono (3000 centavos por cono = 3000 por unidad) ÷ 360.2 = 8.33 centavos
+    const costo = costoLinea({ tipo: 'hilo', rendimiento: rendimiento!, precio: { num: 3000n, den: 1n } });
+    expect(redondear(costo!)).toBe(8);
+
+    // sin yardas, el "rinde" escrito a mano
+    const aMano = rendimientoHilo({
+      titulo: '20/3',
+      yardasPorCono: null,
+      cmPorPrenda: CM_HILO_POR_PRENDA_DEFECTO,
+      mermaPct: 10,
+      rendimiento: 100,
+    });
+    expect(aMano).toEqual({ rendimiento: { num: 100n, den: 1n }, porMetros: false });
   });
 });

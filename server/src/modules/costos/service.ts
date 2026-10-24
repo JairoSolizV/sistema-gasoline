@@ -39,6 +39,10 @@ import {
   type PlanInput,
   type ProyeccionDTO,
   type StockDTO,
+  CM_HILO_POR_PRENDA_DEFECTO,
+  MERMA_HILO_DEFECTO,
+  rendimientoHilo,
+  type TituloHilo,
 } from '@taller/shared';
 import { AppError } from '../../middleware/errors.js';
 import { configuracionRepository } from '../configuracion/repository.js';
@@ -141,12 +145,25 @@ export const precioDeLinea = (l: LineaFicha): Fraccion | null => {
   return compra ? precioUnitario(compra) : null;
 };
 
-/** Rendimiento del hilo: el de la ficha o, si no, el del insumo. */
-export const rendimientoDeLinea = (l: LineaFicha) =>
-  l.tipo === 'hilo' ? (l.rendimiento ?? l.insumo?.rendimiento ?? null) : null;
+/** Hilo de la ficha: prendas que rinde un cono (fracción exacta). Por METROS
+ *  (yardas del cono, metros por prenda y merma de la ficha) si se puede; si no,
+ *  el "rinde" escrito a mano (el de la línea o el del insumo). */
+export function rendimientoDeHilo(l: LineaFicha, f: FichaConDatos) {
+  return rendimientoHilo({
+    titulo: l.insumo?.titulo ?? null,
+    yardasPorCono: l.insumo?.yardasPorCono ?? null,
+    cmPorPrenda: (f.cmHiloPorPrenda as Record<TituloHilo, number> | null) ?? CM_HILO_POR_PRENDA_DEFECTO,
+    mermaPct: f.mermaHilo ?? MERMA_HILO_DEFECTO,
+    rendimiento: l.rendimiento ?? l.insumo?.rendimiento ?? null,
+  });
+}
+
+/** Prendas por cono de una línea (null si no es hilo o no se puede calcular). */
+export const rendimientoDeLinea = (l: LineaFicha, f: FichaConDatos) =>
+  l.tipo === 'hilo' ? rendimientoDeHilo(l, f).rendimiento : null;
 
 /** Una línea guardada, lista para el cálculo de costo por prenda. */
-export function aLineaParaCosto(l: LineaFicha): LineaParaCosto {
+export function aLineaParaCosto(l: LineaFicha, f: FichaConDatos): LineaParaCosto {
   const precio = precioDeLinea(l);
   switch (l.tipo) {
     case 'por_prenda':
@@ -155,8 +172,12 @@ export function aLineaParaCosto(l: LineaFicha): LineaParaCosto {
       return { tipo: 'tela_tizado', largoMm: l.largoMm!, prendasPorCapa: l.prendasPorCapa!, precio };
     case 'hilo': {
       // sin rendimiento no se puede costear: queda como "sin precio"
-      const rendimiento = rendimientoDeLinea(l);
-      return { tipo: 'hilo', rendimiento: rendimiento ?? 1, precio: rendimiento ? precio : null };
+      const rendimiento = rendimientoDeLinea(l, f);
+      return {
+        tipo: 'hilo',
+        rendimiento: rendimiento ?? { num: 1n, den: 1n },
+        precio: rendimiento ? precio : null,
+      };
     }
     case 'prorrateo':
       return { tipo: 'prorrateo', monto: l.monto!, prendas: l.prendas! };
@@ -171,11 +192,12 @@ export function calcularFicha(
   config: Configuracion,
   costoFijo?: Fraccion, // costos fijos del taller por prenda (etapa 5)
 ): FichaCostoDetalleDTO {
-  const lineasCalculo = f.lineas.map(aLineaParaCosto);
+  const lineasCalculo = f.lineas.map((l) => aLineaParaCosto(l, f));
   const lineasDTO: Omit<LineaCostoDTO, 'costo'>[] = [];
   for (const l of f.lineas) {
     const compra = l.insumo?.compras[0] ?? null;
-    const rendimientoUsado = rendimientoDeLinea(l);
+    const hilo = l.tipo === 'hilo' ? rendimientoDeHilo(l, f) : null;
+    const rendimientoUsado = hilo?.rendimiento ? Math.round(Number(hilo.rendimiento.num) / Number(hilo.rendimiento.den)) : null;
     lineasDTO.push({
       orden: l.orden,
       tipo: l.tipo,
@@ -193,6 +215,7 @@ export function calcularFicha(
         l.tipo === 'tela_tizado' ? consumoTela(l.largoMm!, l.prendasPorCapa!) : null,
       rendimiento: l.rendimiento,
       rendimientoUsado,
+      rendimientoPorMetros: hilo?.porMetros ?? false,
       monto: l.monto,
       prendas: l.prendas,
       precio: l.precio,
@@ -242,6 +265,7 @@ export function calcularFicha(
     notas: f.notas,
     cierresPorTalla: (f.cierresPorTalla as { talla: number; medidaCm: number }[] | null) ?? null,
     cmHiloPorPrenda: (f.cmHiloPorPrenda as FichaCostoDetalleDTO['cmHiloPorPrenda']) ?? null,
+    mermaHilo: f.mermaHilo,
     lineas: lineasDTO.map((l, i) => ({ ...l, costo: c.lineas[i] })),
     materiales: c.materiales,
     manoDeObra: c.manoDeObra,
@@ -550,6 +574,7 @@ async function guardar(id: string | null, input: FichaCostoInput): Promise<strin
       notas: input.notas ?? null,
       cierresPorTalla: input.cierresPorTalla ?? Prisma.DbNull,
       cmHiloPorPrenda: input.cmHiloPorPrenda ?? Prisma.DbNull,
+      mermaHilo: input.mermaHilo ?? null,
     },
     input.lineas.map((l, i) => ({
       orden: i + 1,

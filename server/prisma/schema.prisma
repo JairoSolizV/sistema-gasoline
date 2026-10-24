@@ -734,6 +734,7 @@ model FichaCosto {
   // requerimiento: centímetros de cada hilo por prenda, { "20/3": 1200, … };
   // null = los de la hoja del dueño (CM_HILO_POR_PRENDA_DEFECTO de shared)
   cmHiloPorPrenda      Json?
+  mermaHilo            Int? // % sobre los metros de hilo (enhebrar, cortes); null = 10 %
   notas                String?
   // catálogo de productos: lo que se le muestra al cliente
   tallas               String? // ej. "28 al 38"

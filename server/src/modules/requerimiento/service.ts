@@ -10,6 +10,7 @@ import {
   calcularRequerimiento,
   CANTIDAD_ESCALA,
   CM_HILO_POR_PRENDA_DEFECTO,
+  MERMA_HILO_DEFECTO,
   costoDeCantidad,
   MAQUINAS_HILO_DEFECTO,
   precioUnitario,
@@ -112,6 +113,7 @@ export const requerimientoService = {
     const cierresPorTalla = (ficha?.cierresPorTalla as CierrePorTalla[] | null) ?? null;
     const hiloDeFicha = ficha?.cmHiloPorPrenda as Record<TituloHilo, number> | null | undefined;
     const cmHiloPorPrenda = hiloDeFicha ?? CM_HILO_POR_PRENDA_DEFECTO;
+    const mermaHilo = ficha?.mermaHilo ?? MERMA_HILO_DEFECTO;
     const maquinas = (config.hilosMaquinas as MaquinaHilos[] | null) ?? MAQUINAS_HILO_DEFECTO;
     const tallas = corte.tallas as number[];
     const plus = corte.plusPorTalla as number[];
@@ -128,6 +130,7 @@ export const requerimientoService = {
       maquinas,
       hilos: Object.fromEntries(hilos.map((h) => [h.titulo, h.insumo && aRequerimiento(h.insumo)])),
       cmHiloPorPrenda,
+      mermaHilo,
       avios: (ficha?.lineas ?? [])
         .filter(
           (l) =>
@@ -151,6 +154,7 @@ export const requerimientoService = {
       ficha: ficha && { id: ficha.id, nombre: ficha.nombre },
       reglaCierres: cierresPorTalla ? 'ficha' : 'defecto',
       cmHiloPorPrenda,
+      mermaHilo,
       hiloDeFicha: hiloDeFicha != null,
       hilos: hilos.map((h) => ({
         titulo: h.titulo,

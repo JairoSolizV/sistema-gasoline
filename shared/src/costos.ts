@@ -74,8 +74,9 @@ export type LineaParaCosto =
   | { tipo: 'por_prenda'; cantidad: number; precio: Fraccion | null }
   /** tela según tizado: largo (mm) ÷ prendas por capa = metros por prenda */
   | { tipo: 'tela_tizado'; largoMm: number; prendasPorCapa: number; precio: Fraccion | null }
-  /** hilo: precio del cono ÷ prendas que rinde */
-  | { tipo: 'hilo'; rendimiento: number; precio: Fraccion | null }
+  /** hilo: precio del cono ÷ prendas que rinde (fracción exacta: por metros
+   *  sale de las yardas y los metros por prenda, ver rendimientoHilo) */
+  | { tipo: 'hilo'; rendimiento: Fraccion; precio: Fraccion | null }
   /** monto que se reparte entre las prendas (flete, saco, pasajes…) */
   | { tipo: 'prorrateo'; monto: number; prendas: number }
   /** precio directo por prenda (lavandería, bordado, otro proceso) */
@@ -89,7 +90,7 @@ export function costoLinea(l: LineaParaCosto): Fraccion | null {
     case 'tela_tizado':
       return l.precio && multiplicar(l.precio, fr(l.largoMm, l.prendasPorCapa * CANTIDAD_ESCALA));
     case 'hilo':
-      return l.precio && multiplicar(l.precio, fr(1, l.rendimiento));
+      return l.precio && multiplicar(l.precio, { num: l.rendimiento.den, den: l.rendimiento.num });
     case 'prorrateo':
       return fr(l.monto, l.prendas);
     case 'precio_prenda':
@@ -152,7 +153,7 @@ export interface LineaGuardada {
   cantidad: number | null;
   largoMm: number | null;
   prendasPorCapa: number | null;
-  rendimiento: number | null; // ya resuelto: el de la ficha o el del insumo
+  rendimiento: Fraccion | null; // prendas por cono, ya resuelto (rendimientoHilo)
 }
 
 /** Material que gasta una línea para `prendas` prendas, en milésimas de la
@@ -167,7 +168,9 @@ export function consumoLinea(l: LineaGuardada, prendas: number): Fraccion | null
       return l.largoMm == null || !l.prendasPorCapa ? null : fr(l.largoMm * prendas, l.prendasPorCapa);
     case 'hilo':
       // conos = prendas ÷ rendimiento → en milésimas de cono
-      return l.rendimiento ? fr(CANTIDAD_ESCALA * prendas, l.rendimiento) : null;
+      return l.rendimiento
+        ? { num: BigInt(CANTIDAD_ESCALA * prendas) * l.rendimiento.den, den: l.rendimiento.num }
+        : null;
     default:
       return null;
   }

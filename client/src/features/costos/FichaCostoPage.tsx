@@ -7,6 +7,8 @@ import {
   formatBs,
   CM_HILO_POR_PRENDA_DEFECTO,
   medidaCierrePorDefecto,
+  MERMA_HILO_DEFECTO,
+  rendimientoHilo,
   TITULOS_HILO,
   prendaBsDeDocenaUsd,
   precioUnitario,
@@ -136,7 +138,25 @@ function aLineaInput(f: Fila, i: number): LineaCostoInput | string {
 }
 
 /** Costo en vivo de una fila con los precios de la última compra (null = no calculable). */
-function aLineaCalculo(f: Fila, insumos: Map<string, InsumoDTO>): LineaParaCosto | null {
+/** Metros por prenda y merma de la ficha, para el hilo por metros. */
+interface HiloFicha {
+  cm: Record<TituloHilo, number>;
+  merma: number;
+}
+
+/** Prendas por cono de una fila de hilo (por metros si se puede; si no, el "rinde"). */
+function rindeDeFila(f: Fila, ins: InsumoDTO | undefined, hilo: HiloFicha) {
+  return rendimientoHilo({
+    titulo: ins?.titulo ?? null,
+    yardasPorCono: ins?.yardasPorCono ?? null,
+    cmPorPrenda: hilo.cm,
+    mermaPct: hilo.merma,
+    // un "rinde" a mano inválido (NaN) no cuenta: queda el del insumo
+    rendimiento: (Number.isInteger(entero(f.rendimiento)) && entero(f.rendimiento) > 0 ? entero(f.rendimiento) : null) ?? ins?.rendimiento ?? null,
+  });
+}
+
+function aLineaCalculo(f: Fila, insumos: Map<string, InsumoDTO>, hilo: HiloFicha): LineaParaCosto | null {
   const ins = insumos.get(f.insumoId);
   const precio = ins?.ultimaCompra ? precioUnitario(ins.ultimaCompra) : null;
   const l = aLineaInput(f, 0);
@@ -145,8 +165,8 @@ function aLineaCalculo(f: Fila, insumos: Map<string, InsumoDTO>): LineaParaCosto
     case 'tela_tizado':
       return { tipo: 'tela_tizado', largoMm: l.largoMm, prendasPorCapa: l.prendasPorCapa, precio };
     case 'hilo': {
-      const r = l.rendimiento ?? ins?.rendimiento ?? null;
-      return { tipo: 'hilo', rendimiento: r ?? 1, precio: r ? precio : null };
+      const r = rindeDeFila(f, ins, hilo).rendimiento;
+      return { tipo: 'hilo', rendimiento: r ?? { num: 1n, den: 1n }, precio: r ? precio : null };
     }
     case 'por_prenda':
       return { tipo: 'por_prenda', cantidad: l.cantidad, precio };
@@ -189,6 +209,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   // requerimiento de insumos: medida del cierre de cada talla ([] = regla por defecto)
   const [cierres, setCierres] = useState<CierrePorTalla[]>(ficha?.cierresPorTalla ?? []);
   // requerimiento: metros de cada hilo por prenda (vacíos = los de la hoja)
+  const [mermaHilo, setMermaHilo] = useState(ficha?.mermaHilo != null ? String(ficha.mermaHilo) : '');
   const [metrosHilo, setMetrosHilo] = useState<Record<TituloHilo, string>>(() =>
     Object.fromEntries(
       TITULOS_HILO.map((t) => [t, ficha?.cmHiloPorPrenda ? String(ficha.cmHiloPorPrenda[t] / 100) : '']),
@@ -197,13 +218,24 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const [error, setError] = useState<string | null>(null);
   const [sucio, setSucio] = useState(false);
   const [confirmarBorrar, setConfirmarBorrar] = useState(false);
-  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas, cierres, metrosHilo]);
+  useEffect(() => setSucio(true), [codigo, nombre, modeloId, manoBs, empaqueBs, servicio, margenPct, docenaUsd, notas, filas, cierres, metrosHilo, mermaHilo]);
   useEffect(() => setSucio(false), []); // recién cargada: sin cambios
 
   const porId = useMemo(() => new Map((insumos ?? []).map((i) => [i.id, i])), [insumos]);
   const cambiarFila = (i: number, cambio: Partial<Fila>) =>
     setFilas((fs) => fs.map((f, k) => (k === i ? { ...f, ...cambio } : f)));
   const agregar = (tipo: Tipo, concepto = '') => setFilas((fs) => [...fs, { ...FILA_VACIA, tipo, concepto }]);
+
+  // hilo por metros: los de la ficha (vacíos = los de la hoja) y la merma
+  const hiloFicha: HiloFicha = {
+    cm: Object.fromEntries(
+      TITULOS_HILO.map((t) => {
+        const v = metrosHilo[t].trim().replace(',', '.');
+        return [t, v !== '' && PATRON_DECIMAL.test(v) ? Math.round(Number(v) * 100) : CM_HILO_POR_PRENDA_DEFECTO[t]];
+      }),
+    ) as Record<TituloHilo, number>,
+    merma: /^\d+$/.test(mermaHilo.trim()) ? Number(mermaHilo.trim()) : MERMA_HILO_DEFECTO,
+  };
 
   // ── cálculo en vivo (mismas funciones que la API) ──
   const vinculado = Boolean(modeloId);
@@ -221,7 +253,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
   const margen = margenPct.trim() ? aCentesimasPct(margenPct) : (config?.margenVenta ?? 0);
   const calculo = costoFicha({
     lineas: filas.map(
-      (f) => aLineaCalculo(f, porId) ?? { tipo: 'por_prenda', cantidad: 0, precio: null },
+      (f) => aLineaCalculo(f, porId, hiloFicha) ?? { tipo: 'por_prenda', cantidad: 0, precio: null },
     ),
     manoDeObra: manoDeObra ?? 0,
     empaque: empaque ?? 0,
@@ -251,6 +283,9 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
     if (cierres.some((c) => !Number.isInteger(c.talla))) return setError('Talla inválida en los cierres');
     if (new Set(cierres.map((c) => c.talla)).size !== cierres.length) return setError('Hay una talla repetida en los cierres');
     const conMetros = TITULOS_HILO.some((t) => metrosHilo[t].trim() !== '');
+    if (mermaHilo.trim() && !(/^\d+$/.test(mermaHilo.trim()) && Number(mermaHilo) <= 100)) {
+      return setError('Merma del hilo inválida (un % entero, ej. 10)');
+    }
     if (TITULOS_HILO.some((t) => metrosHilo[t].trim() !== '' && !PATRON_DECIMAL.test(metrosHilo[t].trim()))) {
       return setError('Metros de hilo por prenda inválidos (ej. 12 o 12.5)');
     }
@@ -276,6 +311,7 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
             ]),
           ) as Record<TituloHilo, number>)
         : null,
+      mermaHilo: mermaHilo.trim() ? Number(mermaHilo.trim()) : null,
       lineas,
     };
     const guardada = await guardar.mutateAsync({ id: ficha?.id ?? null, input });
@@ -407,6 +443,11 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
                 key={i}
                 f={f}
                 insumo={porId.get(f.insumoId)}
+                rindePorMetros={(() => {
+                  if (f.tipo !== 'hilo') return null;
+                  const r = rindeDeFila(f, porId.get(f.insumoId), hiloFicha);
+                  return r.porMetros && r.rendimiento ? Number(r.rendimiento.num) / Number(r.rendimiento.den) : null;
+                })()}
                 opciones={opcionesInsumo(f.tipo)}
                 costo={calculo.lineas[i]}
                 onCambiar={(c) => cambiarFila(i, c)}
@@ -444,7 +485,31 @@ function Editor({ ficha }: { ficha: FichaCostoDetalleDTO | null }) {
               </span>
             </label>
           ))}
+          <label className="text-xs">
+            <span className="mb-1 block font-medium text-gray-600">Merma</span>
+            <span className="flex items-center gap-1.5">
+              <input
+                value={mermaHilo}
+                onChange={(e) => setMermaHilo(e.target.value)}
+                inputMode="numeric"
+                placeholder={String(MERMA_HILO_DEFECTO)}
+                className="mono w-16 rounded-md border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:border-acento"
+              />
+              <span className="text-gray-500">%</span>
+            </span>
+          </label>
         </div>
+        <p className="mt-2 text-xs text-gray-500">
+          El costo del hilo de esta ficha también sale de acá: precio del cono × metros por prenda (con la
+          merma) ÷ metros del cono. Los hilos sin yardas cargadas usan el "rinde" escrito a mano.
+        </p>
+        <MedirHilo
+          insumos={insumos ?? []}
+          onUsar={(metros) => {
+            setMetrosHilo({ ...metrosHilo, ...metros });
+            setMermaHilo('0');
+          }}
+        />
       </div>
 
       <CierresPorTalla
@@ -563,6 +628,7 @@ function ResumenCosto({
 function FilaEditor({
   f,
   insumo,
+  rindePorMetros,
   opciones,
   costo,
   onCambiar,
@@ -570,6 +636,7 @@ function FilaEditor({
 }: {
   f: Fila;
   insumo: InsumoDTO | undefined;
+  rindePorMetros: number | null; // hilo: prendas por cono calculadas por metros
   opciones: InsumoDTO[];
   costo: number | null;
   onCambiar: (c: Partial<Fila>) => void;
@@ -639,7 +706,13 @@ function FilaEditor({
             {consumo != null && <span className="mono whitespace-nowrap">= {consumo.toFixed(3)} m</span>}
           </div>
         )}
-        {f.tipo === 'hilo' && (
+        {f.tipo === 'hilo' && rindePorMetros != null && (
+          <div className="text-xs text-gray-500" title="Yardas del cono ÷ metros por prenda (con la merma) de esta ficha">
+            rinde <span className="mono font-semibold text-gray-700">{Math.round(rindePorMetros)}</span> prendas/cono
+            <span className="text-gray-400"> · por metros</span>
+          </div>
+        )}
+        {f.tipo === 'hilo' && rindePorMetros == null && (
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
             rinde
             <input
@@ -746,6 +819,97 @@ function CierresPorTalla({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Calculadora: metros reales de hilo por prenda medidos en un corte (conos
+ *  gastados entre dos conteos). Lo medido ya trae la merma: al usarlo, la merma
+ *  queda en 0 %. */
+function MedirHilo({
+  insumos,
+  onUsar,
+}: {
+  insumos: InsumoDTO[];
+  onUsar: (metros: Partial<Record<TituloHilo, string>>) => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [prendas, setPrendas] = useState('');
+  const [conos, setConos] = useState<Record<TituloHilo, string>>({ '20/3': '', '20/2': '', '40/2': '', Over: '' });
+  // yardas del cono de cada título: las del primer hilo de ese título que las tenga
+  const yardas = (t: TituloHilo) =>
+    insumos.find((i) => i.categoria === 'hilo' && i.titulo?.toLowerCase() === t.toLowerCase() && i.yardasPorCono)
+      ?.yardasPorCono ?? null;
+  const n = Number(prendas);
+  const metros = Object.fromEntries(
+    TITULOS_HILO.map((t) => {
+      const c = Number(conos[t].replace(',', '.'));
+      const y = yardas(t);
+      return [t, n > 0 && c > 0 && y ? (c * y * 0.9144) / n : null];
+    }),
+  ) as Record<TituloHilo, number | null>;
+  const hayResultado = TITULOS_HILO.some((t) => metros[t] != null);
+
+  if (!abierto) {
+    return (
+      <button onClick={() => setAbierto(true)} className="mt-2 text-[13px] font-medium text-acento hover:underline">
+        Medir con un corte real…
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3">
+      <div className="text-xs text-gray-600">
+        Contá los conos antes y después de un corte (Costos → Insumos → Contar) y anotá cuántos se gastaron
+        de cada hilo. Puede ser con decimales (ej. 2.5 conos).
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <label className="text-xs">
+          <span className="mb-1 block font-medium text-gray-600">Prendas del corte</span>
+          <input
+            value={prendas}
+            onChange={(e) => setPrendas(e.target.value.replace(/\D/g, ''))}
+            inputMode="numeric"
+            className="mono w-24 rounded-md border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:border-acento"
+          />
+        </label>
+        {TITULOS_HILO.map((t) => (
+          <label key={t} className="text-xs">
+            <span className="mb-1 block font-medium text-gray-600">
+              Conos {t}
+              {yardas(t) == null && <span className="text-amber-700"> (sin yardas)</span>}
+            </span>
+            <input
+              value={conos[t]}
+              onChange={(e) => setConos({ ...conos, [t]: e.target.value })}
+              inputMode="decimal"
+              className="mono w-20 rounded-md border border-gray-300 px-2 py-1 text-right text-sm outline-none focus:border-acento"
+            />
+            {metros[t] != null && (
+              <span className="mono mt-1 block text-gray-700">= {metros[t]!.toFixed(1)} m/prenda</span>
+            )}
+          </label>
+        ))}
+      </div>
+      <div className="mt-3 flex gap-3">
+        <button
+          onClick={() => {
+            onUsar(
+              Object.fromEntries(
+                TITULOS_HILO.filter((t) => metros[t] != null).map((t) => [t, metros[t]!.toFixed(2)]),
+              ),
+            );
+            setAbierto(false);
+          }}
+          disabled={!hayResultado}
+          className="rounded-lg bg-acento px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#265dc2] disabled:opacity-50"
+        >
+          Usar estos metros (merma 0 %: lo medido ya la incluye)
+        </button>
+        <button onClick={() => setAbierto(false)} className="text-xs text-gray-500 hover:underline">
+          Cancelar
+        </button>
+      </div>
     </div>
   );
 }

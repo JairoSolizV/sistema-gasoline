@@ -43,6 +43,16 @@ cono ÷ metros por jean (20/3: 396). Decisiones:
 2. **Metros por jean en la ficha de cada modelo** (vacío = los de la hoja) y **yardas en cada insumo de
    hilo**. Cargadas en la base del taller el 2026-10-23.
 
+3. **Merma del hilo** en la ficha (10 % por defecto): se suma a los metros por jean, en el requerimiento
+   y en el costo.
+4. **El costo del hilo de las fichas sale de los metros** (opción a): precio del cono × metros por prenda
+   × (1 + merma) ÷ metros del cono. Los hilos sin yardas siguen con el "rinde" escrito a mano. El stock y
+   la proyección usan el mismo rendimiento. Efecto en las fichas 25–32 (2026-10-23): el hilo pasó de
+   Bs 0.53–1.45 por prenda (con el "rinde" del catálogo) a **Bs 0.33–0.34**. La regla del dueño de
+   "Bs 1 por prenda" se acerca más a la carga de las máquinas repartida en un corte chico.
+5. **Medir con un corte real** (calculadora en la ficha): conos gastados entre dos conteos × metros del
+   cono ÷ prendas = metros reales por prenda; al usarlos la merma queda en 0 % (lo medido ya la incluye).
+
 El dato del costurero (C40 = 1400: "un cono de 20/3 alcanza para 100 prendas") no se usa: el dueño dice
 que no tiene lógica, y con 12 m por jean un cono de 5 200 yardas rinde ~396.
 

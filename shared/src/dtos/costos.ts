@@ -74,7 +74,8 @@ export interface LineaCostoDTO {
   prendasPorCapa: number | null;
   consumoTela: number | null; // metros por prenda (tizado), para mostrar
   rendimiento: number | null; // el de la ficha (null = el del insumo)
-  rendimientoUsado: number | null; // el que se aplicó
+  rendimientoUsado: number | null; // prendas por cono que se aplicó (redondeado, para mostrar)
+  rendimientoPorMetros: boolean; // salió de las yardas y los metros por prenda (no del "rinde")
   monto: number | null;
   prendas: number | null;
   precio: number | null;
@@ -105,6 +106,7 @@ export interface FichaCostoDetalleDTO extends FichaCostoResumenDTO {
   notas: string | null;
   cierresPorTalla: { talla: number; medidaCm: number }[] | null; // null = la regla por defecto
   cmHiloPorPrenda: Record<'20/3' | '20/2' | '40/2' | 'Over', number> | null; // null = los de la hoja
+  mermaHilo: number | null; // % sobre los metros de hilo; null = 10 %
   lineas: LineaCostoDTO[];
   materiales: number;
   manoDeObra: number;

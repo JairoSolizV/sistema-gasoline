@@ -137,6 +137,7 @@ export const fichaCostoInputSchema = z.object({
     )
     .nullable()
     .optional(),
+  mermaHilo: z.number().int().min(0, 'La merma no puede ser negativa').max(100).nullable().optional(), // %
   lineas: z.array(lineaCostoInputSchema).max(60).default([]),
 });
 
